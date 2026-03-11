@@ -66,6 +66,8 @@ CREATE OR REPLACE FUNCTION public.current_app_user_id()
 RETURNS uuid
 LANGUAGE plpgsql
 STABLE
+SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE v_user_id uuid;
 BEGIN
@@ -81,6 +83,8 @@ CREATE OR REPLACE FUNCTION public.is_staff_user()
 RETURNS boolean
 LANGUAGE sql
 STABLE
+SECURITY DEFINER
+SET search_path = public
 AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.admin_users au
