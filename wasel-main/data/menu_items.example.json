@@ -1,0 +1,20 @@
+[
+  {
+    "id": "example-menu-item-id",
+    "restaurant_id": "example-restaurant-id",
+    "name": "شاورما فروج",
+    "name_en": "Chicken Shawarma",
+    "description": "شاورما فروج طازجة مع الخضار",
+    "description_en": "Fresh chicken shawarma with vegetables",
+    "category": "ساندويشات",
+    "category_en": "Sandwiches",
+    "base_price": 50000,
+    "customer_price": 55000,
+    "price": 55000,
+    "image_url": "https://example.com/shawarma.jpg",
+    "is_available": true,
+    "is_featured": false,
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  }
+]

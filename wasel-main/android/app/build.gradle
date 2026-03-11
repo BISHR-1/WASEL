@@ -1,0 +1,81 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace = "com.wasel.app"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "com.wasel.app"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 9
+        versionName "1.0.8"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+    lint {
+        baseline = file("lint-baseline.xml")
+    }
+}
+
+// Custom task to delete duplicate .png files that conflict with .webp
+task deleteDuplicatePngs {
+    doLast {
+        def resDir = file("src/main/res")
+        resDir.eachDir { dir ->
+            if (dir.name.startsWith("mipmap-")) {
+                dir.eachFile { file ->
+                    if (file.name.endsWith(".png") && (file.name.startsWith("ic_launcher") || file.name.startsWith("ic_launcher_round") || file.name.startsWith("ic_launcher_foreground"))) {
+                        def webpFile = new File(file.parent, file.name.replace(".png", ".webp"))
+                        if (webpFile.exists()) {
+                            println "Deleting duplicate PNG: ${file.path}"
+                            file.delete()
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Make sure it runs before merging resources
+preBuild.dependsOn deleteDuplicatePngs
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    implementation project(':capacitor-push-notifications')
+    
+    // Google Sign-In
+    implementation 'com.google.android.gms:play-services-auth:20.7.0'
+    implementation 'com.google.android.gms:play-services-base:18.2.0'
+    
+    // Firebase Messaging for topic subscription
+    implementation 'com.google.firebase:firebase-messaging:24.0.0'
+    
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+apply plugin: 'com.google.gms.google-services'

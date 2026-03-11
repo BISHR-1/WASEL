@@ -1,0 +1,28 @@
+{
+  "name": "wasel-root",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm --prefix wasel-main run dev",
+    "build": "npm --prefix wasel-main run build",
+    "preview": "npm --prefix wasel-main run preview"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.0.2",
+    "@capacitor/core": "^8.0.2",
+    "@codetrix-studio/capacitor-google-auth": "^3.4.0-rc.4",
+    "@supabase/supabase-js": "^2.95.3",
+    "@types/node-cron": "^3.0.11",
+    "firebase-admin": "^13.6.1",
+    "lucide-react": "^0.563.0",
+    "node-cron": "^4.2.1",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.0.2",
+    "@types/node": "^25.0.9",
+    "@types/node-fetch": "^2.6.13",
+    "vite": "^7.3.1"
+  }
+}
