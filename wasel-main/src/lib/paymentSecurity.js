@@ -286,8 +286,6 @@ export async function logSuspiciousPaymentAttempt(_supabase, _userId, _reason, _
   // Skip the HTTP call entirely to avoid 404 noise in browser console.
   // To re-enable: create the table via SUPABASE_SECURITY_SQL_CLEAN.md, then restore the insert call.
 }
-  }
-}
 
 /**
  * صارم: منع إنشاء طلبات مكررة في فترة زمنية قصيرة

@@ -1,5 +1,8 @@
 -- =====================================================
--- EMERGENCY FIX: Remove broken RLS policies and restore working ones
+-- EMERGENCY FIX v2: Fix RLS infinite recursion on admin_users
+-- Problem: policies that do EXISTS(SELECT FROM admin_users) trigger
+--   admin_users own RLS which self-references → 500 error
+-- Solution: use SECURITY DEFINER functions instead of sub-queries
 -- Run this ENTIRE file in Supabase SQL Editor
 -- =====================================================
 
@@ -9,59 +12,21 @@ BEGIN;
 -- STEP 1: Drop ALL existing policies on affected tables
 -- =============================================================
 
--- Orders: drop everything
 DO $$ DECLARE p record; BEGIN
-  FOR p IN SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND tablename = 'orders' LOOP
-    EXECUTE format('DROP POLICY IF EXISTS %I ON public.orders', p.policyname);
-  END LOOP;
-END $$;
-
--- admin_users: drop everything
-DO $$ DECLARE p record; BEGIN
-  FOR p IN SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND tablename = 'admin_users' LOOP
-    EXECUTE format('DROP POLICY IF EXISTS %I ON public.admin_users', p.policyname);
-  END LOOP;
-END $$;
-
--- wallets: drop everything
-DO $$ DECLARE p record; BEGIN
-  FOR p IN SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND tablename = 'wallets' LOOP
-    EXECUTE format('DROP POLICY IF EXISTS %I ON public.wallets', p.policyname);
-  END LOOP;
-END $$;
-
--- wallet_transactions: drop everything
-DO $$ DECLARE p record; BEGIN
-  FOR p IN SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND tablename = 'wallet_transactions' LOOP
-    EXECUTE format('DROP POLICY IF EXISTS %I ON public.wallet_transactions', p.policyname);
-  END LOOP;
-END $$;
-
--- notifications: drop everything
-DO $$ DECLARE p record; BEGIN
-  FOR p IN SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND tablename = 'notifications' LOOP
-    EXECUTE format('DROP POLICY IF EXISTS %I ON public.notifications', p.policyname);
-  END LOOP;
-END $$;
-
--- courier_profiles: drop everything
-DO $$ DECLARE p record; BEGIN
-  FOR p IN SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND tablename = 'courier_profiles' LOOP
-    EXECUTE format('DROP POLICY IF EXISTS %I ON public.courier_profiles', p.policyname);
-  END LOOP;
-END $$;
-
--- order_items: drop everything
-DO $$ DECLARE p record; BEGIN
-  FOR p IN SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND tablename = 'order_items' LOOP
-    EXECUTE format('DROP POLICY IF EXISTS %I ON public.order_items', p.policyname);
+  FOR p IN SELECT policyname, tablename FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename IN ('orders','order_items','admin_users','wallets',
+                         'wallet_transactions','notifications','courier_profiles')
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', p.policyname, p.tablename);
   END LOOP;
 END $$;
 
 -- =============================================================
--- STEP 2: Ensure helper functions exist
+-- STEP 2: SECURITY DEFINER helper functions (bypass RLS)
 -- =============================================================
 
+-- Maps auth.uid() → public.users.id
 CREATE OR REPLACE FUNCTION public.current_app_user_id()
 RETURNS uuid
 LANGUAGE plpgsql
@@ -79,32 +44,53 @@ BEGIN
 END;
 $$;
 
+-- Checks if current user is admin/staff (bypasses RLS on admin_users + users)
 CREATE OR REPLACE FUNCTION public.is_staff_user()
 RETURNS boolean
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT EXISTS (
+BEGIN
+  RETURN (
+    EXISTS (
+      SELECT 1 FROM public.admin_users au
+      WHERE au.id = auth.uid()
+        AND COALESCE(au.is_active, true) = true
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.users u
+      WHERE (u.auth_id = auth.uid() OR u.id = auth.uid())
+        AND u.role IN ('admin', 'operator', 'courier', 'supervisor')
+    )
+  );
+END;
+$$;
+
+-- Checks if current user is admin (bypasses RLS on admin_users)
+CREATE OR REPLACE FUNCTION public.is_admin_like()
+RETURNS boolean
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN EXISTS (
     SELECT 1 FROM public.admin_users au
     WHERE au.id = auth.uid()
       AND COALESCE(au.is_active, true) = true
-  ) OR EXISTS (
-    SELECT 1 FROM public.users u
-    WHERE (u.auth_id = auth.uid() OR u.id = auth.uid())
-      AND u.role IN ('admin', 'operator', 'courier', 'supervisor')
   );
+END;
 $$;
 
 -- =============================================================
--- STEP 3: Orders - proper non-recursive RLS
--- Key: user_id may = public.users.id OR auth.uid()
+-- STEP 3: Orders
 -- =============================================================
 
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 
--- Users see their own orders (matching auth.uid or via public.users mapping)
 CREATE POLICY orders_select_own ON public.orders
 FOR SELECT USING (
   user_id = auth.uid()
@@ -114,30 +100,12 @@ FOR SELECT USING (
   OR paid_by_user_id = auth.uid()
 );
 
--- Staff see all orders
 CREATE POLICY orders_select_staff ON public.orders
-FOR SELECT USING (
-  EXISTS (
-    SELECT 1 FROM public.admin_users au
-    WHERE au.id = auth.uid() AND COALESCE(au.is_active, true) = true
-  )
-);
+FOR SELECT USING ( public.is_staff_user() );
 
--- Couriers see assigned orders
-CREATE POLICY orders_select_courier ON public.orders
-FOR SELECT USING (
-  EXISTS (
-    SELECT 1 FROM public.order_assignments oa
-    WHERE oa.order_id = orders.id
-      AND oa.delivery_person_id = auth.uid()
-  )
-);
-
--- Insert: allow authenticated users (RPC functions are SECURITY DEFINER anyway)
 CREATE POLICY orders_insert_authenticated ON public.orders
 FOR INSERT WITH CHECK (true);
 
--- Update: owners + staff
 CREATE POLICY orders_update_own ON public.orders
 FOR UPDATE USING (
   user_id = auth.uid()
@@ -148,29 +116,14 @@ FOR UPDATE USING (
 );
 
 CREATE POLICY orders_update_staff ON public.orders
-FOR UPDATE USING (
-  EXISTS (
-    SELECT 1 FROM public.admin_users au
-    WHERE au.id = auth.uid() AND COALESCE(au.is_active, true) = true
-  )
-) WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM public.admin_users au
-    WHERE au.id = auth.uid() AND COALESCE(au.is_active, true) = true
-  )
-);
+FOR UPDATE USING ( public.is_staff_user() )
+WITH CHECK ( public.is_staff_user() );
 
--- Delete: staff only
 CREATE POLICY orders_delete_staff ON public.orders
-FOR DELETE USING (
-  EXISTS (
-    SELECT 1 FROM public.admin_users au
-    WHERE au.id = auth.uid() AND COALESCE(au.is_active, true) = true
-  )
-);
+FOR DELETE USING ( public.is_staff_user() );
 
 -- =============================================================
--- STEP 4: order_items - follows orders access
+-- STEP 4: order_items
 -- =============================================================
 
 ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
@@ -182,29 +135,21 @@ CREATE POLICY order_items_insert ON public.order_items
 FOR INSERT WITH CHECK (true);
 
 CREATE POLICY order_items_update_staff ON public.order_items
-FOR UPDATE USING (
-  EXISTS (
-    SELECT 1 FROM public.admin_users au
-    WHERE au.id = auth.uid() AND COALESCE(au.is_active, true) = true
-  )
-);
+FOR UPDATE USING ( public.is_staff_user() );
 
 -- =============================================================
--- STEP 5: admin_users
+-- STEP 5: admin_users (NO self-referencing sub-queries!)
 -- =============================================================
 
 ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY;
 
+-- Self: can see own row
 CREATE POLICY admin_users_select_self ON public.admin_users
 FOR SELECT USING (id = auth.uid());
 
+-- Admins see all: use SECURITY DEFINER function, NOT sub-query
 CREATE POLICY admin_users_select_by_admin ON public.admin_users
-FOR SELECT USING (
-  EXISTS (
-    SELECT 1 FROM public.admin_users au2
-    WHERE au2.id = auth.uid() AND au2.role = 'admin'
-  )
-);
+FOR SELECT USING ( public.is_admin_like() );
 
 -- =============================================================
 -- STEP 6: wallets
@@ -218,6 +163,9 @@ FOR SELECT USING (
   OR user_id = public.current_app_user_id()
 );
 
+CREATE POLICY wallets_staff ON public.wallets
+FOR SELECT USING ( public.is_staff_user() );
+
 CREATE POLICY wallets_update_own ON public.wallets
 FOR UPDATE USING (
   user_id = auth.uid()
@@ -228,14 +176,6 @@ CREATE POLICY wallets_insert_own ON public.wallets
 FOR INSERT WITH CHECK (
   user_id = auth.uid()
   OR user_id = public.current_app_user_id()
-);
-
-CREATE POLICY wallets_staff ON public.wallets
-FOR SELECT USING (
-  EXISTS (
-    SELECT 1 FROM public.admin_users au
-    WHERE au.id = auth.uid() AND COALESCE(au.is_active, true) = true
-  )
 );
 
 -- =============================================================
@@ -250,16 +190,11 @@ FOR SELECT USING (
   OR user_id = public.current_app_user_id()
 );
 
+CREATE POLICY wt_staff ON public.wallet_transactions
+FOR SELECT USING ( public.is_staff_user() );
+
 CREATE POLICY wt_insert ON public.wallet_transactions
 FOR INSERT WITH CHECK (true);
-
-CREATE POLICY wt_staff ON public.wallet_transactions
-FOR SELECT USING (
-  EXISTS (
-    SELECT 1 FROM public.admin_users au
-    WHERE au.id = auth.uid() AND COALESCE(au.is_active, true) = true
-  )
-);
 
 -- =============================================================
 -- STEP 8: notifications
@@ -271,22 +206,12 @@ CREATE POLICY notif_select_own ON public.notifications
 FOR SELECT USING (
   user_id = auth.uid()
   OR user_id = public.current_app_user_id()
-  OR EXISTS (
-    SELECT 1 FROM public.users u
-    WHERE u.id = notifications.user_id
-      AND (u.auth_id = auth.uid() OR u.id = auth.uid())
-  )
 );
 
 CREATE POLICY notif_update_own ON public.notifications
 FOR UPDATE USING (
   user_id = auth.uid()
   OR user_id = public.current_app_user_id()
-  OR EXISTS (
-    SELECT 1 FROM public.users u
-    WHERE u.id = notifications.user_id
-      AND (u.auth_id = auth.uid() OR u.id = auth.uid())
-  )
 );
 
 CREATE POLICY notif_insert ON public.notifications
@@ -311,12 +236,7 @@ FOR UPDATE USING (
 );
 
 CREATE POLICY courier_staff ON public.courier_profiles
-FOR SELECT USING (
-  EXISTS (
-    SELECT 1 FROM public.admin_users au
-    WHERE au.id = auth.uid() AND COALESCE(au.is_active, true) = true
-  )
-);
+FOR SELECT USING ( public.is_staff_user() );
 
 -- =============================================================
 -- STEP 10: Grant permissions
@@ -332,5 +252,6 @@ GRANT SELECT, UPDATE ON public.courier_profiles TO authenticated;
 
 GRANT EXECUTE ON FUNCTION public.current_app_user_id() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.is_staff_user() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_admin_like() TO authenticated;
 
 COMMIT;
