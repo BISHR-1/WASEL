@@ -1304,6 +1304,7 @@ const Cart = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [isWaselPlusMember, setIsWaselPlusMember] = useState(false);
   const [currentUserEmail, setCurrentUserEmail] = useState('');
+  const [currentAppUserId, setCurrentAppUserId] = useState(null);
   const [userRegion, setUserRegion] = useState(null);
   const [showCouponAnimation, setShowCouponAnimation] = useState(false);
   const [showPaymentAnimation, setShowPaymentAnimation] = useState(false);
@@ -1866,6 +1867,11 @@ const Cart = () => {
   const handleShareCart = useCallback(async () => {
     try {
       setCreatingCartShareLink(true);
+      const creatorAppUserId = currentAppUserId || await resolveCurrentAppUserId();
+      if (!creatorAppUserId) {
+        throw new Error('PUBLIC_USER_REQUIRED');
+      }
+
       const sharePayload = {
         sender: {
           name: insideSyria ? recipientName : (senderName || 'غير محدد'),
@@ -1898,22 +1904,9 @@ const Cart = () => {
         sourceRegion: insideSyria ? 'inside_syria' : 'outside_syria',
       };
 
-      // ===== STEP 1: Get share token (single await before share) =====
-      const { data, error } = await supabase.rpc('create_cart_share_link', {
-        p_payload: sharePayload,
-        p_expires_in_hours: 72,
-      });
+      const { shareId, shareToken, shortCode } = buildSharedCartIdentifiers();
+      const shareUrl = buildPublicAppUrl(`/shared-cart/${shareToken}?sid=${encodeURIComponent(shareId)}`);
 
-      if (error) {
-        console.warn('create_cart_share_link warning (non-fatal):', error);
-      }
-
-      const shareToken = data?.token || null;
-      const shareUrl = shareToken
-        ? buildPublicAppUrl(`/shared-cart/${shareToken}`)
-        : buildPublicAppUrl('/');
-
-      // ===== STEP 2: Build share text =====
       const compactItems = cartItems.slice(0, 8).map((item, idx) => {
         const itemQty = item.quantity || 1;
         const itemLineTotal = (item.customer_price || item.price || 0) * itemQty;
@@ -1927,6 +1920,8 @@ const Cart = () => {
         '',
         'أهلاً! قمت بتجهيز سلة مشتريات خاصة',
         'عبر تطبيق *واصل* ويمكنك إتمامها بسهولة:',
+        '',
+        `🆔 *رقم السلة:* ${shareId}`,
         '',
         '📦 *المنتجات:*',
         compactItems || '   - لا توجد عناصر',
@@ -1943,31 +1938,51 @@ const Cart = () => {
         'واصل - نوصّل لأحبابك 💙',
       ].filter(Boolean).join('\n');
 
-      // ===== STEP 3: Share IMMEDIATELY (user gesture still active) =====
-      // يجب استدعاء navigator.share هنا مباشرة قبل أي await آخر
-      let shareSuccess = false;
+      let sharedViaSystemDialog = false;
       try {
         if (navigator.share) {
           await navigator.share({ title: 'تطبيق واصل - مشاركة سلة', text: shareText, url: shareUrl });
-          shareSuccess = true;
+          sharedViaSystemDialog = true;
         }
       } catch (shareError) {
-        // dismissed or not supported — fallback to clipboard
         console.warn('Share cart native share warning:', shareError);
       }
 
-      if (!shareSuccess) {
+      if (!sharedViaSystemDialog) {
         try {
           await navigator.clipboard.writeText(shareText);
-          toast.info('تم نسخ رابط السلة! يمكنك لصقه في أي تطبيق مراسلة 📋');
-        } catch (_) {
-          // clipboard also failed — show the URL in a toast so user can copy manually
-          toast.info(`رابط السلة: ${shareUrl}`, { duration: 8000 });
+          toast.info('تم نسخ رسالة السلة مع الرابط. يمكنك لصقها مباشرة في أي تطبيق مراسلة 📋');
+        } catch (clipboardError) {
+          console.warn('Share cart clipboard warning:', clipboardError);
         }
       }
 
-      // ===== STEP 4: Create draft order in background =====
-      const sharedOrderNumber = `WAS-SH-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+      const { data: createdLink, error: createLinkError } = await supabase
+        .from('cart_share_links')
+        .insert([{
+          created_by: creatorAppUserId,
+          token: shareToken,
+          short_code: shortCode,
+          status: 'active',
+          payload: {
+            ...sharePayload,
+            _share_meta: {
+              client_share_id: shareId,
+              shared_cart_token: shareToken,
+              shared_cart_url: shareUrl,
+              created_via: 'shared_cart_link',
+            },
+          },
+          expires_at: new Date(Date.now() + (72 * 60 * 60 * 1000)).toISOString(),
+        }])
+        .select('*')
+        .single();
+
+      if (createLinkError) {
+        throw createLinkError;
+      }
+
+      const sharedOrderNumber = await generateOrderNumber();
       let sharedOrder = null;
       let sharedOrderError = null;
 
@@ -1987,10 +2002,13 @@ const Cart = () => {
             coupon: sharePayload.coupon,
             orderNumber: sharedOrderNumber,
             collaborationMode: 'shared',
+            recipientUserId: creatorAppUserId,
             metadata: {
               created_via: 'shared_cart_link',
               shared_cart_token: shareToken,
               shared_cart_url: shareUrl,
+              shared_cart_link_id: createdLink?.id || null,
+              shared_cart_client_id: shareId,
               source_region: sharePayload.sourceRegion,
             },
           },
@@ -2006,8 +2024,6 @@ const Cart = () => {
       }
 
       if (!sharedOrder) {
-        const { data: authData } = await supabase.auth.getUser();
-        const authUser = authData?.user;
         const directPayload = {
           order_number: sharedOrderNumber,
           status: 'pending',
@@ -2019,12 +2035,15 @@ const Cart = () => {
           currency: 'USD',
           items: sharePayload.items,
           collaboration_mode: 'shared',
+          recipient_user_id: creatorAppUserId,
           sender_details: {
             ...sharePayload.sender,
             meta: {
               created_via: 'shared_cart_link',
               shared_cart_token: shareToken,
               shared_cart_url: shareUrl,
+              shared_cart_link_id: createdLink?.id || null,
+              shared_cart_client_id: shareId,
               sourceRegion: sharePayload.sourceRegion,
             },
           },
@@ -2032,8 +2051,8 @@ const Cart = () => {
           notes: `طلب سلة مشتركة بانتظار دفع الطرف الخارجي.${additionalNotes ? ` ${additionalNotes}` : ''}`,
         };
 
-        if (authUser?.id) {
-          directPayload.user_id = authUser.id;
+        if (creatorAppUserId) {
+          directPayload.user_id = creatorAppUserId;
         }
 
         const { data: insertedOrder, error: directInsertError } = await supabase
@@ -2053,6 +2072,7 @@ const Cart = () => {
       if (sharedOrder?.id) {
         const collaborationPatch = {
           collaboration_mode: 'shared',
+          recipient_user_id: creatorAppUserId,
         };
         // أضف sender_details.meta إذا لم يكن محفوظاً من الـ RPC
         if (!sharedOrder.sender_details?.meta?.created_via) {
@@ -2062,6 +2082,8 @@ const Cart = () => {
               created_via: 'shared_cart_link',
               shared_cart_token: shareToken,
               shared_cart_url: shareUrl,
+              shared_cart_link_id: createdLink?.id || null,
+              shared_cart_client_id: shareId,
               sourceRegion: sharePayload.sourceRegion,
             },
           };
@@ -2075,6 +2097,11 @@ const Cart = () => {
         } else {
           sharedOrder = { ...sharedOrder, ...collaborationPatch };
         }
+
+        await supabase
+          .from('cart_share_links')
+          .update({ created_order_id: sharedOrder.id })
+          .eq('id', createdLink.id);
       }
 
       // ===== STEP 6: Insert order_items =====
@@ -2116,7 +2143,9 @@ const Cart = () => {
       toast.success('تم إنشاء السلة المشتركة بنجاح');
     } catch (error) {
       console.error('Share cart failed:', error);
-      if (isMissingRpcFunctionError(error, 'create_cart_share_link')) {
+      if (String(error?.message || '') === 'PUBLIC_USER_REQUIRED') {
+        toast.error('تعذر تجهيز حسابك للمشاركة الآن. أعد تسجيل الدخول ثم جرّب مرة أخرى.');
+      } else if (isMissingRpcFunctionError(error, 'create_cart_share_link')) {
         toast.error('مشاركة السلة تحتاج تحديث قاعدة البيانات: شغّل migration 010_cart_share_links_checkout.sql');
       } else if (isMissingRpcFunctionError(error, 'create_compatible_order_v2')) {
         toast.error('إنشاء طلب السلة المشتركة يحتاج تحديث قاعدة البيانات: شغّل migration 013_create_compatible_order_rpc_v2.sql');
@@ -2126,7 +2155,7 @@ const Cart = () => {
     } finally {
       setCreatingCartShareLink(false);
     }
-  }, [insideSyria, recipientName, recipientPhone, recipientAddress, senderName, senderPhone, senderCountry, currentUserEmail, cartItems, exchangeRate, finalTotalSYP, finalTotalUSD, membershipDiscountSYP, selectedTipSYP, appliedCoupon, additionalNotes, deliveryTime, clearCart]);
+  }, [insideSyria, recipientName, recipientPhone, recipientAddress, senderName, senderPhone, senderCountry, currentUserEmail, cartItems, exchangeRate, finalTotalSYP, finalTotalUSD, membershipDiscountSYP, selectedTipSYP, appliedCoupon, additionalNotes, deliveryTime, clearCart, currentAppUserId, resolveCurrentAppUserId, buildSharedCartIdentifiers, generateOrderNumber]);
 
   const handleDownloadInvoicePdf = useCallback(async () => {
     try {
@@ -2269,6 +2298,72 @@ const Cart = () => {
     return `WSL-${Date.now().toString().slice(-8)}`;
   }, []);
 
+  const buildSharedCartIdentifiers = useCallback(() => {
+    const shareId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `sc-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const nonce = Math.random().toString(36).slice(2, 10);
+
+    return {
+      shareId,
+      shareToken: `${shareId}-${nonce}`,
+      shortCode: shareId.replace(/-/g, '').slice(0, 10).toUpperCase(),
+    };
+  }, []);
+
+  const resolveCurrentAppUserId = useCallback(async (authUserOverride = null) => {
+    if (currentAppUserId) return currentAppUserId;
+
+    let authUser = authUserOverride;
+    if (!authUser) {
+      const { data: authData } = await supabase.auth.getUser();
+      authUser = authData?.user || null;
+    }
+
+    if (!authUser) return null;
+
+    try {
+      const { data: ensuredId, error: ensureError } = await supabase.rpc('ensure_current_app_user_id');
+      if (!ensureError && ensuredId) {
+        setCurrentAppUserId(ensuredId);
+        return ensuredId;
+      }
+    } catch (error) {
+      console.warn('ensure_current_app_user_id fallback:', error);
+    }
+
+    const { data: userRow, error } = await supabase
+      .from('users')
+      .select('id')
+      .or(`auth_id.eq.${authUser.id},id.eq.${authUser.id},email.eq.${authUser.email}`)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('resolveCurrentAppUserId warning:', error);
+      return null;
+    }
+
+    if (userRow?.id) {
+      setCurrentAppUserId(userRow.id);
+      return userRow.id;
+    }
+
+    return null;
+  }, [currentAppUserId]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        if (authData?.user) {
+          await resolveCurrentAppUserId(authData.user);
+        }
+      } catch (error) {
+        console.warn('Cart app user preload warning:', error);
+      }
+    })();
+  }, [resolveCurrentAppUserId]);
+
   // حفظ الطلب في Supabase
   const saveOrderToSupabase = useCallback(async (orderData) => {
     try {
@@ -2320,6 +2415,7 @@ const Cart = () => {
           try {
             const { data: authData } = await supabase.auth.getUser();
             const authUser = authData?.user;
+            const appUserId = await resolveCurrentAppUserId(authUser);
             const directPayload = {
               order_number: generatedOrderNumber,
               status: paymentStatus,
@@ -2337,8 +2433,8 @@ const Cart = () => {
               recipient_user_id: orderData?.sharedCart?.creator_id || null,
             };
 
-            if (authUser?.id) {
-              directPayload.user_id = authUser.id;
+            if (appUserId) {
+              directPayload.user_id = appUserId;
             }
 
             const { data: insertedOrder, error: directInsertError } = await supabase
@@ -2498,7 +2594,7 @@ const Cart = () => {
       console.error('❌ فشل في حفظ الطلب:', error);
       throw error;
     }
-  }, [generateOrderNumber, exchangeRate, currentUserEmail]);
+  }, [generateOrderNumber, exchangeRate, currentUserEmail, resolveCurrentAppUserId]);
 
   const persistPayPalOrderWithRetry = useCallback(async (orderData) => {
     const captureId = orderData.paypalCaptureId;
