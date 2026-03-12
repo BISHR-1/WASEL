@@ -2483,13 +2483,19 @@ const Cart = () => {
         const isJsonCastError =
           String(orderError?.code || '') === '22P02'
           || String(orderError?.message || '').toLowerCase().includes('invalid input syntax for type json');
+        const isFkViolation = String(orderError?.code || '') === '23503';
 
-        if (isJsonCastError) {
-          console.warn('⚠️ RPC failed with JSON cast issue, trying direct insert fallback...', orderError);
+        if (isJsonCastError || isFkViolation) {
+          console.warn(`⚠️ RPC failed with ${isFkViolation ? 'FK violation' : 'JSON cast issue'}, trying direct insert fallback...`, orderError);
           try {
-            const { data: authData } = await supabase.auth.getUser();
-            const authUser = authData?.user;
-            const appUserId = await resolveCurrentAppUserId(authUser);
+            let appUserId = null;
+            try {
+              const { data: authData } = await supabase.auth.getUser();
+              const authUser = authData?.user;
+              appUserId = await resolveCurrentAppUserId(authUser);
+            } catch (resolveErr) {
+              console.warn('resolveCurrentAppUserId in order fallback:', resolveErr);
+            }
             const directPayload = {
               order_number: generatedOrderNumber,
               status: paymentStatus,
@@ -2517,9 +2523,24 @@ const Cart = () => {
               .select('*')
               .single();
 
-            if (directInsertError) throw directInsertError;
-            order = insertedOrder;
-            orderError = null;
+            if (directInsertError && String(directInsertError.code) === '23503' && directPayload.user_id) {
+              // FK still failing — retry without user_id
+              console.warn('⚠️ Direct insert FK violation on user_id, retrying without user_id...');
+              delete directPayload.user_id;
+              const { data: retryOrder, error: retryError } = await supabase
+                .from('orders')
+                .insert([directPayload])
+                .select('*')
+                .single();
+              if (retryError) throw retryError;
+              order = retryOrder;
+              orderError = null;
+            } else if (directInsertError) {
+              throw directInsertError;
+            } else {
+              order = insertedOrder;
+              orderError = null;
+            }
           } catch (fallbackError) {
             console.error('❌ Direct fallback insert failed:', fallbackError);
             throw orderError;
