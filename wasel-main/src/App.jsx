@@ -297,10 +297,20 @@ const AuthenticatedApp = () => {
           if (isMounted) {
             const resolved = { type: 'google', email: supabaseSession.user.email, user: supabaseSession.user };
             setActiveIdentityScope(supabaseSession.user.email || supabaseSession.user.id || 'guest');
-            await applyReferralCourierProvision(resolved);
             setSession(resolved);
-            await resolveUserRole(resolved);
+            // افتح الواجهة فوراً ثم أكمل الاستعلامات البطيئة بالخلفية
             setCheckingAuth(false);
+            void (async () => {
+              try {
+                await applyReferralCourierProvision(resolved);
+                await resolveUserRole(resolved);
+              } catch (backgroundError) {
+                authError('AUTH_APP_BACKGROUND_POST_SESSION_FAILED', backgroundError, {
+                  userId: supabaseSession.user.id,
+                  email: supabaseSession.user.email || null,
+                });
+              }
+            })();
           }
           return;
         }
@@ -336,11 +346,11 @@ const AuthenticatedApp = () => {
         if (isMounted) {
           const resolved = { type: 'google', email: supabaseSession.user.email, user: supabaseSession.user };
           setActiveIdentityScope(supabaseSession.user.email || supabaseSession.user.id || 'guest');
+          setSession(resolved);
+          setCheckingAuth(false);
           (async () => {
             await applyReferralCourierProvision(resolved);
-            setSession(resolved);
             await resolveUserRole(resolved);
-            setCheckingAuth(false);
             // تهيئة الإشعارات بعد تسجيل الدخول
             initializePushNotifications();
             authTrace('AUTH_APP_SIGNED_IN_READY', {
