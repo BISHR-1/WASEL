@@ -307,67 +307,51 @@ export default function SupervisorPanel() {
   };
 
   const loadDashboardData = async () => {
-    const [ordersResult, couriersResult, adminCouriersResult, walletsResult] = await Promise.all([
+    const [ordersResult, couriersResult, adminCouriersResult] = await Promise.all([
       supabase.from('orders').select('*').order('created_at', { ascending: false }),
       supabase.from('users').select('id, auth_id, full_name, email, role').in('role', ['courier', 'delivery_person']).order('full_name', { ascending: true }),
       supabase.from('admin_users').select('id, name, email, role, is_active').eq('role', 'delivery_person').eq('is_active', true),
-      supabase.from('wallets').select('*, user:users(full_name, email)'),
     ]);
 
     if (ordersResult.error) throw ordersResult.error;
     if (couriersResult.error) throw couriersResult.error;
     if (adminCouriersResult.error) throw adminCouriersResult.error;
-    if (walletsResult?.data) setSystemWallets(walletsResult.data);
 
     const ordersData = Array.isArray(ordersResult.data) ? ordersResult.data : [];
-    console.log('📋 Sample order structure:', ordersData[0] ? Object.keys(ordersData[0]) : 'No orders', ordersData[0]);
     const orderIds = ordersData.map((o) => o.id).filter(Boolean);
-    let assignmentsByOrderId = {};
+    let mergedOrders = ordersData.map((o) => ({ ...o, order_assignments: [], items: extractOrderItems(o) }));
 
     if (orderIds.length > 0) {
-      const { data: assignmentsData, error: assignmentsError } = await supabase
-        .from('order_assignments').select('id, order_id, delivery_person_id, status, assigned_at')
-        .in('status', ['assigned', 'accepted', 'in_progress', 'delivering']).in('order_id', orderIds);
-      if (assignmentsError) console.warn('order_assignments load warning:', assignmentsError);
-      else {
-        assignmentsByOrderId = (assignmentsData || []).reduce((acc, a) => {
-          if (!a?.order_id) return acc;
-          if (!acc[a.order_id]) acc[a.order_id] = [];
-          acc[a.order_id].push({ id: a.id, delivery_person_id: a.delivery_person_id, status: a.status, assigned_at: a.assigned_at });
-          return acc;
-        }, {});
-      }
-    }
+      const [assignmentsResult, itemsResult] = await Promise.all([
+        supabase.from('order_assignments').select('id, order_id, delivery_person_id, status, assigned_at')
+          .in('status', ['assigned', 'accepted', 'in_progress', 'delivering']).in('order_id', orderIds),
+        supabase.from('order_items').select('*').in('order_id', orderIds),
+      ]);
 
-    let itemsByOrderId = {};
-    if (orderIds.length > 0) {
-      const { data: itemsData, error: itemsError } = await supabase.from('order_items').select('*').in('order_id', orderIds);
-      console.log('🔍 DEBUG order_items query result:', { itemsData, itemsError, orderIds });
-      if (itemsError) console.warn('❌ order_items load warning:', itemsError);
-      else {
-        itemsByOrderId = (itemsData || []).reduce((acc, item) => {
-          if (!item?.order_id) return acc;
-          if (!acc[item.order_id]) acc[item.order_id] = [];
-          acc[item.order_id].push(item);
-          return acc;
-        }, {});
-        console.log('📦 itemsByOrderId mapping:', itemsByOrderId);
-      }
-    }
+      const assignmentsByOrderId = !assignmentsResult.error
+        ? (assignmentsResult.data || []).reduce((acc, a) => {
+            if (!a?.order_id) return acc;
+            if (!acc[a.order_id]) acc[a.order_id] = [];
+            acc[a.order_id].push({ id: a.id, delivery_person_id: a.delivery_person_id, status: a.status, assigned_at: a.assigned_at });
+            return acc;
+          }, {})
+        : {};
 
-    const mergedOrders = ordersData.map((order) => {
-      const dbItems = itemsByOrderId[order.id] || [];
-      // CRITICAL: Only override order.items if dbItems actually has data.
-      // The orders table has a JSONB 'items' column - don't replace it with empty array!
-      const sourceOrder = dbItems.length > 0 ? { ...order, items: dbItems } : order;
-      const fallbackItems = extractOrderItems(sourceOrder);
-      if (fallbackItems.length === 0) {
-        console.log(`⚠️ Order ${order.id} (${order.order_number}): No items found`, { items: order.items, cart_snapshot: order.cart_snapshot, sender_details_meta: order.sender_details?.meta });
-      } else {
-        console.log(`✅ Order ${order.id} (${order.order_number}): Found ${fallbackItems.length} items`);
-      }
-      return { ...order, order_assignments: assignmentsByOrderId[order.id] || [], items: fallbackItems };
-    });
+      const itemsByOrderId = !itemsResult.error
+        ? (itemsResult.data || []).reduce((acc, item) => {
+            if (!item?.order_id) return acc;
+            if (!acc[item.order_id]) acc[item.order_id] = [];
+            acc[item.order_id].push(item);
+            return acc;
+          }, {})
+        : {};
+
+      mergedOrders = ordersData.map((order) => {
+        const dbItems = itemsByOrderId[order.id] || [];
+        const sourceOrder = dbItems.length > 0 ? { ...order, items: dbItems } : order;
+        return { ...order, order_assignments: assignmentsByOrderId[order.id] || [], items: extractOrderItems(sourceOrder) };
+      });
+    } // end if (orderIds.length > 0)
 
     const usersCouriers = (couriersResult.data || []).map((row) => ({
       id: row.auth_id || row.id, public_user_id: row.id, full_name: row.full_name,
@@ -548,6 +532,11 @@ export default function SupervisorPanel() {
     }
     if (activeSection === 'messages') {
       loadConversations();
+    }
+    if (activeSection === 'wallets') {
+      supabase.from('wallets').select('*, user:users(full_name, email)').then(({ data }) => {
+        if (data) setSystemWallets(data);
+      });
     }
   }, [activeSection]);
 
@@ -766,8 +755,19 @@ export default function SupervisorPanel() {
       try { await notifyOrderUsers('order_status_changed', { ...order, status: 'processing' }, { newStatus: 'processing' }); }
       catch (e) { console.warn('Status notification warning:', e); }
 
-      if (didAssign) toast.success('تم فرز الطلب بنجاح');
-      await loadDashboardData();
+      if (didAssign) {
+        toast.success('تم فرز الطلب بنجاح');
+        // Optimistic: update order assignments in local state
+        setOrders(prev => prev.map(o => {
+          if (o.id !== order.id) return o;
+          const existingArr = Array.isArray(o.order_assignments) ? o.order_assignments : [];
+          const newAssignment = { id: existingAssignment?.id || `temp-${Date.now()}`, delivery_person_id: courierId, status: 'assigned', assigned_at: new Date().toISOString() };
+          const updatedAssignments = existingAssignment?.id
+            ? existingArr.map(a => a.id === existingAssignment.id ? newAssignment : a)
+            : [...existingArr, newAssignment];
+          return { ...o, status: 'processing', order_assignments: updatedAssignments };
+        }));
+      }
     } catch (error) {
       console.error('Assign order error:', error);
       toast.error('تعذر فرز الطلب للموصل');
@@ -789,7 +789,8 @@ export default function SupervisorPanel() {
       }
       setSelectedCourierByOrder((prev) => ({ ...prev, [order.id]: '' }));
       toast.success('تم إلغاء فرز الطلب بنجاح');
-      await loadDashboardData();
+      // Optimistic: clear assignments from local state
+      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'pending', order_assignments: [] } : o));
     } catch (error) {
       console.error('Unassign order error:', error);
       toast.error('تعذر إلغاء فرز الطلب');
@@ -812,7 +813,7 @@ export default function SupervisorPanel() {
       if (error) throw error;
 
       toast.success(`تم حذف الطلب #${orderLabel} بنجاح`);
-      await loadDashboardData();
+      setOrders(prev => prev.filter(o => o.id !== order.id));
     } catch (error) {
       console.error('Delete order error:', error);
       toast.error('تعذر حذف الطلب');
@@ -827,14 +828,14 @@ export default function SupervisorPanel() {
       if (error) throw error;
 
       // Notify sender/recipient about the status change
+      // Optimistic: update order status in local state
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: nextStatus } : o));
+      toast.success('تم تحديث حالة الطلب');
+
       const order = orders.find((o) => o.id === orderId);
       if (order) {
-        try { await notifyOrderUsers('order_status_changed', { ...order, status: nextStatus }, { newStatus: nextStatus }); }
-        catch (e) { console.warn('Status change notification warning:', e); }
+        notifyOrderUsers('order_status_changed', { ...order, status: nextStatus }, { newStatus: nextStatus }).catch(() => {});
       }
-
-      toast.success('تم تحديث حالة الطلب');
-      await loadDashboardData();
     } catch (error) {
       console.error('Update status error:', error);
       toast.error('فشل تحديث الحالة');
@@ -853,7 +854,7 @@ export default function SupervisorPanel() {
       const { error } = await supabase.from('orders').update(updates).eq('id', orderId);
       if (error) throw error;
       toast.success('تم حفظ وقت التوصيل');
-      await loadDashboardData();
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o));
     } catch (error) {
       console.error('Save delivery time error:', error);
       toast.error('فشل حفظ وقت التوصيل');
@@ -879,8 +880,9 @@ export default function SupervisorPanel() {
         .eq('user_email', membership.user_email);
 
       if (error) throw error;
+      setMemberships(prev => prev.map(m => m.user_email === membership.user_email
+        ? { ...m, status: 'active', start_date: now.toISOString(), end_date: endDate.toISOString() } : m));
       toast.success(`تم تفعيل اشتراك ${membership.user_email}`);
-      await loadDashboardData();
     } catch (error) {
       console.error('Activate membership error:', error);
       toast.error('فشل تفعيل الاشتراك');
@@ -925,8 +927,8 @@ export default function SupervisorPanel() {
         .eq('user_email', membership.user_email);
 
       if (error) throw error;
+      setMemberships(prev => prev.map(m => m.user_email === membership.user_email ? { ...m, ...updates } : m));
       toast.success('تم تحديث تواريخ العضوية');
-      await loadDashboardData();
     } catch (error) {
       console.error('Update membership dates error:', error);
       toast.error('فشل تحديث تواريخ العضوية');
@@ -949,8 +951,9 @@ export default function SupervisorPanel() {
         .eq('user_email', membership.user_email);
 
       if (error) throw error;
+      setMemberships(prev => prev.map(m => m.user_email === membership.user_email
+        ? { ...m, status: 'cancelled', end_date: new Date().toISOString() } : m));
       toast.success('تم إلغاء العضوية');
-      await loadDashboardData();
     } catch (error) {
       console.error('Cancel membership error:', error);
       toast.error('فشل إلغاء العضوية');
@@ -994,7 +997,7 @@ export default function SupervisorPanel() {
       updateUsdToSypRateCache(numericRate);
 
       toast.success('تم تحديث سعر الصرف');
-      await loadDashboardData();
+      // No reload needed - rate is applied via cache and UI reflects exchangeRateInput
     } catch (error) {
       console.error('Update exchange rate error:', error);
       toast.error('فشل تحديث سعر الصرف');
@@ -1021,8 +1024,8 @@ export default function SupervisorPanel() {
          }]);
       }
 
+      setSystemWallets(prev => prev.map(w => w.id === walletId ? { ...w, balance_usd: 0 } : w));
       toast.success('تم تصفير رصيد المحفظة للمستخدم');
-      await loadDashboardData();
     } catch (error) {
       console.error('Wallet reset error:', error);
       toast.error('فشل تصفير رصيد المحفظة');
@@ -1071,8 +1074,9 @@ export default function SupervisorPanel() {
           note: `manual payout reset by ${currentUser?.email || 'supervisor'}`,
         });
 
+      setCouriers(prev => prev.map(c => c.id === courier.id
+        ? { ...c, balance_usd: 0, balance_syp: 0, completed_orders_count: 0, first_delivery_completed_at: null } : c));
       toast.success('تم تصفير رصيد الموصل بعد التسديد');
-      await loadDashboardData();
     } catch (error) {
       console.error('Reset courier balance error:', error);
       toast.error('فشل تصفير رصيد الموصل');

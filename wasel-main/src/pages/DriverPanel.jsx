@@ -476,42 +476,53 @@ export default function DriverPanel() {
   };
 
   const markAccepted = async (order) => {
+    // Optimistic update: show change immediately
+    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, assignment_status: 'accepted' } : o));
     try {
-      await updateAssignmentAndOrder(order, 'accepted', 'loading_goods');
-      // No notification for user here according to requirements, just log/supervisor notification typically implicitly checked
-      
-      // Auto-analyze products and show instructions on Accept
+      const { error } = await supabase.from('order_assignments').update({ status: 'accepted' }).eq('id', order.assignment_id);
+      if (error) {
+        setOrders(prev => prev.map(o => o.id === order.id ? { ...o, assignment_status: 'assigned' } : o));
+        throw error;
+      }
+      supabase.from('orders').update({ status: 'loading_goods' }).eq('id', order.id).then(() => {});
       getOrderInstructions(extractOrderItems(order)).forEach((message) => toast.info(message, { duration: 15000 }));
-      
       toast.success('تم قبول الطلب وبدء التحميل');
-      await loadAssignedOrders(currentUser);
-    } catch {
-      toast.error('فشل قبول الطلب');
+    } catch (err) {
+      toast.error(`فشل قبول الطلب: ${err?.message || ''}`);
     }
   };
 
   const markRejected = async (order) => {
+    const prevStatus = order.assignment_status;
+    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, assignment_status: 'rejected' } : o));
     try {
-      await updateAssignmentAndOrder(order, 'rejected', 'paid');
+      const { error } = await supabase.from('order_assignments').update({ status: 'rejected' }).eq('id', order.assignment_id);
+      if (error) {
+        setOrders(prev => prev.map(o => o.id === order.id ? { ...o, assignment_status: prevStatus } : o));
+        throw error;
+      }
+      supabase.from('orders').update({ status: 'paid' }).eq('id', order.id).then(() => {});
       toast.success('تم رفض الطلب وإعادته للمشرف');
-      // Notify supervisor that courier rejected
-      try {
-        await notifyAdminUsers('order_status_changed', order, { newStatus: 'rejected_by_courier', courierName: currentUser?.name || 'الموصل' });
-      } catch (e) { console.warn('Reject notify error:', e); }
-      await loadAssignedOrders(currentUser);
-    } catch {
-      toast.error('فشل رفض الطلب');
+      notifyAdminUsers('order_status_changed', order, { newStatus: 'rejected_by_courier', courierName: currentUser?.name || 'الموصل' }).catch(e => console.warn('Reject notify error:', e));
+    } catch (err) {
+      toast.error(`فشل رفض الطلب: ${err?.message || ''}`);
     }
   };
 
   const markInProgress = async (order) => {
+    const prevStatus = order.assignment_status;
+    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, assignment_status: 'delivering', status: 'delivering' } : o));
     try {
-      await updateAssignmentAndOrder(order, 'delivering', 'delivering');
-      await notifyOrderUsers('order_status_changed', order, { newStatus: 'delivering' });
+      const { error } = await supabase.from('order_assignments').update({ status: 'delivering' }).eq('id', order.assignment_id);
+      if (error) {
+        setOrders(prev => prev.map(o => o.id === order.id ? { ...o, assignment_status: prevStatus, status: order.status } : o));
+        throw error;
+      }
+      supabase.from('orders').update({ status: 'delivering' }).eq('id', order.id).then(() => {});
+      notifyOrderUsers('order_status_changed', order, { newStatus: 'delivering' }).catch(() => {});
       toast.success('تم بدء التوصيل للمستلم');
-      await loadAssignedOrders(currentUser);
-    } catch {
-      toast.error('فشل بدء التوصيل');
+    } catch (err) {
+      toast.error(`فشل بدء التوصيل: ${err?.message || ''}`);
     }
   };
 
@@ -522,30 +533,39 @@ export default function DriverPanel() {
     }
 
     try {
-      await supabase.from('order_assignments').update({ status: 'completed' }).eq('id', order.assignment_id);
-      await supabase.from('orders').update({ status: 'completed', shipping_status: 'delivered' }).eq('id', order.id);
-      
+      const { error: assignErr } = await supabase.from('order_assignments').update({ status: 'completed' }).eq('id', order.assignment_id);
+      if (assignErr) throw assignErr;
+
+      const { error: orderErr } = await supabase.from('orders').update({ status: 'completed', shipping_status: 'delivered' }).eq('id', order.id);
+      if (orderErr) console.warn('orders update warning (RLS may restrict):', orderErr.message);
+
+      // Optimistic update: move order to archived immediately
+      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, assignment_status: 'completed', status: 'completed' } : o));
+
+      // Background tasks (non-blocking)
       if (!courierProfile?.first_delivery_completed_at) {
-        await supabase.from('courier_profiles').update({ first_delivery_completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('user_id', currentUser.id);
+        supabase.from('courier_profiles').update({ first_delivery_completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('user_id', currentUser.id).then(() => {});
       }
+      supabase.from('order_assignments')
+        .select('*', { count: 'exact', head: true })
+        .eq('delivery_person_id', currentUser.assignment_id || currentUser.id)
+        .eq('status', 'completed')
+        .then(({ count }) => {
+          if ((count || 0) >= 3) {
+            supabase.from('courier_referrals')
+              .update({ onboarding_completed: true, updated_at: new Date().toISOString() })
+              .eq('referred_user_id', currentUser.id)
+              .eq('registration_completed', true)
+              .then(() => {});
+          }
+        });
 
-      // Check how many completed orders driver has now
-      const { count } = await supabase.from('order_assignments').select('*', { count: 'exact', head: true }).eq('delivery_person_id', currentUser.assignment_id || currentUser.id).eq('status', 'completed');
-      
-      if (count >= 3) {
-        // Unlock referral bonus for the referrer
-        await supabase
-          .from('courier_referrals')
-          .update({ onboarding_completed: true, updated_at: new Date().toISOString() })
-          .eq('referred_user_id', currentUser.id)
-          .eq('registration_completed', true);
-      }
-
-      await notifyOrderUsers('order_delivered', order);
-      toast.success('تم التسليم بنجاح');
-      await Promise.all([loadAssignedOrders(currentUser), loadCourierProfile(currentUser)]);
-    } catch {
-      toast.error('فشل إنهاء التسليم');
+      notifyOrderUsers('order_delivered', order).catch(() => {});
+      toast.success('تم التسليم بنجاح 🎉');
+      loadCourierProfile(currentUser).catch(() => {});
+    } catch (err) {
+      console.error('markDelivered error:', err);
+      toast.error(`فشل إنهاء التسليم: ${err?.message || 'خطأ غير معروف'}`);
     }
   };
 
