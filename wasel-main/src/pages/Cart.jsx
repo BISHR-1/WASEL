@@ -1898,6 +1898,7 @@ const Cart = () => {
         sourceRegion: insideSyria ? 'inside_syria' : 'outside_syria',
       };
 
+      // ===== STEP 1: Get share token (single await before share) =====
       const { data, error } = await supabase.rpc('create_cart_share_link', {
         p_payload: sharePayload,
         p_expires_in_hours: 72,
@@ -1912,8 +1913,60 @@ const Cart = () => {
         ? buildPublicAppUrl(`/shared-cart/${shareToken}`)
         : buildPublicAppUrl('/');
 
-      // Create a real draft order immediately when sharing the cart,
-      // so supervisors can track it before the payer completes checkout.
+      // ===== STEP 2: Build share text =====
+      const compactItems = cartItems.slice(0, 8).map((item, idx) => {
+        const itemQty = item.quantity || 1;
+        const itemLineTotal = (item.customer_price || item.price || 0) * itemQty;
+        return `   ${idx + 1}. ${item.name_ar || item.name || 'منتج'} × ${itemQty} = ${Math.round(itemLineTotal).toLocaleString('en-US')} ل.س`;
+      }).join('\n');
+      const moreItemsNote = cartItems.length > 8 ? `\n   ... +${cartItems.length - 8} منتجات إضافية` : '';
+
+      const shareText = [
+        '🛍️  *سلّة واصل*',
+        '━━━━━━━━━━━━━━━━',
+        '',
+        'أهلاً! قمت بتجهيز سلة مشتريات خاصة',
+        'عبر تطبيق *واصل* ويمكنك إتمامها بسهولة:',
+        '',
+        '📦 *المنتجات:*',
+        compactItems || '   - لا توجد عناصر',
+        moreItemsNote,
+        '',
+        '━━━━━━━━━━━━━━━━',
+        `💵 *المجموع الكلي:* $${finalTotalUSD.toFixed(2)}`,
+        '   (شامل رسوم الخدمة والتوصيل)',
+        '',
+        '🔗 *أكمل الطلب من هنا:*',
+        shareUrl,
+        '',
+        '━━━━━━━━━━━━━━━━',
+        'واصل - نوصّل لأحبابك 💙',
+      ].filter(Boolean).join('\n');
+
+      // ===== STEP 3: Share IMMEDIATELY (user gesture still active) =====
+      // يجب استدعاء navigator.share هنا مباشرة قبل أي await آخر
+      let shareSuccess = false;
+      try {
+        if (navigator.share) {
+          await navigator.share({ title: 'تطبيق واصل - مشاركة سلة', text: shareText, url: shareUrl });
+          shareSuccess = true;
+        }
+      } catch (shareError) {
+        // dismissed or not supported — fallback to clipboard
+        console.warn('Share cart native share warning:', shareError);
+      }
+
+      if (!shareSuccess) {
+        try {
+          await navigator.clipboard.writeText(shareText);
+          toast.info('تم نسخ رابط السلة! يمكنك لصقه في أي تطبيق مراسلة 📋');
+        } catch (_) {
+          // clipboard also failed — show the URL in a toast so user can copy manually
+          toast.info(`رابط السلة: ${shareUrl}`, { duration: 8000 });
+        }
+      }
+
+      // ===== STEP 4: Create draft order in background =====
       const sharedOrderNumber = `WAS-SH-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
       let sharedOrder = null;
       let sharedOrderError = null;
@@ -1995,7 +2048,36 @@ const Cart = () => {
         sharedOrder = insertedOrder;
       }
 
-      // Ensure order_items contains this order snapshot for supervisor readability.
+      // ===== STEP 5: Ensure collaboration_mode is saved in DB =====
+      // create_compatible_order_v2 لا يحفظ collaboration_mode، لذا نضمنه بـ UPDATE
+      if (sharedOrder?.id) {
+        const collaborationPatch = {
+          collaboration_mode: 'shared',
+        };
+        // أضف sender_details.meta إذا لم يكن محفوظاً من الـ RPC
+        if (!sharedOrder.sender_details?.meta?.created_via) {
+          collaborationPatch.sender_details = {
+            ...(sharedOrder.sender_details || {}),
+            meta: {
+              created_via: 'shared_cart_link',
+              shared_cart_token: shareToken,
+              shared_cart_url: shareUrl,
+              sourceRegion: sharePayload.sourceRegion,
+            },
+          };
+        }
+        const { error: patchError } = await supabase
+          .from('orders')
+          .update(collaborationPatch)
+          .eq('id', sharedOrder.id);
+        if (patchError) {
+          console.warn('⚠️ تعذر تثبيت collaboration_mode على الطلب المشترك:', patchError);
+        } else {
+          sharedOrder = { ...sharedOrder, ...collaborationPatch };
+        }
+      }
+
+      // ===== STEP 6: Insert order_items =====
       try {
         if (sharedOrder?.id && Array.isArray(sharePayload.items) && sharePayload.items.length > 0) {
           const { error: itemsError } = await insertOrderItemsCompat(sharedOrder.id, sharePayload.items);
@@ -2007,7 +2089,7 @@ const Cart = () => {
         console.warn('Share cart order_items warning:', itemsError);
       }
 
-      // Firebase + in-app notifications for supervisors/admins.
+      // ===== STEP 7: Notify admins =====
       try {
         const notifyResult = await notifyAdminUsers('new_order_created', sharedOrder, {
           paymentMethod: 'shared_cart',
@@ -2019,50 +2101,9 @@ const Cart = () => {
         }
       } catch (notifyError) {
         console.warn('Share cart admin notify warning:', notifyError);
-        toast.warning('تم إنشاء الطلب، لكن حدثت مشكلة أثناء إشعار المشرف.');
       }
 
-      const compactItems = cartItems.slice(0, 8).map((item, idx) => {
-        const itemQty = item.quantity || 1;
-        const itemLineTotal = (item.customer_price || item.price || 0) * itemQty;
-        return `   ${idx + 1}. ${item.name_ar || item.name || 'منتج'} × ${itemQty} = ${Math.round(itemLineTotal).toLocaleString('en-US')} ل.س`;
-      }).join('\n');
-      const moreItemsNote = cartItems.length > 8 ? `\n   ... +${cartItems.length - 8} منتجات إضافية` : '';
-
-      const shareText = [
-        '🛍️  *سلّة واصل*',
-        '━━━━━━━━━━━━━━━━',
-        '',
-        'أهلاً! قمت بتجهيز سلة مشتريات خاصة',
-        'عبر تطبيق *واصل* ويمكنك إتمامها بسهولة:',
-        '',
-        '📦 *المنتجات:*',
-        compactItems || '   - لا توجد عناصر',
-        moreItemsNote,
-        '',
-        '━━━━━━━━━━━━━━━━',
-        `💵 *المجموع الكلي:* $${finalTotalUSD.toFixed(2)}`,
-        '   (شامل رسوم الخدمة والتوصيل)',
-        '',
-        '🔗 *أكمل الطلب من هنا:*',
-        shareUrl,
-        '',
-        '━━━━━━━━━━━━━━━━',
-        'واصل - نوصّل لأحبابك 💙',
-      ].filter(Boolean).join('\n');
-
-      try {
-        if (navigator.share) {
-          await navigator.share({ title: 'تطبيق واصل - مشاركة سلة', text: shareText, url: shareUrl });
-        } else {
-          await navigator.clipboard.writeText(shareText);
-        }
-      } catch (shareError) {
-        // If native share is dismissed, keep the order flow successful and fallback to clipboard.
-        try { await navigator.clipboard.writeText(shareText); } catch (_) { /* noop */ }
-        console.warn('Share cart native share warning:', shareError);
-      }
-
+      // ===== STEP 8: Clear cart + show success animation → redirect to shared tab =====
       clearCart?.();
       localStorage.removeItem('wasel_shared_cart_session');
       setPaymentSuccessMessage('تم إنشاء رابط السلة المشتركة وإرسال الطلب بنجاح ✨');
