@@ -102,8 +102,18 @@ function getMembershipDiscountRate(item) {
   const itemType = normalizeCategory(item?.item_type);
   const category = normalizeCategory(item?.category);
   const sourceType = normalizeCategory(item?.source_type || item?.type);
+  const combinedType = `${itemType} ${sourceType} ${category}`;
 
-  if (itemType === 'gift' || itemType === 'package') return 0.2;
+  if (
+    combinedType.includes('gift') ||
+    combinedType.includes('gifts') ||
+    combinedType.includes('هد') ||
+    combinedType.includes('package') ||
+    combinedType.includes('packages') ||
+    combinedType.includes('باقة')
+  ) {
+    return 0.2;
+  }
 
   if (
     category.includes('gift') ||
@@ -116,15 +126,26 @@ function getMembershipDiscountRate(item) {
   }
 
   if (
+    itemType.includes('supermarket') ||
+    itemType.includes('market') ||
+    itemType.includes('grocery') ||
+    itemType.includes('سوبر') ||
     category.includes('supermarket') ||
     category.includes('market') ||
     category.includes('grocery') ||
-    category.includes('سوبر')
+    category.includes('سوبر') ||
+    sourceType.includes('supermarket') ||
+    sourceType.includes('market')
   ) {
     return 0.2;
   }
 
   if (
+    itemType.includes('restaurant') ||
+    itemType.includes('menu') ||
+    itemType.includes('food') ||
+    itemType.includes('مطعم') ||
+    itemType.includes('menuitem') ||
     category.includes('restaurant') ||
     category.includes('menu') ||
     category.includes('food') ||
@@ -135,9 +156,14 @@ function getMembershipDiscountRate(item) {
   }
 
   if (
+    itemType.includes('electronic') ||
+    itemType.includes('electronics') ||
+    itemType.includes('الكترون') ||
     category.includes('electronic') ||
     category.includes('electronics') ||
-    category.includes('الكترون')
+    category.includes('الكترون') ||
+    sourceType.includes('electronic') ||
+    sourceType.includes('electronics')
   ) {
     return 0.1;
   }
