@@ -51,3 +51,4 @@ __pycache__/
 # Gradle
 .gradle/
 local.properties
+.vercel

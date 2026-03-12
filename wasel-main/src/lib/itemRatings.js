@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const OBJECT_ID_REGEX = /^[0-9a-f]{24}$/i;
 
 function toNumber(value, fallback = 0) {
   const num = Number(value);
@@ -11,6 +12,25 @@ function normalizeId(value) {
   if (value === null || value === undefined) return '';
   const id = String(value).trim();
   return id;
+}
+
+function isUuid(value) {
+  return UUID_REGEX.test(normalizeId(value));
+}
+
+function isObjectId(value) {
+  return OBJECT_ID_REGEX.test(normalizeId(value));
+}
+
+function pickQueryableIds(ids) {
+  const uuidIds = ids.filter((id) => isUuid(id));
+  if (uuidIds.length > 0) return uuidIds;
+
+  // Most Supabase schemas here use uuid for reviews.item_id/product_id.
+  // If all incoming IDs are non-uuid (e.g. Base44 ObjectId), skip remote query to avoid 400 spam.
+  if (ids.every((id) => isObjectId(id))) return [];
+
+  return ids;
 }
 
 function findItemId(item) {
@@ -40,6 +60,9 @@ function applyRatingFields(item, average, count) {
 async function queryReviewsByColumn(column, ids, itemType) {
   if (!ids.length) return [];
 
+  const queryableIds = pickQueryableIds(ids);
+  if (!queryableIds.length) return [];
+
   const runQuery = async (candidateIds, withType) => {
     if (!candidateIds.length) return { data: [], error: null };
     let query = supabase
@@ -55,22 +78,13 @@ async function queryReviewsByColumn(column, ids, itemType) {
     return query;
   };
 
-  let { data, error } = await runQuery(ids, true);
+  let { data, error } = await runQuery(queryableIds, true);
 
   if (error && itemType) {
     // Fallback for schemas that do not include item_type in reviews.
-    const fallback = await runQuery(ids, false);
+    const fallback = await runQuery(queryableIds, false);
     data = fallback.data;
     error = fallback.error;
-  }
-
-  if (error && error.code === '22P02') {
-    const uuidOnly = ids.filter((id) => UUID_REGEX.test(id));
-    if (uuidOnly.length > 0 && uuidOnly.length !== ids.length) {
-      const retry = await runQuery(uuidOnly, Boolean(itemType));
-      data = retry.data;
-      error = retry.error;
-    }
   }
 
   if (error) return [];
@@ -90,11 +104,6 @@ export async function attachRatingsFromReviews(items, options = {}) {
     });
   }
 
-  const [itemIdRows, productIdRows] = await Promise.all([
-    queryReviewsByColumn('item_id', ids, itemType),
-    queryReviewsByColumn('product_id', ids, itemType),
-  ]);
-
   const ratingMap = new Map();
 
   const consumeRows = (rows, idKey) => {
@@ -111,8 +120,14 @@ export async function attachRatingsFromReviews(items, options = {}) {
     });
   };
 
+  // Try modern schema first, then legacy schema to avoid duplicate failing requests.
+  const itemIdRows = await queryReviewsByColumn('item_id', ids, itemType);
   consumeRows(itemIdRows, 'item_id');
-  consumeRows(productIdRows, 'product_id');
+
+  if (ratingMap.size === 0) {
+    const productIdRows = await queryReviewsByColumn('product_id', ids, itemType);
+    consumeRows(productIdRows, 'product_id');
+  }
 
   return list.map((item) => {
     const key = findItemId(item);

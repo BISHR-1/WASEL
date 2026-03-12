@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ShoppingCart, Gift, Heart } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useCart } from '@/components/cart/CartContext';
 
@@ -10,6 +10,8 @@ export default function SharedCartPay() {
   const params = useParams();
   const { addToCart, clearCart } = useCart();
   const [loadingMsg, setLoadingMsg] = useState('جاري التحقق من حالة تسجيل الدخول...');
+  const [recipientInfo, setRecipientInfo] = useState(null);
+  const [phase, setPhase] = useState('loading'); // 'loading' | 'ready' | 'error'
 
   useEffect(() => {
     const query = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
@@ -69,27 +71,73 @@ export default function SharedCartPay() {
            }, 100);
         }
 
-        localStorage.setItem('wasel_shared_cart_session', JSON.stringify({
+        const sessionData = {
           token: token.trim(),
           creator_id: data.creator_id,
           payload: data.payload,
           recipient: data.payload?.recipient,
           sender: data.payload?.sender
-        }));
+        };
+        localStorage.setItem('wasel_shared_cart_session', JSON.stringify(sessionData));
+        localStorage.setItem('wasel_auth_region_locked', 'outside_syria');
+
+        // Show branded confirmation screen before redirecting
+        const recipientName = data.payload?.recipient?.name || data.payload?.sender?.name || '';
+        const itemCount = data.payload?.items?.length || 0;
+        setRecipientInfo({ name: recipientName, itemCount });
+        setPhase('ready');
 
         toast.success('تم دمج السلة بنجاح، يمكنك إضافة منتجات أخرى أو إتمام الطلب!');
-        
-        setTimeout(() => navigate('/Cart', { replace: true }), 400);
+
+        setTimeout(() => navigate('/Cart', { replace: true }), 2000);
 
       } catch (err) {
         console.error(err);
+        setPhase('error');
         toast.error('عذراً، الرابط غير صالح أو منتهي الصلاحية');
-        navigate('/', { replace: true });
+        setTimeout(() => navigate('/', { replace: true }), 2000);
       }
     };
 
     processSharedCart();
   }, [navigate, params?.token, addToCart, clearCart]);
+
+  if (phase === 'ready' && recipientInfo) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center bg-gradient-to-b from-green-50 to-white px-4" dir="rtl">
+        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-sm w-full text-center border border-green-100">
+          <div className="flex justify-center mb-4">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+              <Heart className="w-8 h-8 text-green-600" />
+            </div>
+          </div>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">سلة مشتركة 🛒</h2>
+          {recipientInfo.name ? (
+            <p className="text-gray-600 mb-1">
+              هذه السلة لـ <span className="font-semibold text-green-700">{recipientInfo.name}</span> داخل سوريا
+            </p>
+          ) : null}
+          {recipientInfo.itemCount > 0 ? (
+            <p className="text-sm text-gray-500 mb-4">
+              يحتوي على {recipientInfo.itemCount} {recipientInfo.itemCount === 1 ? 'منتج' : 'منتجات'}
+            </p>
+          ) : null}
+          <div className="flex items-center justify-center gap-2 text-green-600 font-medium">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>جاري الانتقال إلى السلة...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === 'error') {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center bg-gray-50/30">
+        <p className="text-red-500 font-medium" dir="rtl">رابط غير صالح أو منتهي الصلاحية</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center bg-gray-50/30">

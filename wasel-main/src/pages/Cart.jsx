@@ -171,6 +171,64 @@ function getMembershipDiscountRate(item) {
   return 0;
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function normalizeOrderItemId(value) {
+  const raw = String(value || '').trim();
+  if (UUID_REGEX.test(raw)) return raw;
+  return crypto.randomUUID();
+}
+
+function buildOrderItemsModern(orderId, items) {
+  return (items || []).map((item) => ({
+    order_id: orderId,
+    item_name: item.name_ar || item.name,
+    item_id: normalizeOrderItemId(item.id || item.item_id),
+    item_type: item.item_type || 'product',
+    quantity: item.quantity,
+    unit_price: Number(item.priceUSD || 0),
+    total_price: Number(item.priceUSD || 0) * (item.quantity || 1),
+    item_image: item.image_url || item.image,
+  }));
+}
+
+function buildOrderItemsLegacy(orderId, items) {
+  return (items || []).map((item) => ({
+    order_id: orderId,
+    product_name: item.name_ar || item.name,
+    product_id: String(item.id || item.item_id || crypto.randomUUID()),
+    quantity: item.quantity,
+    price: Number(item.priceUSD || 0),
+    image_url: item.image_url || item.image,
+  }));
+}
+
+async function insertOrderItemsCompat(orderId, items) {
+  const modernRows = buildOrderItemsModern(orderId, items);
+  if (!modernRows.length) return { error: null };
+
+  const modernInsert = await supabase.from('order_items').insert(modernRows);
+  if (!modernInsert.error) return modernInsert;
+
+  const message = String(
+    modernInsert.error?.message || modernInsert.error?.details || modernInsert.error?.hint || ''
+  ).toLowerCase();
+
+  const shouldTryLegacy =
+    message.includes('could not find the') ||
+    message.includes('column') ||
+    message.includes('item_name') ||
+    message.includes('unit_price') ||
+    message.includes('total_price') ||
+    message.includes('item_type') ||
+    message.includes('item_image');
+
+  if (!shouldTryLegacy) return modernInsert;
+
+  const legacyRows = buildOrderItemsLegacy(orderId, items);
+  return supabase.from('order_items').insert(legacyRows);
+}
+
 // =====================================================
 // EMPTY CART COMPONENT
 // =====================================================
@@ -1940,17 +1998,10 @@ const Cart = () => {
       // Ensure order_items contains this order snapshot for supervisor readability.
       try {
         if (sharedOrder?.id && Array.isArray(sharePayload.items) && sharePayload.items.length > 0) {
-          const orderItems = sharePayload.items.map((item) => ({
-            order_id: sharedOrder.id,
-            item_name: item.name_ar || item.name,
-            item_id: item.id || crypto.randomUUID(),
-            item_type: item.item_type || 'product',
-            quantity: item.quantity,
-            unit_price: Number(item.priceUSD || 0),
-            total_price: Number(item.priceUSD || 0) * (item.quantity || 1),
-            item_image: item.image_url,
-          }));
-          await supabase.from('order_items').insert(orderItems);
+          const { error: itemsError } = await insertOrderItemsCompat(sharedOrder.id, sharePayload.items);
+          if (itemsError) {
+            console.warn('Share cart order_items warning:', itemsError);
+          }
         }
       } catch (itemsError) {
         console.warn('Share cart order_items warning:', itemsError);
@@ -2292,24 +2343,10 @@ const Cart = () => {
       }
 
       // حفظ عناصر الطلب
-      const orderItems = orderData.items.map(item => ({
-        order_id: order.id,
-        item_name: item.name_ar || item.name,
-        item_id: item.id || crypto.randomUUID(),
-        item_type: item.item_type || 'product',
-        quantity: item.quantity,
-        unit_price: Number(item.priceUSD || 0),
-        total_price: Number(item.priceUSD || 0) * (item.quantity || 1),
-        item_image: item.image_url || item.image
-      }));
-
-      const { data: items, error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
+      const { error: itemsError } = await insertOrderItemsCompat(order.id, orderData.items);
 
       if (itemsError) {
         console.warn('⚠️ تعذر حفظ عناصر الطلب في order_items، تم حفظ الطلب الرئيسي فقط:', itemsError);
-      } else {
       }
 
       // ===== حفظ الهدايا النقدية (إذا كانت موجودة) =====
@@ -2370,6 +2407,38 @@ const Cart = () => {
           }
         } catch (giftProcessError) {
           console.warn('⚠️ خطأ في معالجة الهدايا النقدية:', giftProcessError);
+        }
+      }
+
+      // ===== تثبيت بيانات الدافع للسلة المشتركة =====
+      // يجب تعيين payer_user_id و paid_by_user_id على الطلب حتى تعمل إشعارات
+      // Firebase بشكل صحيح لكلا الطرفين (المُنشئ والدافع)
+      if (orderData?.sharedCart?.creator_id && order?.id) {
+        try {
+          const { data: { session: payerSession } } = await supabase.auth.getSession();
+          const payerUid = payerSession?.user?.id || null;
+          if (payerUid) {
+            const payerFields = {
+              payer_user_id: payerUid,
+              collaboration_mode: 'shared',
+            };
+            // paid_by_user_id قد يكون موجوداً فقط عند اكتمال الدفع (ليس عند الإنشاء)
+            if (orderData.paymentMethod === 'paypal' || orderData.paymentMethod === 'wallet') {
+              payerFields.paid_by_user_id = payerUid;
+            }
+            const { error: payerUpdateError } = await supabase
+              .from('orders')
+              .update(payerFields)
+              .eq('id', order.id);
+            if (payerUpdateError) {
+              console.warn('⚠️ تعذر تعيين payer_user_id على الطلب المشترك:', payerUpdateError);
+            } else {
+              // تحديث الكائن المحلي أيضاً لكي تعمل الإشعارات الفورية بعد الإنشاء
+              order = { ...order, ...payerFields };
+            }
+          }
+        } catch (payerUpdateErr) {
+          console.warn('⚠️ خطأ في تحديث حقول الدافع:', payerUpdateErr);
         }
       }
 
@@ -3059,7 +3128,23 @@ const Cart = () => {
               <h3 className="font-bold text-gray-900 text-lg" dir="rtl">تفاصيل التوصيل المطلوبة</h3>
             </div>
 
-            {/* Sender Information (outside Syria only) */}
+            {/* Shared Cart prominent banner for payer */}
+            {sharedCartMode && (
+              <div className="mb-5 p-4 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl shadow-md text-white text-center" dir="rtl">
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <span className="text-2xl">💚</span>
+                  <span className="text-lg font-extrabold">أنت تدفع سلة مشتركة</span>
+                </div>
+                {recipientName ? (
+                  <p className="text-sm font-semibold opacity-90">
+                    هذا الطلب سيُوصَّل إلى <span className="font-extrabold text-white">{recipientName}</span> داخل سوريا
+                  </p>
+                ) : (
+                  <p className="text-sm font-semibold opacity-90">هذا الطلب سيُوصَّل إلى مستلم داخل سوريا</p>
+                )}
+                <p className="text-xs opacity-75 mt-1">بعد إتمام الدفع، ستصل رسالة تأكيد لمن أنشأ الطلب ❤️</p>
+              </div>
+            )}
             {!insideSyria && (
             <div className="mb-6">
               <h4 className="font-bold text-gray-900 mb-3 text-base" dir="rtl">بيانات المرسل</h4>
