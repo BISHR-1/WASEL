@@ -1878,8 +1878,6 @@ const Cart = () => {
   }, []);
 
   const resolveCurrentAppUserId = useCallback(async (authUserOverride = null) => {
-    if (currentAppUserId) return currentAppUserId;
-
     let authUser = authUserOverride;
     if (!authUser) {
       const { data: authData } = await supabase.auth.getUser();
@@ -1888,30 +1886,69 @@ const Cart = () => {
 
     if (!authUser) return null;
 
+    // If cached, verify it still exists in public.users
+    if (currentAppUserId) {
+      const { data: exists } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', currentAppUserId)
+        .maybeSingle();
+      if (exists?.id) return currentAppUserId;
+      // Stale cache — clear and re-resolve
+      setCurrentAppUserId(null);
+    }
+
+    // Try the SECURITY DEFINER RPC that creates the user if missing
     try {
       const { data: ensuredId, error: ensureError } = await supabase.rpc('ensure_current_app_user_id');
       if (!ensureError && ensuredId) {
         setCurrentAppUserId(ensuredId);
         return ensuredId;
       }
+      if (ensureError) console.warn('ensure_current_app_user_id error:', ensureError);
     } catch (error) {
       console.warn('ensure_current_app_user_id fallback:', error);
     }
 
+    // Direct lookup by auth_id, id, or email
     const { data: userRow, error } = await supabase
       .from('users')
       .select('id')
       .or(`auth_id.eq.${authUser.id},id.eq.${authUser.id},email.eq.${authUser.email}`)
       .maybeSingle();
 
-    if (error) {
-      console.warn('resolveCurrentAppUserId warning:', error);
-      return null;
-    }
-
-    if (userRow?.id) {
+    if (!error && userRow?.id) {
       setCurrentAppUserId(userRow.id);
       return userRow.id;
+    }
+
+    if (error) {
+      console.warn('resolveCurrentAppUserId query warning:', error);
+    }
+
+    // Last resort: create a minimal public.users row so the FK will succeed
+    try {
+      const email = authUser.email || `user-${authUser.id.slice(0, 8)}@placeholder.wasel`;
+      const name = authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'Wasel User';
+      const { data: newRow, error: insertError } = await supabase
+        .from('users')
+        .upsert({
+          id: authUser.id,
+          email,
+          full_name: name,
+          auth_id: authUser.id,
+          role: 'user',
+        }, { onConflict: 'email' })
+        .select('id')
+        .single();
+
+      if (!insertError && newRow?.id) {
+        setCurrentAppUserId(newRow.id);
+        return newRow.id;
+      }
+      if (insertError) console.warn('resolveCurrentAppUserId upsert warning:', insertError);
+    } catch (upsertError) {
+      console.warn('resolveCurrentAppUserId upsert fallback:', upsertError);
     }
 
     return null;
@@ -2036,29 +2073,51 @@ const Cart = () => {
         }
       }
 
-      const { data: createdLink, error: createLinkError } = await supabase
-        .from('cart_share_links')
-        .insert([{
-          created_by: creatorAppUserId,
-          token: shareToken,
-          short_code: shortCode,
-          status: 'active',
-          payload: {
-            ...sharePayload,
-            _share_meta: {
-              client_share_id: shareId,
-              shared_cart_token: shareToken,
-              shared_cart_url: shareUrl,
-              created_via: 'shared_cart_link',
-            },
+      let createdLink = null;
+      let linkInsertUserId = creatorAppUserId;
+
+      const buildLinkRow = (userId) => ({
+        created_by: userId,
+        token: shareToken,
+        short_code: shortCode,
+        status: 'active',
+        payload: {
+          ...sharePayload,
+          _share_meta: {
+            client_share_id: shareId,
+            shared_cart_token: shareToken,
+            shared_cart_url: shareUrl,
+            created_via: 'shared_cart_link',
           },
-          expires_at: new Date(Date.now() + (72 * 60 * 60 * 1000)).toISOString(),
-        }])
+        },
+        expires_at: new Date(Date.now() + (72 * 60 * 60 * 1000)).toISOString(),
+      });
+
+      const { data: firstLink, error: firstError } = await supabase
+        .from('cart_share_links')
+        .insert([buildLinkRow(linkInsertUserId)])
         .select('*')
         .single();
 
-      if (createLinkError) {
-        throw createLinkError;
+      if (firstError && firstError.code === '23503') {
+        // FK violation — created_by not in public.users; clear cache and re-resolve
+        console.warn('cart_share_links FK violation, re-resolving user id...');
+        setCurrentAppUserId(null);
+        const freshId = await resolveCurrentAppUserId();
+        if (!freshId) throw new Error('PUBLIC_USER_REQUIRED');
+        linkInsertUserId = freshId;
+
+        const { data: retryLink, error: retryError } = await supabase
+          .from('cart_share_links')
+          .insert([buildLinkRow(linkInsertUserId)])
+          .select('*')
+          .single();
+        if (retryError) throw retryError;
+        createdLink = retryLink;
+      } else if (firstError) {
+        throw firstError;
+      } else {
+        createdLink = firstLink;
       }
 
       const sharedOrderNumber = await generateOrderNumber();
@@ -2081,7 +2140,7 @@ const Cart = () => {
             coupon: sharePayload.coupon,
             orderNumber: sharedOrderNumber,
             collaborationMode: 'shared',
-            recipientUserId: creatorAppUserId,
+            recipientUserId: linkInsertUserId,
             metadata: {
               created_via: 'shared_cart_link',
               shared_cart_token: shareToken,
@@ -2114,7 +2173,7 @@ const Cart = () => {
           currency: 'USD',
           items: sharePayload.items,
           collaboration_mode: 'shared',
-          recipient_user_id: creatorAppUserId,
+          recipient_user_id: linkInsertUserId,
           sender_details: {
             ...sharePayload.sender,
             meta: {
@@ -2130,8 +2189,8 @@ const Cart = () => {
           notes: `طلب سلة مشتركة بانتظار دفع الطرف الخارجي.${additionalNotes ? ` ${additionalNotes}` : ''}`,
         };
 
-        if (creatorAppUserId) {
-          directPayload.user_id = creatorAppUserId;
+        if (linkInsertUserId) {
+          directPayload.user_id = linkInsertUserId;
         }
 
         const { data: insertedOrder, error: directInsertError } = await supabase
@@ -2151,7 +2210,7 @@ const Cart = () => {
       if (sharedOrder?.id) {
         const collaborationPatch = {
           collaboration_mode: 'shared',
-          recipient_user_id: creatorAppUserId,
+          recipient_user_id: linkInsertUserId,
         };
         // أضف sender_details.meta إذا لم يكن محفوظاً من الـ RPC
         if (!sharedOrder.sender_details?.meta?.created_via) {
