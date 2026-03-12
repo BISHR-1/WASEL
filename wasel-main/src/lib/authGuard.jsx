@@ -54,26 +54,42 @@ export async function requireAdmin() {
 
 /**
  * صارم: التحقق من أن المستخدم هو موصل مفوّض
+ * يُقبَل المستخدم إذا:
+ * 1. لديه سجل في courier_profiles (بغض النظر عن onboarding_completed)، أو
+ * 2. دوره في جدول users هو 'courier' أو 'delivery_person'
  */
 export async function requireCourier() {
   const user = await requireAuth();
-  
-  const { data: courier, error } = await supabase
+
+  // فحص courier_profiles أولاً
+  const { data: courier, error: courierError } = await supabase
     .from('courier_profiles')
     .select('user_id, onboarding_completed')
     .eq('user_id', user.id)
     .maybeSingle();
-  
-  if (error) {
-    console.error('❌ Courier check error:', error);
+
+  if (courier) {
+    return { user, courier };
+  }
+
+  // فحص دور المستخدم في جدول users كـ fallback
+  const { data: userRow, error: userError } = await supabase
+    .from('users')
+    .select('id, role, auth_id')
+    .or(`auth_id.eq.${user.id},id.eq.${user.id}`)
+    .maybeSingle();
+
+  if (userError) {
+    console.error('❌ Courier role check error:', userError);
     throw new Error('UNAUTHORIZED: Failed to verify courier status');
   }
-  
-  if (!courier || !courier.onboarding_completed) {
+
+  const role = String(userRow?.role || '').toLowerCase();
+  if (!userRow || !['courier', 'delivery_person'].includes(role)) {
     throw new Error('UNAUTHORIZED: User is not a verified courier');
   }
-  
-  return { user, courier };
+
+  return { user, courier: null };
 }
 
 /**
