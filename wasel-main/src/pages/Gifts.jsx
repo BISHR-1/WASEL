@@ -3,7 +3,7 @@ import { base44 } from '../api/base44Client';
 
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Gift, ShoppingBag, Eye } from 'lucide-react';
+import { Gift, ShoppingBag, Eye, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/components/cart/CartContext';
 import PriceDisplay from '@/components/common/PriceDisplay';
@@ -12,6 +12,7 @@ import ProductDetailModal from '@/components/common/ProductDetailModal';
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
 import AddToCartButton from '@/components/buttons/AddToCartButton';
+import { attachRatingsFromReviews, normalizeItemRating } from '@/lib/itemRatings';
 
 const Gifts = () => {
   const { addToCart } = useCart();
@@ -20,7 +21,11 @@ const Gifts = () => {
 
   const { data: gifts = [], isLoading } = useQuery({
     queryKey: ['gifts'],
-    queryFn: () => base44.entities.Gift.list(),
+    queryFn: async () => {
+      const list = await base44.entities.Gift.list();
+      const normalized = Array.isArray(list) ? list.map((gift) => normalizeItemRating(gift)) : [];
+      return await attachRatingsFromReviews(normalized, { itemType: 'gift' });
+    },
   });
 
   // Auto-hide add-to-cart animation
@@ -116,6 +121,15 @@ const Gifts = () => {
                 </div>
                 <div className="p-4">
                   <h3 className="text-xl font-bold text-gray-800 mb-2">{gift.name}</h3>
+                  {Number(gift?.review_count ?? gift?.rating_count ?? 0) > 0 && (
+                    <div className="flex items-center gap-1 mb-2">
+                      <Star className="w-4 h-4 text-[#F59E0B] fill-[#F59E0B]" />
+                      <span className="text-sm font-bold text-gray-700">
+                        {Number(gift?.avg_rating ?? gift?.rating_avg ?? gift?.rating ?? 0).toFixed(1)}
+                      </span>
+                      <span className="text-xs text-gray-400">({Number(gift?.review_count ?? gift?.rating_count ?? 0)})</span>
+                    </div>
+                  )}
                   <p className="text-gray-600 text-sm mb-4">{gift.description}</p>
                   <div className="flex items-center justify-between mb-4">
                     <PriceDisplay basePrice={gift.price} discount={0.1} />

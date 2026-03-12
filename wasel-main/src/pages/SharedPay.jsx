@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { CheckCircle, Copy, CreditCard, Loader2, Link2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -8,6 +8,8 @@ import PayPalPayment from '@/components/payment/PayPalPayment';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { notifyOrderUsers } from '@/services/firebaseOrderNotifications';
+import SmartLottie from '@/components/animations/SmartLottie';
+import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
 
 export default function SharedPay() {
   const navigate = useNavigate();
@@ -21,12 +23,31 @@ export default function SharedPay() {
   const [shareData, setShareData] = useState(null);
   const [order, setOrder] = useState(null);
   const [manualRef, setManualRef] = useState('');
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('تم الدفع بنجاح');
 
   const amountUsd = useMemo(() => {
     if (!order) return 0;
     const raw = order.total_usd ?? order.total_amount ?? 0;
     return Number(raw) || 0;
   }, [order]);
+
+  useEffect(() => {
+    if (!showSuccessAnimation) return;
+    const timer = setTimeout(() => {
+      setShowSuccessAnimation(false);
+      navigate('/MyOrders', {
+        replace: true,
+        state: {
+          showInvoicePrompt: true,
+          invoiceOrderId: order?.id || null,
+          activeOrdersTab: 'shared',
+        },
+      });
+    }, 2600);
+
+    return () => clearTimeout(timer);
+  }, [showSuccessAnimation, navigate, order?.id]);
 
   const claimLink = async () => {
     if (!token?.trim()) {
@@ -73,8 +94,13 @@ export default function SharedPay() {
       await notifyOrderUsers('shared_payment_success', data, {
         provider,
         reference: manualRef || payload?.id || payload?.orderID || null,
+        payerName: data?.sender_details?.name || 'المُرسِل',
+        recipientName: data?.recipient_details?.name || 'المستلم',
+        newStatus: 'processing',
       });
 
+      setSuccessMessage('تم الدفع بنجاح! سيتم تحويلك إلى طلباتي (المشتركة)');
+      setShowSuccessAnimation(true);
       toast.success('تم تسجيل الدفع بنجاح');
     } catch (err) {
       console.error('mark paid error', err);
@@ -191,6 +217,35 @@ export default function SharedPay() {
             </Button>
           </motion.div>
         )}
+
+        <AnimatePresence>
+          {showSuccessAnimation && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm flex items-center justify-center"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-white rounded-3xl p-7 max-w-sm mx-4 text-center shadow-2xl"
+              >
+                <SmartLottie
+                  animationPath={ANIMATION_PRESETS.paymentSuccess.path}
+                  width={140}
+                  height={140}
+                  trigger="never"
+                  autoplay={true}
+                  loop={false}
+                />
+                <h3 className="text-xl font-extrabold text-[#1B4332]" dir="rtl">تم الدفع بنجاح 🎉</h3>
+                <p className="text-sm text-gray-600 mt-2" dir="rtl">{successMessage}</p>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

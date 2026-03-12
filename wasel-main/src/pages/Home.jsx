@@ -20,6 +20,7 @@ import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
 import AddToCartButton from '@/components/buttons/AddToCartButton';
 import { useDarkMode } from '@/lib/DarkModeContext';
+import { attachRatingsFromReviews, normalizeItemRating } from '@/lib/itemRatings';
 
 const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
 
@@ -101,7 +102,11 @@ const Home = () => {
 
   const { data: products = [], isLoading: productsLoading } = useQuery({
     queryKey: ['home-products'],
-    queryFn: () => base44.entities.Product.list({ limit: 10, sort: { created_date: -1 } })
+    queryFn: async () => {
+      const list = await base44.entities.Product.list({ limit: 10, sort: { created_date: -1 } });
+      const normalized = Array.isArray(list) ? list.map((item) => normalizeItemRating(item)) : [];
+      return await attachRatingsFromReviews(normalized, { itemType: 'product' });
+    }
   });
 
   useEffect(() => {
@@ -217,12 +222,20 @@ const Home = () => {
 
   const { data: gifts = [] } = useQuery({
     queryKey: ['home-gifts'],
-    queryFn: () => base44.entities.Gift.list({ limit: 12, sort: { created_date: -1 } })
+    queryFn: async () => {
+      const list = await base44.entities.Gift.list({ limit: 12, sort: { created_date: -1 } });
+      const normalized = Array.isArray(list) ? list.map((item) => normalizeItemRating(item)) : [];
+      return await attachRatingsFromReviews(normalized, { itemType: 'gift' });
+    }
   });
 
   const { data: packages = [] } = useQuery({
     queryKey: ['home-packages'],
-    queryFn: () => base44.entities.Package.list({ limit: 12, sort: { created_date: -1 } })
+    queryFn: async () => {
+      const list = await base44.entities.Package.list({ limit: 12, sort: { created_date: -1 } });
+      const normalized = Array.isArray(list) ? list.map((item) => normalizeItemRating(item)) : [];
+      return await attachRatingsFromReviews(normalized, { itemType: 'package' });
+    }
   });
 
   const categories = [
@@ -251,7 +264,7 @@ const Home = () => {
   };
 
   const normalizeShowcaseItem = (item, itemType) => ({
-    ...item,
+    ...normalizeItemRating(item),
     item_type: itemType,
     name: item?.name || item?.name_ar || (itemType === 'gift' ? 'Gift Item' : 'Package Item'),
     image_url: item?.image_url || item?.image || item?.images?.[0] || 'https://placehold.co/400x400/F8FAFC/1F2933?text=Wasel',
@@ -439,8 +452,8 @@ const Home = () => {
                     <p className="text-xs text-[#64748B] line-clamp-2 min-h-[2rem] mb-2">{product.description || product.description_ar || 'بدون وصف حالياً'}</p>
                     <div className="flex items-center gap-1 text-xs mb-3">
                       <Star className="w-4 h-4 text-[#F59E0B] fill-[#F59E0B]" />
-                      <span className="font-bold text-[#1F2933]">{Number(product.avg_rating ?? product.rating ?? 0).toFixed(1)}</span>
-                      <span className="text-[#94A3B8]">({Number(product.review_count ?? 0)})</span>
+                      <span className="font-bold text-[#1F2933]">{Number(product.avg_rating ?? product.rating_avg ?? product.rating ?? 0).toFixed(1)}</span>
+                      <span className="text-[#94A3B8]">({Number(product.review_count ?? product.rating_count ?? 0)})</span>
                     </div>
                     <div className="flex flex-col gap-2 relative">
                       <PriceDisplay basePrice={product.price} />

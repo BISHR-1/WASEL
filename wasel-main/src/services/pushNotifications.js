@@ -78,14 +78,6 @@ const setupWebNotifications = async () => {
       return null;
     }
 
-    if ('Notification' in window && Notification.permission === 'default') {
-      try {
-        await Notification.requestPermission();
-      } catch (error) {
-        console.warn('Web Notification permission warning:', error);
-      }
-    }
-
     if (webNotificationsChannel) {
       supabase.removeChannel(webNotificationsChannel);
       webNotificationsChannel = null;
@@ -122,23 +114,6 @@ const setupWebNotifications = async () => {
           const title = row.title || 'اشعار جديد';
           const body = row.message || '';
 
-          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-            try {
-              const notification = new Notification(title, { body });
-              notification.onclick = () => {
-                openNotificationLink(row.link);
-              };
-            } catch (error) {
-              console.warn('Web Notification display warning:', error);
-            }
-          }
-
-          showInAppNotification({
-            id: row.id,
-            title,
-            body,
-            data: { link: row.link },
-          });
         }
       )
       .subscribe();
@@ -170,21 +145,6 @@ const setupWebNotifications = async () => {
 
           const title = row.title || 'اشعار جديد';
           const body = row.message || '';
-          showInAppNotification({
-            id: row.id,
-            title,
-            body,
-            data: { link: row.link },
-          });
-
-          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-            try {
-              const notification = new Notification(title, { body });
-              notification.onclick = () => openNotificationLink(row.link);
-            } catch (notifyError) {
-              console.warn('Web Notification polling display warning:', notifyError);
-            }
-          }
         });
       } catch (pollError) {
         console.warn('Web notifications polling exception:', pollError);
@@ -225,7 +185,6 @@ const setupListeners = () => {
   // عند وصول إشعار والتطبيق مفتوح (Foreground)
   PushNotifications.addListener('pushNotificationReceived', (notification) => {
     console.log('📬 إشعار جديد:', notification);
-    showInAppNotification(notification);
   });
 
   // عند الضغط على الإشعار
@@ -406,20 +365,7 @@ const saveTokenToDatabase = async (token) => {
  * عرض إشعار داخل التطبيق
  */
 const showInAppNotification = (notification) => {
-  const title = notification?.title || 'اشعار جديد';
-  const body = notification?.body || '';
-  const link = notification?.data?.link;
-
-  toast.info(title, {
-    description: body,
-    duration: 7000,
-    action: link
-      ? {
-        label: 'فتح',
-        onClick: () => openNotificationLink(link),
-      }
-      : undefined,
-  });
+  // Notifications disabled - no popup shown
 };
 
 /**

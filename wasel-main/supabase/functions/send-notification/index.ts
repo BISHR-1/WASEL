@@ -24,9 +24,20 @@ function toUniqueStrings(values: Array<string | null | undefined>): string[] {
   return Array.from(new Set((values || []).filter(Boolean).map((v) => String(v))));
 }
 
-function getServerStyledContent(event: string, newStatus: string, fallbackTitle: string, fallbackBody: string) {
+function getServerStyledContent(
+  event: string,
+  newStatus: string,
+  fallbackTitle: string,
+  fallbackBody: string,
+  data?: Record<string, string>,
+) {
   if (event === 'new_order_created') {
-    const paymentMethod = fallbackBody?.includes('باي بال') ? 'باي بال 💳'
+    const methodFromData = String(data?.payment_method || '').toLowerCase();
+    const paymentMethod = methodFromData === 'paypal' ? 'باي بال 💳'
+      : methodFromData === 'whatsapp' ? 'واتساب 💬'
+      : methodFromData === 'wallet' ? 'المحفظة 💰'
+      : methodFromData === 'shared_cart' ? 'سلة مشتركة 🛒'
+      : fallbackBody?.includes('باي بال') ? 'باي بال 💳'
       : fallbackBody?.includes('واتساب') ? 'واتساب 💬'
       : fallbackBody?.includes('المحفظة') ? 'المحفظة 💰'
       : fallbackBody?.includes('سلة مشتركة') ? 'سلة مشتركة 🛒'
@@ -45,9 +56,38 @@ function getServerStyledContent(event: string, newStatus: string, fallbackTitle:
   }
 
   if (event === 'shared_payment_success') {
+    // Keep legacy support but preserve customized body if provided by client.
     return {
-      title: '💳 تم الدفع بنجاح',
-      body: 'تم تأكيد دفع طلبك بنجاح. شكرا لك!',
+      title: fallbackTitle || '💳 تم الدفع بنجاح',
+      body: fallbackBody || 'تم تأكيد دفع طلبك بنجاح. شكرا لك!',
+    };
+  }
+
+  if (event === 'shared_cart_paid_creator') {
+    return {
+      title: fallbackTitle || '💜 خبر جميل وصل',
+      body: fallbackBody || 'تم دفع السلة المشتركة بنجاح. طلبك الآن قيد التجهيز.',
+    };
+  }
+
+  if (event === 'shared_cart_paid_payer') {
+    return {
+      title: fallbackTitle || '💳 تم الدفع بنجاح',
+      body: fallbackBody || 'تم دفع السلة المشتركة بنجاح. شكراً لكرمك ❤️',
+    };
+  }
+
+  if (event === 'shared_order_status_creator') {
+    return {
+      title: fallbackTitle || '📦 تحديث على سلتك المشتركة',
+      body: fallbackBody || 'هناك تحديث جديد على الطلب المشترك.',
+    };
+  }
+
+  if (event === 'shared_order_status_payer') {
+    return {
+      title: fallbackTitle || '💙 تحديث طلب المُستلم',
+      body: fallbackBody || 'هناك تحديث جديد على الطلب الذي قمت بدفعه.',
     };
   }
 
@@ -261,7 +301,7 @@ Deno.serve(async (req) => {
     const { userId, userIds, topic, title, body, data, imageUrl } = payload;
     const event = String(data?.event || '');
     const newStatus = String(data?.new_status || '');
-    const styledContent = getServerStyledContent(event, newStatus, title, body);
+    const styledContent = getServerStyledContent(event, newStatus, title, body, data);
     const finalTitle = styledContent.title;
     const finalBody = styledContent.body;
 

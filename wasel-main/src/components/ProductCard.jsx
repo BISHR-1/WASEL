@@ -56,6 +56,8 @@ const ProductCard = memo(function ProductCard({
   const imageUrl = product.images?.[0] || product.thumbnail_url || product.image || '/placeholder-product.png';
   const productTitle = product.title_ar || product.title || product.name || 'منتج';
   const productStock = product.stock ?? 10;
+  const productRatingCount = Number(product.review_count ?? product.rating_count ?? 0);
+  const productRatingAverage = Number(product.avg_rating ?? product.rating_avg ?? product.rating ?? 0);
 
   // Size configurations
   const sizeConfig = {
@@ -223,11 +225,11 @@ const ProductCard = memo(function ProductCard({
         </h3>
 
         {/* Rating */}
-        {product.rating_count > 0 && (
+        {productRatingCount > 0 && (
           <div className="flex items-center gap-1">
             <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
             <span className="text-xs text-[#1F2933]/70">
-              {product.rating_avg?.toFixed(1)} ({product.rating_count})
+              {productRatingAverage.toFixed(1)} ({productRatingCount})
             </span>
           </div>
         )}

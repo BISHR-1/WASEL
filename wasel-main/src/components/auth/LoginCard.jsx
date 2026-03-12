@@ -137,7 +137,9 @@ export default function LoginCard({
                 </div>
                 {regionLocked && (
                   <p className="text-[11px] text-[#0F766E] mt-2">
-                    تم قفل المنطقة على "داخل سوريا" عبر رابط إحالة موصل{referralCode ? ` (رمز: ${referralCode})` : ''}.
+                    {selectedRegion === 'outside_syria'
+                      ? 'تم قفل المنطقة على "خارج سوريا" لهذا الرابط ولا يمكن تغييرها.'
+                      : `تم قفل المنطقة على "داخل سوريا"${referralCode ? ` عبر رمز الإحالة (${referralCode})` : ''}.`}
                   </p>
                 )}
               </div>

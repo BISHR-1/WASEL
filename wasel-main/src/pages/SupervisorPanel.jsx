@@ -63,10 +63,11 @@ const PANEL_SECTIONS = [
   { key: 'reviews', label: 'التقييمات', icon: Star },
   { key: 'messages', label: 'الرسائل', icon: MessageCircle },
   { key: 'memberships', label: 'Wasel+', icon: Crown },
-  { key: 'wallets', label: 'المحافظ', icon: BookOpen },
   { key: 'user-control', label: 'إدارة المستخدمين', icon: Wallet },
   { key: 'controls', label: 'التحكم', icon: Settings2 },
 ];
+
+const USER_ROLE_OPTIONS = ['user', 'courier', 'supervisor'];
 
 const DEFAULT_EXCHANGE_RATE = 150;
 
@@ -194,6 +195,9 @@ export default function SupervisorPanel() {
   const [walletAmountToReduce, setWalletAmountToReduce] = useState('');
   const [updatingUserWallet, setUpdatingUserWallet] = useState(null);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [roleChangeEmail, setRoleChangeEmail] = useState('');
+  const [roleChangeTarget, setRoleChangeTarget] = useState('user');
+  const [updatingUserRole, setUpdatingUserRole] = useState(false);
 
   // Reviews Section States
   const [reviewsFeedback, setReviewsFeedback] = useState([]);
@@ -533,11 +537,6 @@ export default function SupervisorPanel() {
     if (activeSection === 'messages') {
       loadConversations();
     }
-    if (activeSection === 'wallets') {
-      supabase.from('wallets').select('*, user:users(full_name, email)').then(({ data }) => {
-        if (data) setSystemWallets(data);
-      });
-    }
   }, [activeSection]);
 
   const loadReviews = async () => {
@@ -612,22 +611,21 @@ export default function SupervisorPanel() {
     if (!chatInput.trim() || !activeConversation || !currentUser) return;
     setSendingChat(true);
     try {
+      const messageText = chatInput.trim();
+      setChatInput('');
       const msg = {
         conversation_id: activeConversation.id,
         sender_id: currentUser.id,
         sender_name: currentUser.name || currentUser.email || 'المشرف',
         sender_role: 'supervisor',
-        message: chatInput.trim(),
+        message: messageText,
       };
       await supabase.from('direct_messages').insert([msg]);
       await supabase.from('conversations').update({
-        last_message: chatInput.trim(),
+        last_message: messageText,
         last_message_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }).eq('id', activeConversation.id);
-
-      setChatMessages(prev => [...prev, { ...msg, id: Date.now(), created_at: new Date().toISOString() }]);
-      setChatInput('');
 
       // Notify the other participant via push
       const otherIds = (activeConversation.participant_ids || []).filter(id => id !== currentUser.id);
@@ -1206,6 +1204,99 @@ export default function SupervisorPanel() {
       toast.error('فشل تحديث المحفظة');
     } finally {
       setUpdatingUserWallet(null);
+    }
+  };
+
+  const updateUserRoleByEmail = async () => {
+    const email = String(roleChangeEmail || '').trim().toLowerCase();
+    if (!email) {
+      toast.error('أدخل البريد الإلكتروني أولاً');
+      return;
+    }
+
+    if (!USER_ROLE_OPTIONS.includes(roleChangeTarget)) {
+      toast.error('اختر دوراً صحيحاً');
+      return;
+    }
+
+    try {
+      setUpdatingUserRole(true);
+
+      const { data: userRow, error: userFetchError } = await supabase
+        .from('users')
+        .select('id, full_name, email, role')
+        .ilike('email', email)
+        .limit(1)
+        .maybeSingle();
+
+      if (userFetchError) throw userFetchError;
+      if (!userRow?.id) {
+        toast.error('لا يوجد مستخدم بهذا البريد');
+        return;
+      }
+
+      const nextRole = roleChangeTarget;
+      const { error: userUpdateError } = await supabase
+        .from('users')
+        .update({ role: nextRole })
+        .eq('id', userRow.id);
+
+      if (userUpdateError) throw userUpdateError;
+
+      const { data: adminRow, error: adminFetchError } = await supabase
+        .from('admin_users')
+        .select('id, email, role, is_active, name')
+        .ilike('email', email)
+        .limit(1)
+        .maybeSingle();
+
+      if (adminFetchError) throw adminFetchError;
+
+      const displayName = userRow.full_name || email.split('@')[0] || 'User';
+
+      if (nextRole === 'supervisor') {
+        if (adminRow?.id) {
+          const { error } = await supabase
+            .from('admin_users')
+            .update({ role: 'supervisor', is_active: true, name: adminRow.name || displayName })
+            .eq('id', adminRow.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from('admin_users')
+            .insert({ email, name: displayName, role: 'supervisor', is_active: true });
+          if (error) throw error;
+        }
+      } else if (nextRole === 'courier') {
+        if (adminRow?.id) {
+          const { error } = await supabase
+            .from('admin_users')
+            .update({ role: 'delivery_person', is_active: true, name: adminRow.name || displayName })
+            .eq('id', adminRow.id);
+          if (error) throw error;
+        }
+      } else if (adminRow?.id) {
+        const { error } = await supabase
+          .from('admin_users')
+          .update({ is_active: false })
+          .eq('id', adminRow.id);
+        if (error) throw error;
+      }
+
+      setUsers((prev) => prev.map((entry) => {
+        if (String(entry?.id) === String(userRow.id)) {
+          return { ...entry, role: nextRole };
+        }
+        return entry;
+      }));
+
+      toast.success(`تم تحديث الدور إلى ${nextRole}`);
+      await Promise.all([loadUsers(), loadDashboardData()]);
+    } catch (error) {
+      console.error('Update user role error:', error);
+      toast.error('فشل تحديث الدور');
+    } finally {
+      setUpdatingUserRole(false);
     }
   };
 
@@ -2176,56 +2267,43 @@ export default function SupervisorPanel() {
           </section>
         )}
 
-        {/* Wallets Section */}
-        {activeSection === 'wallets' && (
-          <section className="rounded-3xl border border-[#E7ECEA] bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between gap-2 mb-4">
-              <h2 className="text-xl font-black text-[#1B4332]">محافظ المستخدمين</h2>
-              <Badge className="bg-[#ECFDF5] text-[#059669] border-0">{systemWallets.length} محفظة</Badge>
-            </div>
-            {systemWallets.length === 0 ? (
-              <div className="text-center py-8 text-[#94A3B8]">
-                <BookOpen className="w-10 h-10 mx-auto mb-2 text-[#CBD5E1]" />
-                <p>لا توجد محافظ بعد</p>
-              </div>
-            ) : (
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {systemWallets.map((w) => (
-                  <motion.article key={w.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                    className="rounded-2xl border border-[#E7ECEA] bg-[#FAFCFB] p-4">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1B4332] to-[#40916C] flex items-center justify-center shrink-0">
-                        <User className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="font-black text-[#1B4332] truncate text-sm">{w.user?.full_name || 'بدون اسم'}</h3>
-                        <p className="text-xs text-[#64748B] truncate">{w.user?.email || 'بدون إيميل'}</p>
-                      </div>
-                    </div>
-                    <div className="space-y-1 text-sm text-[#64748B] mb-3">
-                      <p>الرصيد الكلي: <span className="font-black text-[#059669]">${Number(w.balance_usd || 0).toFixed(2)}</span> / <span className="text-[#059669]">{Math.round(Number(w.balance_usd || 0) * exchangeRate).toLocaleString('en-US')} ل.س</span></p>
-                      <p className="text-xs">آخر تحديث: <span className="font-bold text-[#1B4332]">{new Date(w.updated_at || w.created_at).toLocaleDateString('ar-EG')}</span></p>
-                    </div>
-                    <Button onClick={() => handleResetWallet(w.id, Number(w.balance_usd || 0), w.user_id)}
-                      disabled={resettingWalletId === w.id || Number(w.balance_usd || 0) <= 0}
-                      variant="outline"
-                      className="w-full rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700">
-                      {resettingWalletId === w.id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                      تصفير الرصيد
-                    </Button>
-                  </motion.article>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-
         {/* User Control Section */}
         {activeSection === 'user-control' && (
           <section className="rounded-3xl border border-[#E7ECEA] bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between gap-2 mb-4">
-              <h2 className="text-xl font-black text-[#1B4332]">إدارة محافظ المستخدمين</h2>
+              <h2 className="text-xl font-black text-[#1B4332]">إدارة المستخدمين</h2>
               <Badge className="bg-[#ECFDF5] text-[#059669] border-0">{users.length} مستخدم</Badge>
+            </div>
+
+            <div className="rounded-2xl border border-[#E7ECEA] bg-[#FAFCFB] p-4 mb-5 space-y-3">
+              <h3 className="text-sm font-black text-[#1B4332]">تغيير دور المستخدم عبر البريد الإلكتروني</h3>
+              <div className="grid gap-2 md:grid-cols-[1fr_180px_140px]">
+                <input
+                  type="email"
+                  placeholder="user@example.com"
+                  value={roleChangeEmail}
+                  onChange={(e) => setRoleChangeEmail(e.target.value)}
+                  className="w-full border border-[#E5E7EB] rounded-xl px-3 py-2.5 text-sm focus:border-[#1B4332] focus:outline-none"
+                />
+                <select
+                  value={roleChangeTarget}
+                  onChange={(e) => setRoleChangeTarget(e.target.value)}
+                  className="w-full border border-[#E5E7EB] rounded-xl px-3 py-2.5 text-sm focus:border-[#1B4332] focus:outline-none"
+                >
+                  {USER_ROLE_OPTIONS.map((role) => (
+                    <option key={role} value={role}>{role}</option>
+                  ))}
+                </select>
+                <Button
+                  onClick={updateUserRoleByEmail}
+                  disabled={updatingUserRole || !roleChangeEmail.trim()}
+                  className="rounded-xl bg-[#1B4332] hover:bg-[#2D6A4F] text-white"
+                >
+                  {updatingUserRole ? <Loader2 className="w-4 h-4 ml-2 animate-spin" /> : null}
+                  تحديث الدور
+                </Button>
+              </div>
+              <p className="text-xs text-[#64748B]">الأدوار المتاحة: user, courier, supervisor</p>
             </div>
 
             {/* Search Bar */}

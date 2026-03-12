@@ -463,6 +463,14 @@ export default function MyOrders() {
     };
   }, [location.pathname, location.state, navigate, language]);
 
+  useEffect(() => {
+    const targetTab = location.state?.activeOrdersTab;
+    if (!targetTab) return;
+    if (['current', 'completed', 'shared'].includes(targetTab)) {
+      setActiveOrdersTab(targetTab);
+    }
+  }, [location.state]);
+
   const handleSubmitReview = async (reviewPayload) => {
     try {
       const productReviews = Array.isArray(reviewPayload)
@@ -821,7 +829,9 @@ export default function MyOrders() {
                 <div className="text-center py-8 text-gray-500 bg-white rounded-2xl border border-[#F5E6D3]">
                   {activeOrdersTab === 'completed'
                     ? (language === 'ar' ? 'لا توجد طلبات مكتملة بعد' : 'No completed orders yet')
-                    : (language === 'ar' ? 'لا توجد طلبات حالية' : 'No current orders')}
+                    : activeOrdersTab === 'shared'
+                      ? (language === 'ar' ? 'لا توجد سلال مشتركة حالياً' : 'No shared carts yet')
+                      : (language === 'ar' ? 'لا توجد طلبات حالية' : 'No current orders')}
                 </div>
               )}
 

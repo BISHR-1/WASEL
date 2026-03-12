@@ -26,6 +26,7 @@ export default function SharedCartPay() {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
           localStorage.setItem('wasel_auth_preferred_mode', 'login');
+          localStorage.setItem('wasel_auth_preferred_region', 'outside_syria');
           localStorage.setItem('wasel_auth_region_locked', 'outside_syria');
           localStorage.setItem('wasel_post_login_redirect', window.location.pathname);
           navigate('/?login=true', { replace: true });

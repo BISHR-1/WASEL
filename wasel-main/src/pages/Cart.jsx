@@ -33,7 +33,7 @@ import { useDarkMode } from '@/lib/DarkModeContext';
 import { useUsdToSypRate } from '@/lib/exchangeRate';
 import { interleaveByCategory, scoreItemsByBehavior, trackPurchase } from '@/lib/recommendationSignals';
 import { getUserRegion, isInsideSyria } from '@/lib/userRegion';
-import { notifyAdminUsers } from '@/services/firebaseOrderNotifications';
+import { notifyAdminUsers, notifyOrderUsers } from '@/services/firebaseOrderNotifications';
 import { buildPublicAppUrl } from '@/lib/publicAppUrl';
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
@@ -1225,6 +1225,7 @@ const Cart = () => {
   const [showPaymentAnimation, setShowPaymentAnimation] = useState(false);
   const [showPaymentSuccessAnimation, setShowPaymentSuccessAnimation] = useState(false);
   const [paymentSuccessMessage, setPaymentSuccessMessage] = useState('');
+  const [paymentSuccessRedirectState, setPaymentSuccessRedirectState] = useState({ showInvoicePrompt: true, activeOrdersTab: 'current' });
   
   // ===== نظام الطلبات المجانية =====
   const [freeOrdersRemaining, setFreeOrdersRemaining] = useState(3);
@@ -1255,10 +1256,10 @@ const Cart = () => {
     const timer = setTimeout(() => {
       setShowPaymentSuccessAnimation(false);
       clearCart();
-      navigate('/MyOrders', { state: { showInvoicePrompt: true } });
+      navigate('/MyOrders', { state: paymentSuccessRedirectState || { showInvoicePrompt: true, activeOrdersTab: 'current' } });
     }, 3000);
     return () => clearTimeout(timer);
-  }, [showPaymentSuccessAnimation]);
+  }, [showPaymentSuccessAnimation, cartItems, clearCart, navigate, paymentSuccessRedirectState]);
 
   // Load wallet balance
   useEffect(() => {
@@ -1818,9 +1819,14 @@ const Cart = () => {
         p_expires_in_hours: 72,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.warn('create_cart_share_link warning (non-fatal):', error);
+      }
 
-      const shareUrl = buildPublicAppUrl(`/shared-cart/${data.token}`);
+      const shareToken = data?.token || null;
+      const shareUrl = shareToken
+        ? buildPublicAppUrl(`/shared-cart/${shareToken}`)
+        : buildPublicAppUrl('/');
 
       // Create a real draft order immediately when sharing the cart,
       // so supervisors can track it before the payer completes checkout.
@@ -1846,7 +1852,7 @@ const Cart = () => {
             collaborationMode: 'shared',
             metadata: {
               created_via: 'shared_cart_link',
-              shared_cart_token: data.token,
+              shared_cart_token: shareToken,
               shared_cart_url: shareUrl,
               source_region: sharePayload.sourceRegion,
             },
@@ -1880,7 +1886,7 @@ const Cart = () => {
             ...sharePayload.sender,
             meta: {
               created_via: 'shared_cart_link',
-              shared_cart_token: data.token,
+              shared_cart_token: shareToken,
               shared_cart_url: shareUrl,
               sourceRegion: sharePayload.sourceRegion,
             },
@@ -1982,8 +1988,14 @@ const Cart = () => {
 
       clearCart?.();
       localStorage.removeItem('wasel_shared_cart_session');
-      navigate('/MyOrders', { state: { showInvoicePrompt: true, invoiceOrderId: sharedOrder?.id || null } });
-      toast.success('تم إنشاء رابط السلة والطلب وإرساله للمشرف، وتم نقله إلى طلباتي');
+      setPaymentSuccessMessage('تم إنشاء رابط السلة المشتركة وإرسال الطلب بنجاح ✨');
+      setPaymentSuccessRedirectState({
+        showInvoicePrompt: true,
+        invoiceOrderId: sharedOrder?.id || null,
+        activeOrdersTab: 'shared',
+      });
+      setShowPaymentSuccessAnimation(true);
+      toast.success('تم إنشاء السلة المشتركة بنجاح');
     } catch (error) {
       console.error('Share cart failed:', error);
       if (isMissingRpcFunctionError(error, 'create_cart_share_link')) {
@@ -1996,7 +2008,7 @@ const Cart = () => {
     } finally {
       setCreatingCartShareLink(false);
     }
-  }, [insideSyria, recipientName, recipientPhone, recipientAddress, senderName, senderPhone, senderCountry, currentUserEmail, cartItems, exchangeRate, finalTotalSYP, finalTotalUSD, membershipDiscountSYP, selectedTipSYP, appliedCoupon, additionalNotes, deliveryTime, clearCart, navigate]);
+  }, [insideSyria, recipientName, recipientPhone, recipientAddress, senderName, senderPhone, senderCountry, currentUserEmail, cartItems, exchangeRate, finalTotalSYP, finalTotalUSD, membershipDiscountSYP, selectedTipSYP, appliedCoupon, additionalNotes, deliveryTime, clearCart]);
 
   const handleDownloadInvoicePdf = useCallback(async () => {
     try {
@@ -2154,6 +2166,13 @@ const Cart = () => {
           p_order: {
             ...orderData,
             orderNumber: generatedOrderNumber,
+            recipientUserId: orderData?.sharedCart?.creator_id || null,
+            collaborationMode: orderData?.sharedCart ? 'shared' : undefined,
+            metadata: orderData?.sharedCart ? {
+              created_via: 'shared_cart_link',
+              shared_cart_token: orderData.sharedCart.token || null,
+              shared_cart_creator_id: orderData.sharedCart.creator_id || null,
+            } : undefined,
           },
         });
         if (!rpc.error && rpc.data) {
@@ -2196,6 +2215,8 @@ const Cart = () => {
               sender_details: orderData.sender || {},
               recipient_details: orderData.recipient || {},
               notes: orderData.notes || '',
+              collaboration_mode: orderData?.sharedCart ? 'shared' : null,
+              recipient_user_id: orderData?.sharedCart?.creator_id || null,
             };
 
             if (authUser?.id) {
@@ -2539,7 +2560,11 @@ const Cart = () => {
         notes: (additionalNotes || '').substring(0, 500), // ✅ تحديد طول الملاحظات
         deliveryTime: deliveryTime || null,
         tip: normalizedTipSYP,
-        coupon: appliedCoupon?.code
+        coupon: appliedCoupon?.code,
+        sharedCart: sharedCartMode ? {
+          token: sharedCartToken || null,
+          creator_id: sharedCartCreator || null,
+        } : null,
       };
 
       // ===================== ✅ SECURITY: VALIDATE ORDER STRUCTURE =====================
@@ -2625,9 +2650,27 @@ const Cart = () => {
             }
             
             // Show payment success animation
+            const isSharedPayment = Boolean(sharedCartMode);
             setShowPaymentSuccessAnimation(true);
             setPaymentSuccessMessage(`تم الدفع بنجاح من المحفظة! رصيدك المتبقي: ${Number(payResult.new_balance).toFixed(2)}$`);
-            toast.success(`${setPaymentSuccessMessage} ✅`, { duration: 5000 });
+            setPaymentSuccessRedirectState({
+              showInvoicePrompt: true,
+              invoiceOrderId: savedOrder?.id || null,
+              activeOrdersTab: isSharedPayment ? 'shared' : 'current',
+            });
+            toast.success('تم الدفع بنجاح ✅', { duration: 5000 });
+
+            if (isSharedPayment && savedOrder?.id) {
+              try {
+                await notifyOrderUsers('shared_payment_success', savedOrder, {
+                  payerName: senderName || currentUserEmail || 'المُرسِل',
+                  recipientName: recipientName || savedOrder?.recipient_details?.name || 'المستلم',
+                  newStatus: 'processing',
+                });
+              } catch (notifySharedError) {
+                console.warn('Shared payment notify warning:', notifySharedError);
+              }
+            }
 
             // Notify admin/supervisor of the completed payment
             try {
@@ -2720,7 +2763,7 @@ const Cart = () => {
       console.log('🏁 handleCheckout finished');
       setIsCheckingOut(false);
     }
-  }, [cartItems, paymentMethod, createWhatsAppMessage, saveOrderToSupabase, sendOrderToBase44, finalTotalSYP, finalTotalUSD, selectedTipSYP, appliedCoupon, membershipDiscountSYP, clearCart, navigate, senderName, senderPhone, recipientName, recipientAddress, senderCountry, recipientPhone, additionalNotes, deliveryTime, exchangeRate, currentUserEmail, openWhatsAppSafely, insideSyria, walletBalance, handleShareCart, isCheckingOut]);
+  }, [cartItems, paymentMethod, createWhatsAppMessage, saveOrderToSupabase, sendOrderToBase44, finalTotalSYP, finalTotalUSD, selectedTipSYP, appliedCoupon, membershipDiscountSYP, clearCart, navigate, senderName, senderPhone, recipientName, recipientAddress, senderCountry, recipientPhone, additionalNotes, deliveryTime, exchangeRate, currentUserEmail, openWhatsAppSafely, insideSyria, walletBalance, handleShareCart, isCheckingOut, sharedCartMode, sharedCartToken, sharedCartCreator]);
 
   // PayPal Success Handler
   const handlePayPalSuccess = useCallback(async (details) => {
@@ -2766,7 +2809,11 @@ const Cart = () => {
         tip: normalizedTipSYP,
         coupon: appliedCoupon?.code,
         paypalCaptureId,
-        paypalDetails: details // حفظ تفاصيل الدفع
+        paypalDetails: details, // حفظ تفاصيل الدفع
+        sharedCart: sharedCartMode ? {
+          token: sharedCartToken || null,
+          creator_id: sharedCartCreator || null,
+        } : null,
       };
 
       // حفظ الطلب المدفوع مع إعادة محاولة داخلية
@@ -2802,7 +2849,25 @@ const Cart = () => {
       // Show payment success animation
       setShowPaymentSuccessAnimation(true);
       setPaymentSuccessMessage('تم الدفع بنجاح! جاري حفظ طلبك...');
+      setPaymentSuccessRedirectState({
+        showInvoicePrompt: true,
+        invoiceOrderId: savedOrderId,
+        activeOrdersTab: sharedCartMode ? 'shared' : 'current',
+      });
       toast.success('تم الدفع بنجاح وحفظ الطلب! شكراً لك 🎉');
+
+      if (sharedCartMode && persisted?.savedOrder?.id) {
+        try {
+          await notifyOrderUsers('shared_payment_success', persisted.savedOrder, {
+            payerName: senderName || currentUserEmail || 'المُرسِل',
+            recipientName: recipientName || persisted.savedOrder?.recipient_details?.name || 'المستلم',
+            newStatus: 'processing',
+          });
+        } catch (notifySharedError) {
+          console.warn('Shared payment notify warning:', notifySharedError);
+        }
+      }
+
       clearCart?.();
       localStorage.removeItem('wasel_shared_cart_session');
       setShowPayPal(false);
@@ -2852,7 +2917,7 @@ const Cart = () => {
       toast.error('تم الدفع بنجاح وسيتم إعادة مزامنة الطلب تلقائيا خلال لحظات.');
       // لا نلغي السلة هنا لأن الدفع نجح
     }
-  }, [cartItems, finalTotalSYP, finalTotalUSD, selectedTipSYP, appliedCoupon, membershipDiscountSYP, sendOrderToBase44, clearCart, navigate, extractPayPalCaptureId, persistPayPalOrderWithRetry, getPendingPayPalOrders, savePendingPayPalOrders, senderName, senderPhone, senderCountry, recipientName, recipientPhone, recipientAddress, additionalNotes, deliveryTime, exchangeRate, currentUserEmail]);
+  }, [cartItems, finalTotalSYP, finalTotalUSD, selectedTipSYP, appliedCoupon, membershipDiscountSYP, sendOrderToBase44, clearCart, navigate, extractPayPalCaptureId, persistPayPalOrderWithRetry, getPendingPayPalOrders, savePendingPayPalOrders, senderName, senderPhone, senderCountry, recipientName, recipientPhone, recipientAddress, additionalNotes, deliveryTime, exchangeRate, currentUserEmail, sharedCartMode, sharedCartToken, sharedCartCreator]);
 
   // PayPal Error Handler
   const handlePayPalError = useCallback((error) => {
@@ -3023,8 +3088,10 @@ const Cart = () => {
             <div className="mb-6">
               <h4 className="font-bold text-gray-900 mb-3 text-base" dir="rtl">بيانات المستلم</h4>
               {sharedCartMode && (
-                <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-sm text-center font-bold relative">
-                  هذا الطلب لـ {recipientName} (سلة مشتركة) 🕊️
+                <div className="mb-3 p-4 bg-gradient-to-r from-violet-50 to-purple-50 border-2 border-violet-300 rounded-xl text-violet-900 text-base text-center font-extrabold relative shadow-sm">
+                  💜 سلة مشتركة
+                  <div className="text-sm font-bold mt-1">المستلم: {recipientName || 'غير محدد'}</div>
+                  <div className="text-xs font-medium mt-1">هذا الطلب سيتم توصيله إلى المستلم داخل سوريا</div>
                   <button onClick={handleClearSharedCart} className="absolute left-2 top-2 text-xs text-red-500 underline">إلغاء</button>
                 </div>
               )}
@@ -3211,20 +3278,6 @@ const Cart = () => {
           </div>
         )}
 
-        {insideSyria && (
-          <motion.button
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-            onClick={handleShareCart}
-            disabled={creatingCartShareLink}
-            className="w-full mt-3 h-12 rounded-2xl border-2 border-[#059669] text-[#065F46] bg-white font-bold flex items-center justify-center gap-2 hover:bg-[#ECFDF5]"
-          >
-            {creatingCartShareLink ? <Loader2 className="w-5 h-5 animate-spin" /> : <Share2 className="w-5 h-5" />}
-            {creatingCartShareLink ? 'جارٍ إنشاء الرابط...' : 'مشاركة السلة'}
-            <Copy className="w-4 h-4 opacity-70" />
-          </motion.button>
-        )}
-
         <motion.button
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.99 }}
@@ -3289,7 +3342,7 @@ const Cart = () => {
                   animate={{ opacity: 1 }}
                   whileHover={{ scale: 1.01 }}
                   whileTap={{ scale: 0.99 }}
-                  onClick={handleCheckout}
+                  onClick={handleShareCart}
                   className="w-full h-12 bg-[#003087] text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#002566] transition-all shadow-lg"
                 >
                   <CreditCard className="w-5 h-5" />

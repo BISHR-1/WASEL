@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle2, Crown, Sparkles, CalendarDays, BadgeDollarSign, MessageCircle } from 'lucide-react';
+import { CheckCircle2, Crown, Sparkles, CalendarDays, BadgeDollarSign, MessageCircle, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import PayPalSubscriptionButton from '@/components/payment/PayPalSubscriptionButton';
 import { supabase } from '@/lib/supabase';
 import { getUserRegion, isInsideSyria } from '@/lib/userRegion';
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
+import { useUsdToSypRate } from '@/lib/exchangeRate';
 
 const WHATSAPP_NUMBER = '971502406519';
 const WHATSAPP_BASE_LINK = `https://wa.me/${WHATSAPP_NUMBER}`;
@@ -61,12 +62,15 @@ export default function WaselPlusMembership() {
   const [selectedPlan, setSelectedPlan] = useState('monthly');
   const [paymentMethod, setPaymentMethod] = useState('paypal');
   const [loadingWhatsApp, setLoadingWhatsApp] = useState(false);
+  const [loadingWallet, setLoadingWallet] = useState(false);
   const [savingPayPal, setSavingPayPal] = useState(false);
   const [memberState, setMemberState] = useState(null);
   const [userRegion, setUserRegion] = useState(null);
+  const [walletBalanceUsd, setWalletBalanceUsd] = useState(null);
 
   const plan = PLAN_OPTIONS[selectedPlan];
   const insideSyria = isInsideSyria(userRegion);
+  const exchangeRate = useUsdToSypRate();
 
   useEffect(() => {
     setUserRegion(getUserRegion());
@@ -109,9 +113,43 @@ export default function WaselPlusMembership() {
     }
   }, []);
 
+  const loadWalletBalance = useCallback(async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user?.id) {
+        setWalletBalanceUsd(null);
+        return;
+      }
+
+      const { data: walletRow, error } = await supabase
+        .from('wallets')
+        .select('balance_usd')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.warn('Wallet balance load warning:', error);
+        setWalletBalanceUsd(null);
+        return;
+      }
+
+      setWalletBalanceUsd(Number(walletRow?.balance_usd || 0));
+    } catch (error) {
+      console.warn('Wallet balance load exception:', error);
+      setWalletBalanceUsd(null);
+    }
+  }, []);
+
   useEffect(() => {
     loadMembership();
   }, [loadMembership]);
+
+  useEffect(() => {
+    loadWalletBalance();
+  }, [loadWalletBalance]);
 
   const saveMembershipRecord = useCallback(
     async ({ status, method, paypalDetails = null }) => {
@@ -242,6 +280,59 @@ export default function WaselPlusMembership() {
     }
   };
 
+  const handleWalletCheckout = async () => {
+    setLoadingWallet(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user?.id) {
+        toast.error('يرجى تسجيل الدخول أولاً');
+        return;
+      }
+
+      const requiredUsd = Number(plan.priceUSD || 0);
+      const currentBalance = Number(walletBalanceUsd || 0);
+
+      if (currentBalance < requiredUsd) {
+        toast.error('رصيد المحفظة غير كافٍ لإتمام الاشتراك');
+        return;
+      }
+
+      const { data: chargeResult, error: chargeError } = await supabase.rpc('wallet_pay', {
+        p_user_id: user.id,
+        p_amount_usd: requiredUsd,
+      });
+
+      if (chargeError) {
+        throw chargeError;
+      }
+
+      const result = await saveMembershipRecord({
+        status: 'active',
+        method: 'wallet',
+        paypalDetails: {
+          wallet_charge: chargeResult || null,
+          charged_usd: requiredUsd,
+        },
+      });
+
+      if (!result.ok) {
+        toast.error('تم خصم المبلغ لكن فشل حفظ العضوية. تواصل مع الدعم فوراً.');
+        return;
+      }
+
+      await loadWalletBalance();
+      toast.success('تم الاشتراك في Wasel+ بنجاح عبر المحفظة');
+    } catch (error) {
+      console.error('Wallet membership checkout failed:', error);
+      toast.error('تعذر إتمام الدفع عبر المحفظة');
+    } finally {
+      setLoadingWallet(false);
+    }
+  };
+
   const memberBadgeText = useMemo(() => {
     if (!memberState) return null;
     if (memberState.status === 'trialing') return 'أنت حالياً في الشهر التجريبي المجاني';
@@ -356,7 +447,7 @@ export default function WaselPlusMembership() {
         >
           <h2 className="text-lg font-bold text-[#1F2937] mb-3" dir="rtl">الدفع للاشتراك المباشر</h2>
 
-          <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
             {!insideSyria && (
               <button
                 onClick={() => setPaymentMethod('paypal')}
@@ -368,6 +459,15 @@ export default function WaselPlusMembership() {
               </button>
             )}
             <button
+              onClick={() => setPaymentMethod('wallet')}
+              className={`rounded-xl py-3 text-sm font-bold border-2 flex items-center justify-center gap-2 ${
+                paymentMethod === 'wallet' ? 'border-[#0EA5E9] bg-[#E0F2FE] text-[#075985]' : 'border-[#E5E7EB] text-[#374151]'
+              }`}
+            >
+              <Wallet className="w-4 h-4" />
+              المحفظة
+            </button>
+            <button
               onClick={() => setPaymentMethod('whatsapp')}
               className={`rounded-xl py-3 text-sm font-bold border-2 ${
                 paymentMethod === 'whatsapp' ? 'border-[#22C55E] bg-[#DCFCE7] text-[#166534]' : 'border-[#E5E7EB] text-[#374151]'
@@ -376,6 +476,23 @@ export default function WaselPlusMembership() {
               WhatsApp
             </button>
           </div>
+
+          {paymentMethod === 'wallet' && (
+            <div className="rounded-2xl border border-[#BFDBFE] bg-[#EFF6FF] p-4 mb-4" dir="rtl">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-[#1E3A8A] font-bold">رصيدك الحالي</span>
+                <span className="text-lg font-extrabold text-[#1D4ED8]">
+                  ${Number(walletBalanceUsd || 0).toFixed(2)}
+                </span>
+              </div>
+              <p className="text-xs text-[#1D4ED8]/80 mb-2">
+                ما يعادل تقريباً {Math.round(Number(walletBalanceUsd || 0) * Number(exchangeRate || 150)).toLocaleString('en-US')} ل.س
+              </p>
+              <p className="text-xs text-[#1D4ED8]/80">
+                تكلفة الخطة الحالية: ${plan.priceUSD.toFixed(2)}
+              </p>
+            </div>
+          )}
 
           {paymentMethod === 'paypal' && !insideSyria ? (
             <div className="rounded-2xl border border-[#FDE68A] bg-[#FFFBEB] p-4">
@@ -401,6 +518,15 @@ export default function WaselPlusMembership() {
               )}
               {savingPayPal && <p className="text-xs text-[#92400E] mt-2" dir="rtl">جاري تثبيت اشتراكك بعد الدفع...</p>}
             </div>
+          ) : paymentMethod === 'wallet' ? (
+            <button
+              onClick={handleWalletCheckout}
+              disabled={loadingWallet}
+              className="w-full h-12 rounded-2xl bg-gradient-to-r from-[#0EA5E9] to-[#0284C7] text-white font-extrabold flex items-center justify-center gap-2 disabled:opacity-70"
+            >
+              <Wallet className="w-5 h-5" />
+              {loadingWallet ? 'جاري الخصم من المحفظة...' : 'الدفع عبر المحفظة وتفعيل العضوية'}
+            </button>
           ) : (
             <button
               onClick={handleWhatsAppCheckout}

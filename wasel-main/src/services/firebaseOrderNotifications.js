@@ -59,6 +59,79 @@ function getEventContent(eventType, order, context = {}) {
     };
   }
 
+  if (eventType === 'shared_cart_paid_creator') {
+    const payerName = String(context?.payerName || 'مرسل الهدية');
+    const recipientName = String(context?.recipientName || order?.recipient_details?.name || 'المستلم');
+    return {
+      title: '💜 خبر جميل وصل',
+      body: `قام ${payerName} بإتمام دفع السلة المشتركة لـ ${recipientName}. طلبك أصبح قيد التجهيز بكل حب!`,
+      type: 'payment_success',
+      data: {
+        type: 'order_update',
+        order_id: String(order?.id || ''),
+        event: 'shared_cart_paid_creator',
+      },
+    };
+  }
+
+  if (eventType === 'shared_cart_paid_payer') {
+    const recipientName = String(context?.recipientName || order?.recipient_details?.name || 'المستلم');
+    return {
+      title: '💳 تم الدفع بنجاح',
+      body: `أحسنت! تم دفع السلة المشتركة بنجاح، وطلب ${recipientName} دخل مرحلة التجهيز.`,
+      type: 'payment_success',
+      data: {
+        type: 'order_update',
+        order_id: String(order?.id || ''),
+        event: 'shared_cart_paid_payer',
+      },
+    };
+  }
+
+  if (eventType === 'shared_order_status_creator') {
+    const recipientName = String(context?.recipientName || order?.recipient_details?.name || 'المستلم');
+    const newStatus = String(context?.newStatus || '').toLowerCase();
+    const statusBody = {
+      pending: `طلب ${recipientName} قيد المراجعة حالياً.`,
+      processing: `تم قبول طلب ${recipientName} ويجري تجهيزه الآن.`,
+      delivering: `طلب ${recipientName} في الطريق للتوصيل.`,
+      completed: `تم توصيل طلب ${recipientName} بنجاح. نتمنى لكم لحظات جميلة!`,
+    };
+    return {
+      title: '📦 تحديث على سلتك المشتركة',
+      body: statusBody[newStatus] || `صار تحديث جديد على طلب ${recipientName}.`,
+      type: 'order_update',
+      data: {
+        type: 'order_update',
+        order_id: String(order?.id || ''),
+        event: 'shared_order_status_creator',
+        new_status: newStatus,
+      },
+    };
+  }
+
+  if (eventType === 'shared_order_status_payer') {
+    const recipientName = String(context?.recipientName || order?.recipient_details?.name || 'المستلم');
+    const newStatus = String(context?.newStatus || '').toLowerCase();
+    const statusBody = {
+      pending: `طلب ${recipientName} الآن قيد المراجعة.`,
+      processing: `بدأ تجهيز طلب ${recipientName} بعد دفعتك الجميلة ❤️`,
+      delivering: `الطلب الذي دفعته لـ ${recipientName} أصبح في الطريق.`,
+      completed: `تم توصيل طلب ${recipientName} بنجاح. شكراً لكرمك!`,
+    };
+    return {
+      title: '💙 تحديث طلب المُستلم',
+      body: statusBody[newStatus] || `هناك تحديث جديد على طلب ${recipientName}.`,
+      type: 'order_update',
+      data: {
+        type: 'order_update',
+        order_id: String(order?.id || ''),
+        event: 'shared_order_status_payer',
+        new_status: newStatus,
+      },
+    };
+  }
+
   if (eventType === 'delivery_proof_uploaded') {
     return {
       title: '📸 تم رفع إثبات التسليم',
@@ -178,6 +251,21 @@ function getEventContent(eventType, order, context = {}) {
       order_id: String(order?.id || ''),
       event: String(eventType || 'order_update'),
     },
+  };
+}
+
+function isSharedOrder(order) {
+  const collaborationMode = String(order?.collaboration_mode || '').toLowerCase();
+  const createdVia = String(order?.sender_details?.meta?.created_via || '').toLowerCase();
+  return collaborationMode === 'shared' || createdVia === 'shared_cart_link';
+}
+
+function resolveSharedAudience(order) {
+  const creatorId = order?.recipient_user_id || order?.sender_details?.meta?.shared_cart_creator_id || order?.user_id || null;
+  const payerId = order?.paid_by_user_id || order?.payer_user_id || order?.user_id || null;
+  return {
+    creatorIds: toUniqueStrings([creatorId]),
+    payerIds: toUniqueStrings([payerId]),
   };
 }
 
@@ -376,6 +464,37 @@ export const notificationDispatchEventName = DISPATCH_EVENT_NAME;
 export async function notifyOrderUsers(eventType, order, context = {}) {
   try {
     if (!order?.id) return { success: false, reason: 'missing_order_id' };
+
+    if (isSharedOrder(order) && ['shared_payment_success', 'order_status_changed', 'order_delivered', 'delivery_proof_uploaded'].includes(eventType)) {
+      const { creatorIds, payerIds } = resolveSharedAudience(order);
+      const normalizedStatus = eventType === 'order_delivered'
+        ? 'completed'
+        : (context?.newStatus || (eventType === 'delivery_proof_uploaded' ? 'delivering' : 'processing'));
+
+      const creatorEvent = eventType === 'shared_payment_success' ? 'shared_cart_paid_creator' : 'shared_order_status_creator';
+      const payerEvent = eventType === 'shared_payment_success' ? 'shared_cart_paid_payer' : 'shared_order_status_payer';
+
+      const [creatorResult, payerResult] = await Promise.all([
+        creatorIds.length
+          ? dispatchToPublicUsers(creatorEvent, order, creatorIds, {
+            ...context,
+            newStatus: normalizedStatus,
+          })
+          : Promise.resolve(null),
+        payerIds.length
+          ? dispatchToPublicUsers(payerEvent, order, payerIds, {
+            ...context,
+            newStatus: normalizedStatus,
+          })
+          : Promise.resolve(null),
+      ]);
+
+      return {
+        success: true,
+        creatorResult,
+        payerResult,
+      };
+    }
 
     const publicUserIds = toUniqueStrings([
       order.user_id,

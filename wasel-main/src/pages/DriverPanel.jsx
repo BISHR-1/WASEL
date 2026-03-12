@@ -29,6 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabase';
 import { createPageUrl } from '@/utils';
 import { notifyOrderUsers, notifyAdminUsers } from '@/services/firebaseOrderNotifications';
+import { useUsdToSypRate } from '@/lib/exchangeRate';
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
 
@@ -154,7 +155,7 @@ export default function DriverPanel() {
 
   const [courierProfile, setCourierProfile] = useState(null);
   const [referralStats, setReferralStats] = useState({ registered: 0, qualified: 0 });
-  const [exchangeRate, setExchangeRate] = useState(DEFAULT_EXCHANGE_RATE);
+  const exchangeRate = useUsdToSypRate();
 
   const isOnboardingComplete = Boolean(courierProfile?.onboarding_completed);
 
@@ -274,40 +275,6 @@ export default function DriverPanel() {
     });
   };
 
-  const loadCurrentExchangeRate = async () => {
-    const { data: manualRow, error: manualError } = await supabase
-      .from('app_exchange_rates')
-      .select('rate')
-      .eq('pair', 'USD_SYP')
-      .eq('source', 'supervisor_manual')
-      .order('fetched_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (!manualError && manualRow?.rate) {
-      const rate = Number(manualRow.rate);
-      if (Number.isFinite(rate) && rate > 0) {
-        setExchangeRate(rate);
-        return;
-      }
-    }
-
-    const { data: rateRow, error: rateError } = await supabase
-      .from('app_exchange_rates')
-      .select('rate')
-      .eq('pair', 'USD_SYP')
-      .order('fetched_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (!rateError && rateRow?.rate) {
-      const rate = Number(rateRow.rate);
-      if (Number.isFinite(rate) && rate > 0) {
-        setExchangeRate(rate);
-      }
-    }
-  };
-
   useEffect(() => {
     const bootstrap = async () => {
       try {
@@ -339,7 +306,7 @@ export default function DriverPanel() {
 
         setCurrentUser(unified);
         setDriverName(unified.name || '');
-        await Promise.all([loadAssignedOrders(unified), loadCourierProfile(unified), loadCurrentExchangeRate()]);
+        await Promise.all([loadAssignedOrders(unified), loadCourierProfile(unified)]);
       } catch (error) {
         console.error('Driver bootstrap error', error);
         toast.error('تعذر فتح لوحة الموصل');
@@ -368,7 +335,7 @@ export default function DriverPanel() {
     if (!currentUser) return;
     try {
       setRefreshingOrders(true);
-      await Promise.all([loadAssignedOrders(currentUser), loadCurrentExchangeRate()]);
+      await Promise.all([loadAssignedOrders(currentUser)]);
       toast.success('تم تحديث الطلبات');
     } catch {
       toast.error('تعذر تحديث الطلبات');
@@ -668,21 +635,20 @@ export default function DriverPanel() {
     if (!courierChatInput.trim() || !courierConversationId) return;
     setSendingCourierChat(true);
     try {
+      const messageText = courierChatInput.trim();
+      setCourierChatInput('');
       const msg = {
         conversation_id: courierConversationId,
         sender_id: courierProfile.user_id,
         sender_name: driverName || 'موصل',
         sender_role: 'courier',
-        message: courierChatInput.trim(),
+        message: messageText,
       };
       await supabase.from('direct_messages').insert([msg]);
       await supabase.from('conversations').update({
-        last_message: courierChatInput.trim(),
+        last_message: messageText,
         last_message_at: new Date().toISOString(),
       }).eq('id', courierConversationId);
-
-      setCourierChatMessages(prev => [...prev, { ...msg, id: Date.now(), created_at: new Date().toISOString() }]);
-      setCourierChatInput('');
 
       // Notify supervisor
       try {

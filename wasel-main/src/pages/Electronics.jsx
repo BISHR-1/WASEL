@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Smartphone, Search, Plus, CheckCircle2 } from 'lucide-react';
+import { Smartphone, Search, Plus, CheckCircle2, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
 import AddToCartButton from '@/components/buttons/AddToCartButton';
 import ProductDetailModal from '@/components/common/ProductDetailModal';
+import { attachRatingsFromReviews } from '@/lib/itemRatings';
 
 export default function Electronics() {
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -39,7 +40,8 @@ export default function Electronics() {
       try {
         const data = await base44.entities.Product.list();
         const items = Array.isArray(data) ? data : [];
-        return items.filter(p => p.category === 'electronics' || p.category === 'الكترونيات');
+        const electronicsItems = items.filter(p => p.category === 'electronics' || p.category === 'الكترونيات');
+        return await attachRatingsFromReviews(electronicsItems, { itemType: 'product' });
       } catch {
         return [];
       }
@@ -216,6 +218,16 @@ export default function Electronics() {
                   <h3 className="font-bold text-[#1B4332] text-sm md:text-base mb-1 line-clamp-1">
                     {language === 'en' ? (product?.name_en || product?.name) : product?.name}
                   </h3>
+
+                  {Number(product?.review_count ?? product?.rating_count ?? 0) > 0 && (
+                    <div className="flex items-center gap-1 mb-1">
+                      <Star className="w-3.5 h-3.5 text-[#F59E0B] fill-[#F59E0B]" />
+                      <span className="text-xs text-[#374151] font-semibold">
+                        {Number(product?.avg_rating ?? product?.rating_avg ?? product?.rating ?? 0).toFixed(1)}
+                      </span>
+                      <span className="text-xs text-[#9CA3AF]">({Number(product?.review_count ?? product?.rating_count ?? 0)})</span>
+                    </div>
+                  )}
 
                   <p className="text-xs text-[#475569] line-clamp-2 min-h-[2rem]">
                     {language === 'en' ? (product?.description_en || product?.description || 'No description available') : (product?.description || 'لا يوجد وصف حالياً')}

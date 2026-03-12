@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Package, X, ArrowRight, ShoppingBag, Eye } from 'lucide-react';
+import { Package, X, ArrowRight, ShoppingBag, Eye, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from "@/components/ui/button";
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
 import AddToCartButton from '@/components/buttons/AddToCartButton';
+import { attachRatingsFromReviews, normalizeItemRating } from '@/lib/itemRatings';
 
 export default function Packages() {
   const [selectedPackage, setSelectedPackage] = useState(null);
@@ -35,7 +36,8 @@ export default function Packages() {
     queryFn: async () => {
       try {
         const list = await base44.entities.Package.list();
-        return Array.isArray(list) ? list : [];
+        const normalized = Array.isArray(list) ? list.map((pkg) => normalizeItemRating(pkg)) : [];
+        return await attachRatingsFromReviews(normalized, { itemType: 'package' });
       } catch (error) {
         console.error('Failed to fetch packages:', error);
         return [];
@@ -142,6 +144,15 @@ export default function Packages() {
 
               <div className="p-4">
                 <h3 className="text-xl font-bold text-gray-800 mb-2">{pkg.name}</h3>
+                {Number(pkg?.review_count ?? pkg?.rating_count ?? 0) > 0 && (
+                  <div className="flex items-center gap-1 mb-2">
+                    <Star className="w-4 h-4 text-[#F59E0B] fill-[#F59E0B]" />
+                    <span className="text-sm font-bold text-gray-700">
+                      {Number(pkg?.avg_rating ?? pkg?.rating_avg ?? pkg?.rating ?? 0).toFixed(1)}
+                    </span>
+                    <span className="text-xs text-gray-400">({Number(pkg?.review_count ?? pkg?.rating_count ?? 0)})</span>
+                  </div>
+                )}
                 <p className="text-gray-600 text-sm mb-4">{pkg.description}</p>
                 
                 <div className="bg-gray-100 p-3 rounded-lg mb-4 text-sm text-gray-700">

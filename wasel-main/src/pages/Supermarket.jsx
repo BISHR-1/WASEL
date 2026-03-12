@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { ShoppingCart, Filter, Search, Plus, Info } from 'lucide-react';
+import { ShoppingCart, Filter, Search, Plus, Info, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
 import AddToCartButton from '@/components/buttons/AddToCartButton';
 import ProductDetailModal from '@/components/common/ProductDetailModal';
+import { attachRatingsFromReviews } from '@/lib/itemRatings';
 
 export default function Supermarket() {
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -40,7 +41,8 @@ export default function Supermarket() {
       try {
         const data = await base44.entities.Product.list();
         const items = Array.isArray(data) ? data : [];
-        return items.filter(p => p.category === 'supermarket' || p.category === 'سوبر ماركت');
+        const supermarketItems = items.filter(p => p.category === 'supermarket' || p.category === 'سوبر ماركت');
+        return await attachRatingsFromReviews(supermarketItems, { itemType: 'product' });
       } catch {
         return [];
       }
@@ -222,6 +224,16 @@ export default function Supermarket() {
                   
                   {product?.brand && (
                     <p className="text-xs text-gray-500 mb-2">{product.brand}</p>
+                  )}
+
+                  {Number(product?.review_count ?? product?.rating_count ?? 0) > 0 && (
+                    <div className="flex items-center gap-1 mb-2">
+                      <Star className="w-3.5 h-3.5 text-[#F59E0B] fill-[#F59E0B]" />
+                      <span className="text-xs text-[#374151] font-semibold">
+                        {Number(product?.avg_rating ?? product?.rating_avg ?? product?.rating ?? 0).toFixed(1)}
+                      </span>
+                      <span className="text-xs text-[#9CA3AF]">({Number(product?.review_count ?? product?.rating_count ?? 0)})</span>
+                    </div>
                   )}
                   
                   <div className="mt-auto pt-2">

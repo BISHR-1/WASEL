@@ -132,22 +132,21 @@ export default function CustomerSupport() {
     if (!chatInput.trim() || !conversationId) return;
     setSending(true);
     try {
+      const messageText = chatInput.trim();
+      setChatInput('');
       const userName = session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || 'عميل';
       const msg = {
         conversation_id: conversationId,
         sender_id: userId,
         sender_name: userName,
         sender_role: 'customer',
-        message: chatInput.trim(),
+        message: messageText,
       };
       await supabase.from('direct_messages').insert([msg]);
       await supabase.from('conversations').update({
-        last_message: chatInput.trim(),
+        last_message: messageText,
         last_message_at: new Date().toISOString(),
       }).eq('id', conversationId);
-
-      setChatMessages(prev => [...prev, { ...msg, id: Date.now(), created_at: new Date().toISOString() }]);
-      setChatInput('');
 
       // Notify supervisor
       try {

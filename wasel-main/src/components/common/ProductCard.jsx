@@ -156,9 +156,9 @@ export default function ProductCard({
   };
 
   const productName = language === 'en' && product.name_en ? product.name_en : product.name;
-  const rating = Number(product.avg_rating ?? product.rating ?? 0);
+  const rating = Number(product.avg_rating ?? product.rating_avg ?? product.rating ?? 0);
   const category = product.category || product.type || '';
-  const reviewCount = Number(product.review_count ?? 0);
+  const reviewCount = Number(product.review_count ?? product.rating_count ?? 0);
 
   return (
     <motion.div
