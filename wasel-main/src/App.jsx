@@ -253,66 +253,9 @@ const AuthenticatedApp = () => {
     let timeoutId = null;
     
     const checkSession = async () => {
-      // فحص إذا كان هناك tokens في URL (من OAuth callback)
-      const hash = window.location.hash;
-      const search = window.location.search;
-      
-      // 0) تدفق الكود (PKCE) — Supabase يرسل ?code=...&state=...
-      const queryParams = new URLSearchParams(search);
-      const oauthCode = queryParams.get('code');
-      if (oauthCode && oauthCode.trim().length > 0) {
-        try {
-          const { data, error } = await supabase.auth.exchangeCodeForSession(window.location.href);
-          const sessionFromCode = data?.session || data;
-          if (sessionFromCode?.user && isMounted && !error) {
-            const resolved = { type: 'google', email: sessionFromCode.user.email, user: sessionFromCode.user };
-            setActiveIdentityScope(sessionFromCode.user.email || sessionFromCode.user.id || 'guest');
-            await applyReferralCourierProvision(resolved);
-            setSession(resolved);
-            await resolveUserRole(resolved);
-            setCheckingAuth(false);
-            window.history.replaceState({}, document.title, '/');
-            return;
-          }
-        } catch (err) {
-          // OAuth code exchange failed, continue to next method
-        }
-      }
+      // main.jsx يعالج OAuth tokens قبل تحميل React
+      // هنا نتحقق فقط من الجلسة الموجودة
 
-      // 1) تدفق Implicit — access_token في URL
-      if (hash.includes('access_token') || search.includes('access_token')) {
-        try {
-          // أولاً دع Supabase يحاول التقاط الجلسة تلقائياً
-          let { data: { session: urlSession } } = await supabase.auth.getSession();
-
-          // إذا لم تُلتقط بعد، استخرج التوكنات يدوياً واضبط الجلسة
-          if (!urlSession?.user) {
-            const raw = hash.includes('access_token') ? hash.substring(1) : search.substring(1);
-            const params = new URLSearchParams(raw);
-            const access_token = params.get('access_token');
-            const refresh_token = params.get('refresh_token');
-            if (access_token) {
-              const { data, error } = await supabase.auth.setSession({ access_token, refresh_token: refresh_token || '' });
-              if (!error) urlSession = data?.session || data; // supabase-js قد يعيد session داخل data
-            }
-          }
-
-          if (urlSession?.user && isMounted) {
-            const resolved = { type: 'google', email: urlSession.user.email, user: urlSession.user };
-            setActiveIdentityScope(urlSession.user.email || urlSession.user.id || 'guest');
-            await applyReferralCourierProvision(resolved);
-            setSession(resolved);
-            await resolveUserRole(resolved);
-            setCheckingAuth(false);
-            // تنظيف URL
-            window.history.replaceState({}, document.title, '/');
-            return;
-          }
-        } catch (err) {
-          // URL token processing failed, continue to next method
-        }
-      }
-      
       // فحص OTP أولاً
       const otpSession = getOtpSession();
       if (otpSession?.email) {
@@ -326,7 +269,7 @@ const AuthenticatedApp = () => {
         return;
       }
       
-      // فحص Supabase (Google)
+      // فحص Supabase session (Google OAuth تم معالجته في main.jsx)
       try {
         const { data: { session: supabaseSession } } = await supabase.auth.getSession();
         if (supabaseSession?.user) {
@@ -351,21 +294,11 @@ const AuthenticatedApp = () => {
     
     checkSession();
     
-    // حد أقصى - كافي لاكتمال OAuth callback parsing
+    // حد أقصى للانتظار
     timeoutId = setTimeout(() => {
       if (!isMounted) return;
-      // قبل إنهاء التحقق، تأكد أنه لا يوجد tokens في URL لم تتم معالجتها بعد
-      const currentHash = window.location.hash;
-      if (currentHash.includes('access_token')) {
-        // لا تزال هناك tokens، أعطِ وقتاً إضافياً لـ onAuthStateChange
-        setTimeout(() => {
-          if (!isMounted) return;
-          setCheckingAuth((prev) => prev ? false : prev);
-        }, 3000);
-        return;
-      }
       setCheckingAuth((prev) => prev ? false : prev);
-    }, 2500);
+    }, 5000);
     
     // الاستماع لتغييرات الجلسة
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, supabaseSession) => {
@@ -378,10 +311,6 @@ const AuthenticatedApp = () => {
             setSession(resolved);
             await resolveUserRole(resolved);
             setCheckingAuth(false);
-            // تنظيف URL إذا كان لا يزال يحتوي على tokens
-            if (window.location.hash.includes('access_token') || window.location.search.includes('access_token')) {
-              window.history.replaceState({}, document.title, window.location.pathname || '/');
-            }
             // تهيئة الإشعارات بعد تسجيل الدخول
             initializePushNotifications();
           })();

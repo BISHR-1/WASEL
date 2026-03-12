@@ -799,7 +799,7 @@ DO $$ BEGIN
       LOOP EXECUTE format('DROP POLICY IF EXISTS %I ON public.courier_referrals', p.policyname); END LOOP;
     END;
     EXECUTE 'CREATE POLICY cr_select ON public.courier_referrals FOR SELECT USING (
-      referrer_id = auth.uid() OR referred_id = auth.uid() OR public.is_staff_user()
+      referrer_user_id = auth.uid() OR referred_user_id = auth.uid() OR public.is_staff_user()
     )';
     EXECUTE 'CREATE POLICY cr_insert ON public.courier_referrals FOR INSERT WITH CHECK (true)';
     EXECUTE 'GRANT SELECT, INSERT ON public.courier_referrals TO authenticated';
@@ -826,7 +826,7 @@ DO $$ BEGIN
       FOR p IN SELECT policyname FROM pg_policies WHERE schemaname='public' AND tablename='admin_profiles'
       LOOP EXECUTE format('DROP POLICY IF EXISTS %I ON public.admin_profiles', p.policyname); END LOOP;
     END;
-    EXECUTE 'CREATE POLICY ap_select_self ON public.admin_profiles FOR SELECT USING (user_id = auth.uid())';
+    EXECUTE 'CREATE POLICY ap_select_self ON public.admin_profiles FOR SELECT USING (id = auth.uid())';
     EXECUTE 'CREATE POLICY ap_select_staff ON public.admin_profiles FOR SELECT USING (public.is_staff_user())';
     EXECUTE 'CREATE POLICY ap_manage ON public.admin_profiles FOR ALL USING (public.is_admin_like())';
     EXECUTE 'GRANT SELECT, INSERT, UPDATE ON public.admin_profiles TO authenticated';
