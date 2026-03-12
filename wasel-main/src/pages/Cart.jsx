@@ -1864,6 +1864,72 @@ const Cart = () => {
     return lines.join('\n');
   }, [cartItems, finalTotalSYP, finalTotalUSD, selectedTipSYP, appliedCoupon, membershipDiscountSYP, senderName, senderCountry, senderPhone, senderCallingCode, recipientName, recipientPhone, recipientAddress, additionalNotes, deliveryTime]);
 
+  const buildSharedCartIdentifiers = useCallback(() => {
+    const shareId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `sc-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const nonce = Math.random().toString(36).slice(2, 10);
+
+    return {
+      shareId,
+      shareToken: `${shareId}-${nonce}`,
+      shortCode: shareId.replace(/-/g, '').slice(0, 10).toUpperCase(),
+    };
+  }, []);
+
+  const resolveCurrentAppUserId = useCallback(async (authUserOverride = null) => {
+    if (currentAppUserId) return currentAppUserId;
+
+    let authUser = authUserOverride;
+    if (!authUser) {
+      const { data: authData } = await supabase.auth.getUser();
+      authUser = authData?.user || null;
+    }
+
+    if (!authUser) return null;
+
+    try {
+      const { data: ensuredId, error: ensureError } = await supabase.rpc('ensure_current_app_user_id');
+      if (!ensureError && ensuredId) {
+        setCurrentAppUserId(ensuredId);
+        return ensuredId;
+      }
+    } catch (error) {
+      console.warn('ensure_current_app_user_id fallback:', error);
+    }
+
+    const { data: userRow, error } = await supabase
+      .from('users')
+      .select('id')
+      .or(`auth_id.eq.${authUser.id},id.eq.${authUser.id},email.eq.${authUser.email}`)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('resolveCurrentAppUserId warning:', error);
+      return null;
+    }
+
+    if (userRow?.id) {
+      setCurrentAppUserId(userRow.id);
+      return userRow.id;
+    }
+
+    return null;
+  }, [currentAppUserId]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        if (authData?.user) {
+          await resolveCurrentAppUserId(authData.user);
+        }
+      } catch (error) {
+        console.warn('Cart app user preload warning:', error);
+      }
+    })();
+  }, [resolveCurrentAppUserId]);
+
   const handleShareCart = useCallback(async () => {
     try {
       setCreatingCartShareLink(true);
@@ -2297,72 +2363,6 @@ const Cart = () => {
 
     return `WSL-${Date.now().toString().slice(-8)}`;
   }, []);
-
-  const buildSharedCartIdentifiers = useCallback(() => {
-    const shareId = (typeof crypto !== 'undefined' && crypto.randomUUID)
-      ? crypto.randomUUID()
-      : `sc-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    const nonce = Math.random().toString(36).slice(2, 10);
-
-    return {
-      shareId,
-      shareToken: `${shareId}-${nonce}`,
-      shortCode: shareId.replace(/-/g, '').slice(0, 10).toUpperCase(),
-    };
-  }, []);
-
-  const resolveCurrentAppUserId = useCallback(async (authUserOverride = null) => {
-    if (currentAppUserId) return currentAppUserId;
-
-    let authUser = authUserOverride;
-    if (!authUser) {
-      const { data: authData } = await supabase.auth.getUser();
-      authUser = authData?.user || null;
-    }
-
-    if (!authUser) return null;
-
-    try {
-      const { data: ensuredId, error: ensureError } = await supabase.rpc('ensure_current_app_user_id');
-      if (!ensureError && ensuredId) {
-        setCurrentAppUserId(ensuredId);
-        return ensuredId;
-      }
-    } catch (error) {
-      console.warn('ensure_current_app_user_id fallback:', error);
-    }
-
-    const { data: userRow, error } = await supabase
-      .from('users')
-      .select('id')
-      .or(`auth_id.eq.${authUser.id},id.eq.${authUser.id},email.eq.${authUser.email}`)
-      .maybeSingle();
-
-    if (error) {
-      console.warn('resolveCurrentAppUserId warning:', error);
-      return null;
-    }
-
-    if (userRow?.id) {
-      setCurrentAppUserId(userRow.id);
-      return userRow.id;
-    }
-
-    return null;
-  }, [currentAppUserId]);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data: authData } = await supabase.auth.getUser();
-        if (authData?.user) {
-          await resolveCurrentAppUserId(authData.user);
-        }
-      } catch (error) {
-        console.warn('Cart app user preload warning:', error);
-      }
-    })();
-  }, [resolveCurrentAppUserId]);
 
   // حفظ الطلب في Supabase
   const saveOrderToSupabase = useCallback(async (orderData) => {
