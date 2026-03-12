@@ -344,6 +344,25 @@ export default function Account() {
             <ChevronRight className="w-5 h-5 text-gray-400" />
           </motion.button>
 
+          <motion.button
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.45 }}
+            onClick={() => navigate(createPageUrl('CustomerSupport'))}
+            className="w-full bg-gradient-to-l from-[#EFF6FF] to-white rounded-xl p-4 flex items-center justify-between hover:shadow-md transition-shadow border border-[#BFDBFE]"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <span className="text-lg">🎧</span>
+              </div>
+              <div className="text-right">
+                <p className="font-bold text-gray-800">مركز المساعدة</p>
+                <p className="text-xs text-gray-500">أسئلة شائعة ودعم مباشر</p>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-blue-400" />
+          </motion.button>
+
           {/* Logout */}
           <motion.button
             initial={{ opacity: 0, y: 20 }}

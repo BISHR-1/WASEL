@@ -22,6 +22,7 @@ import {
   Copy,
   ShieldAlert,
   Clock,
+  Send,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -142,6 +143,12 @@ export default function DriverPanel() {
   const [uploadedProofIds, setUploadedProofIds] = useState(() => new Set());
 
   const [activeTab, setActiveTab] = useState('active');
+
+  // Chat with supervisor state
+  const [courierChatMessages, setCourierChatMessages] = useState([]);
+  const [courierChatInput, setCourierChatInput] = useState('');
+  const [sendingCourierChat, setSendingCourierChat] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [sendingPayoutRequest, setSendingPayoutRequest] = useState(false);
 
@@ -598,6 +605,97 @@ export default function DriverPanel() {
     }
   };
 
+  // ---- Courier-Supervisor Chat ----
+  const courierConversationId = courierProfile?.user_id
+    ? `courier_supervisor:${courierProfile.user_id}`
+    : null;
+
+  const loadCourierChat = async () => {
+    if (!courierConversationId) return;
+    setChatLoading(true);
+    try {
+      // Ensure conversation exists
+      const { data: existing } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('id', courierConversationId)
+        .maybeSingle();
+
+      if (!existing) {
+        await supabase.from('conversations').insert([{
+          id: courierConversationId,
+          type: 'courier_supervisor',
+          participant_ids: [courierProfile.user_id],
+          status: 'active',
+        }]);
+      }
+
+      const { data: msgs } = await supabase
+        .from('direct_messages')
+        .select('*')
+        .eq('conversation_id', courierConversationId)
+        .order('created_at', { ascending: true })
+        .limit(200);
+      setCourierChatMessages(msgs || []);
+    } catch (err) {
+      console.error('Load courier chat error:', err);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const sendCourierChatMessage = async () => {
+    if (!courierChatInput.trim() || !courierConversationId) return;
+    setSendingCourierChat(true);
+    try {
+      const msg = {
+        conversation_id: courierConversationId,
+        sender_id: courierProfile.user_id,
+        sender_name: driverName || 'موصل',
+        sender_role: 'courier',
+        message: courierChatInput.trim(),
+      };
+      await supabase.from('direct_messages').insert([msg]);
+      await supabase.from('conversations').update({
+        last_message: courierChatInput.trim(),
+        last_message_at: new Date().toISOString(),
+      }).eq('id', courierConversationId);
+
+      setCourierChatMessages(prev => [...prev, { ...msg, id: Date.now(), created_at: new Date().toISOString() }]);
+      setCourierChatInput('');
+
+      // Notify supervisor
+      try {
+        await notifyAdminUsers('new_chat_message', { id: courierConversationId }, { senderName: msg.sender_name });
+      } catch (e) { /* silent */ }
+    } catch (err) {
+      console.error('Send courier chat error:', err);
+      toast.error('فشل إرسال الرسالة');
+    } finally {
+      setSendingCourierChat(false);
+    }
+  };
+
+  // Real-time subscription for courier chat
+  useEffect(() => {
+    if (!courierConversationId || activeTab !== 'chat') return;
+    loadCourierChat();
+    const channel = supabase.channel(`courier-chat-${courierConversationId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'direct_messages',
+        filter: `conversation_id=eq.${courierConversationId}`,
+      }, (payload) => {
+        setCourierChatMessages(prev => {
+          if (prev.some(m => m.id === payload.new.id)) return prev;
+          return [...prev, payload.new];
+        });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [courierConversationId, activeTab]);
+
   const openWhatsAppRecipient = (order) => {
     const phone = String(order?.recipient_details?.phone || '').replace(/[^0-9+]/g, '');
     if (!phone || phone.length < 6) {
@@ -774,10 +872,81 @@ export default function DriverPanel() {
   <div className="flex gap-2 flex-wrap mb-4 bg-white rounded-2xl p-1.5 shadow-sm border border-[#E5E7EB]">
     <button onClick={() => setActiveTab('active')} className={`flex-1 rounded-xl py-2.5 px-4 text-sm font-bold transition-all ${activeTab === 'active' ? 'bg-[#1B4332] text-white shadow-md' : 'text-[#64748B] hover:bg-[#F1F5F9]'}`}>طلبات حالية ({activeOrders.length})</button>
     <button onClick={() => setActiveTab('archive')} className={`flex-1 rounded-xl py-2.5 px-4 text-sm font-bold transition-all ${activeTab === 'archive' ? 'bg-[#1B4332] text-white shadow-md' : 'text-[#64748B] hover:bg-[#F1F5F9]'}`}>سجل الطلبات ({archivedOrders.length})</button>
+    <button onClick={() => setActiveTab('chat')} className={`flex-1 rounded-xl py-2.5 px-4 text-sm font-bold transition-all ${activeTab === 'chat' ? 'bg-[#2563EB] text-white shadow-md' : 'text-blue-600 bg-blue-50 hover:bg-blue-100'}`}>💬 المحادثة</button>
     <button onClick={() => setActiveTab('profile')} className={`flex-1 rounded-xl py-2.5 px-4 text-sm font-bold transition-all ${activeTab === 'profile' ? 'bg-orange-500 text-white shadow-md' : 'text-orange-600 bg-orange-50 hover:bg-orange-100'}`}>الملف الشخصي</button>
   </div>
 )}
         
+
+                {/* Chat with Supervisor Tab */}
+                {isOnboardingComplete && activeTab === 'chat' && (
+                  <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                    className="rounded-3xl border border-[#E7ECEA] bg-white shadow-sm overflow-hidden" style={{ minHeight: '50vh' }}>
+                    <div className="flex items-center gap-2 px-5 py-4 border-b border-[#E7ECEA] bg-[#F8FAFB]">
+                      <MessageCircle className="w-5 h-5 text-[#2563EB]" />
+                      <h3 className="font-black text-[#1B4332] text-lg">المحادثة مع المشرف</h3>
+                    </div>
+
+                    {chatLoading ? (
+                      <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-[#1B4332]" /></div>
+                    ) : (
+                      <div className="flex flex-col" style={{ height: '50vh' }}>
+                        {/* Messages */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                          {courierChatMessages.length === 0 ? (
+                            <div className="text-center text-sm text-[#94A3B8] mt-8">
+                              <MessageCircle className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                              <p>لا توجد رسائل بعد</p>
+                              <p className="text-xs mt-1">أرسل رسالة للتواصل مع المشرف</p>
+                            </div>
+                          ) : courierChatMessages.map((msg, idx) => {
+                            const isMine = msg.sender_role === 'courier' || msg.sender_id === courierProfile?.user_id;
+                            return (
+                              <div key={msg.id || idx} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[75%] rounded-2xl px-4 py-2 ${
+                                  isMine
+                                    ? 'bg-[#1B4332] text-white rounded-br-sm'
+                                    : 'bg-[#E7ECEA] text-[#1B4332] rounded-bl-sm'
+                                }`}>
+                                  {!isMine && (
+                                    <p className="text-[10px] font-bold mb-0.5 opacity-70">{msg.sender_name || 'المشرف'}</p>
+                                  )}
+                                  <p className="text-sm leading-relaxed">{msg.message}</p>
+                                  {msg.attachment_url && (
+                                    <a href={msg.attachment_url} target="_blank" rel="noopener noreferrer" className="text-xs underline mt-1 block opacity-80">📎 مرفق</a>
+                                  )}
+                                  <p className={`text-[10px] mt-1 ${isMine ? 'text-green-200' : 'text-gray-400'}`}>
+                                    {msg.created_at ? new Date(msg.created_at).toLocaleTimeString('ar-SY', { hour: '2-digit', minute: '2-digit' }) : ''}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Input */}
+                        <div className="flex items-center gap-2 px-4 py-3 border-t border-[#E7ECEA] bg-[#F8FAFB]">
+                          <input
+                            type="text"
+                            value={courierChatInput}
+                            onChange={(e) => setCourierChatInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendCourierChatMessage()}
+                            placeholder="اكتب رسالة للمشرف..."
+                            className="flex-1 rounded-xl border border-[#E5E7EB] bg-white px-4 py-2.5 text-sm focus:border-[#1B4332] focus:outline-none"
+                            dir="rtl"
+                          />
+                          <Button
+                            onClick={sendCourierChatMessage}
+                            disabled={!courierChatInput.trim() || sendingCourierChat}
+                            className="rounded-xl bg-[#1B4332] hover:bg-[#2D6A4F] text-white h-10 w-10 p-0"
+                          >
+                            {sendingCourierChat ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </motion.section>
+                )}
 
                 {( !isOnboardingComplete || activeTab === 'profile' ) && (
 <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-3xl border border-[#E7ECEA] bg-white p-5 shadow-sm">

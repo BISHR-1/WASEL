@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Clock, Package } from 'lucide-react';
 import AddToCartButton from '@/components/buttons/AddToCartButton';
 import PriceDisplay from '@/components/common/PriceDisplay';
+import ProductReviews from '@/components/common/ProductReviews';
 import { useDarkMode } from '@/lib/DarkModeContext';
 
 /**
@@ -117,6 +118,14 @@ export default function ProductDetailModal({
 
                 {/* Extra content (e.g. contents, delivery info for packages) */}
                 {extraContent}
+
+                {/* Product Reviews */}
+                <ProductReviews
+                  productId={item.id || item.item_id}
+                  productType={item.item_type || item.type || 'product'}
+                  isDarkMode={isDarkMode}
+                  maxVisible={3}
+                />
               </div>
 
               {/* Add to Cart - sticky bottom */}

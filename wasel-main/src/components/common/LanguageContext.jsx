@@ -23,7 +23,9 @@ export function LanguageProvider({ children }) {
   const changeLanguage = (lang) => {
     setLanguage(lang);
     localStorage.setItem('wasel_lang', lang);
-    window.location.reload(); 
+    // Update document direction without full page reload
+    document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.lang = lang;
   };
 
   const dir = language === 'ar' ? 'rtl' : 'ltr';

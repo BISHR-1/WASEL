@@ -21,6 +21,7 @@ import { buildPublicAppUrl } from '@/lib/publicAppUrl';
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
 import { useDarkMode } from '@/lib/DarkModeContext';
+import { notifyAdminUsers } from '@/services/firebaseOrderNotifications';
 
 const statusOptions = {
   pending: { label: 'قيد انتظار القبول', color: 'bg-gray-100 text-gray-700', icon: Clock },
@@ -674,6 +675,14 @@ export default function MyOrders() {
 
       toast.success('شكراً لك! تم إرسال تقييمك بنجاح');
       setReviewingOrder(null);
+
+      // Notify supervisor about the new review
+      try {
+        const avgRating = productReviews.reduce((s, r) => s + Number(r.rating || 0), 0) / Math.max(productReviews.length, 1);
+        await notifyAdminUsers('new_review', reviewingOrder, { rating: Math.round(avgRating) });
+      } catch (notifErr) {
+        console.warn('Review notification to supervisor failed:', notifErr);
+      }
     } catch (error) {
       console.error('Review error:', error);
       toast.error('حدث خطأ في إرسال التقييم');

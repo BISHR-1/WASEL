@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '../hooks/useUser';
+import { Link } from 'react-router-dom';
 import Loyalty from '../components/Loyalty';
 import ProgressBar from '../components/ProgressBar';
 
@@ -48,6 +49,9 @@ const Profile = () => {
         ))}
       </div>
       <button onClick={handleOrderForSomeone}>الطلب لشخص آخر</button>
+      <Link to="/CustomerSupport" className="block w-full text-center py-3 px-4 bg-blue-50 text-blue-700 font-bold rounded-xl hover:bg-blue-100 transition-colors mt-3">
+        🎧 مركز المساعدة والدعم
+      </Link>
       <button onClick={handleLogout}>تسجيل الخروج</button>
     </div>
   );

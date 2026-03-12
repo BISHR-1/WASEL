@@ -139,6 +139,36 @@ function getEventContent(eventType, order, context = {}) {
     };
   }
 
+  if (eventType === 'new_review') {
+    const rating = Number(context?.rating || 0);
+    const stars = '⭐'.repeat(Math.min(rating, 5));
+    return {
+      title: '📝 تقييم جديد',
+      body: `تقييم جديد ${stars} على طلب #${order?.order_number || ''}`,
+      type: 'new_review',
+      data: {
+        type: 'review',
+        order_id: String(order?.id || ''),
+        event: 'new_review',
+        rating: String(rating),
+      },
+    };
+  }
+
+  if (eventType === 'new_chat_message') {
+    const senderName = context?.senderName || '';
+    return {
+      title: '💬 رسالة جديدة',
+      body: senderName ? `رسالة جديدة من ${senderName}` : 'لديك رسالة جديدة',
+      type: 'chat_message',
+      data: {
+        type: 'chat',
+        conversation_id: String(order?.id || ''),
+        event: 'new_chat_message',
+      },
+    };
+  }
+
   return {
     title: '🔔 تحديث جديد',
     body: 'هناك تحديث جديد على طلبك.',

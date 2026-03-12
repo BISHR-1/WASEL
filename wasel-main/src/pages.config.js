@@ -50,6 +50,7 @@ import CourierGuide from './pages/CourierGuide';
 import SupervisorGuide from './pages/SupervisorGuide';
 import AdminTerms from './pages/AdminTerms';
 import Wallet from './pages/Wallet';
+import CustomerSupport from './pages/CustomerSupport';
 import __Layout from './Layout.jsx';
 
 
@@ -106,6 +107,7 @@ export const PAGES = {
     "SupervisorGuide": SupervisorGuide,
     "AdminTerms": AdminTerms,
     "Wallet": Wallet,
+    "CustomerSupport": CustomerSupport,
 }
 
 export const pagesConfig = {
