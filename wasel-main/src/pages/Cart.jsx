@@ -1983,10 +1983,6 @@ const Cart = () => {
   const handleShareCart = useCallback(async () => {
     try {
       setCreatingCartShareLink(true);
-      const creatorAppUserId = currentAppUserId || await resolveCurrentAppUserId();
-      if (!creatorAppUserId) {
-        throw new Error('PUBLIC_USER_REQUIRED');
-      }
 
       const sharePayload = {
         sender: {
@@ -2020,9 +2016,65 @@ const Cart = () => {
         sourceRegion: insideSyria ? 'inside_syria' : 'outside_syria',
       };
 
-      const { shareId, shareToken, shortCode } = buildSharedCartIdentifiers();
-      const shareUrl = buildPublicAppUrl(`/shared-cart/${shareToken}?sid=${encodeURIComponent(shareId)}`);
+      // ===== STEP 1: Create cart share link (try server RPC first, then direct INSERT) =====
+      let createdLink = null;
+      let linkToken = null;
+      let linkShortCode = null;
+      let linkCreatedBy = null;
 
+      // Strategy A: Use the SECURITY DEFINER RPC (handles user creation internally)
+      try {
+        const { data: rpcLink, error: rpcError } = await supabase.rpc('create_cart_share_link', {
+          p_payload: sharePayload,
+          p_expires_in_hours: 72,
+        });
+        if (!rpcError && rpcLink) {
+          createdLink = rpcLink;
+          linkToken = rpcLink.token;
+          linkShortCode = rpcLink.short_code;
+          linkCreatedBy = rpcLink.created_by;
+          console.log('✅ Cart share link created via RPC');
+        } else if (rpcError) {
+          console.warn('create_cart_share_link RPC warning:', rpcError);
+        }
+      } catch (rpcErr) {
+        console.warn('create_cart_share_link RPC fallback:', rpcErr);
+      }
+
+      // Strategy B: Direct INSERT (only if RPC failed)
+      if (!createdLink) {
+        const creatorAppUserId = currentAppUserId || await resolveCurrentAppUserId();
+        if (!creatorAppUserId) {
+          throw new Error('PUBLIC_USER_REQUIRED');
+        }
+
+        const { shareId: localShareId, shareToken: localToken, shortCode: localShortCode } = buildSharedCartIdentifiers();
+
+        const { data: directLink, error: directError } = await supabase
+          .from('cart_share_links')
+          .insert([{
+            created_by: creatorAppUserId,
+            token: localToken,
+            short_code: localShortCode,
+            status: 'active',
+            payload: sharePayload,
+            expires_at: new Date(Date.now() + (72 * 60 * 60 * 1000)).toISOString(),
+          }])
+          .select('*')
+          .single();
+
+        if (directError) throw directError;
+        createdLink = directLink;
+        linkToken = localToken;
+        linkShortCode = localShortCode;
+        linkCreatedBy = creatorAppUserId;
+        console.log('✅ Cart share link created via direct INSERT');
+      }
+
+      const { shareId } = buildSharedCartIdentifiers();
+      const shareUrl = buildPublicAppUrl(`/shared-cart/${linkToken}`);
+
+      // ===== STEP 2: Build share text and share via system dialog =====
       const compactItems = cartItems.slice(0, 8).map((item, idx) => {
         const itemQty = item.quantity || 1;
         const itemLineTotal = (item.customer_price || item.price || 0) * itemQty;
@@ -2037,7 +2089,7 @@ const Cart = () => {
         'أهلاً! قمت بتجهيز سلة مشتريات خاصة',
         'عبر تطبيق *واصل* ويمكنك إتمامها بسهولة:',
         '',
-        `🆔 *رقم السلة:* ${shareId}`,
+        `🆔 *رقم السلة:* ${linkShortCode || shareId}`,
         '',
         '📦 *المنتجات:*',
         compactItems || '   - لا توجد عناصر',
@@ -2073,53 +2125,8 @@ const Cart = () => {
         }
       }
 
-      let createdLink = null;
-      let linkInsertUserId = creatorAppUserId;
-
-      const buildLinkRow = (userId) => ({
-        created_by: userId,
-        token: shareToken,
-        short_code: shortCode,
-        status: 'active',
-        payload: {
-          ...sharePayload,
-          _share_meta: {
-            client_share_id: shareId,
-            shared_cart_token: shareToken,
-            shared_cart_url: shareUrl,
-            created_via: 'shared_cart_link',
-          },
-        },
-        expires_at: new Date(Date.now() + (72 * 60 * 60 * 1000)).toISOString(),
-      });
-
-      const { data: firstLink, error: firstError } = await supabase
-        .from('cart_share_links')
-        .insert([buildLinkRow(linkInsertUserId)])
-        .select('*')
-        .single();
-
-      if (firstError && firstError.code === '23503') {
-        // FK violation — created_by not in public.users; clear cache and re-resolve
-        console.warn('cart_share_links FK violation, re-resolving user id...');
-        setCurrentAppUserId(null);
-        const freshId = await resolveCurrentAppUserId();
-        if (!freshId) throw new Error('PUBLIC_USER_REQUIRED');
-        linkInsertUserId = freshId;
-
-        const { data: retryLink, error: retryError } = await supabase
-          .from('cart_share_links')
-          .insert([buildLinkRow(linkInsertUserId)])
-          .select('*')
-          .single();
-        if (retryError) throw retryError;
-        createdLink = retryLink;
-      } else if (firstError) {
-        throw firstError;
-      } else {
-        createdLink = firstLink;
-      }
-
+      // ===== STEP 3: Create shared order =====
+      const linkInsertUserId = linkCreatedBy;
       const sharedOrderNumber = await generateOrderNumber();
       let sharedOrder = null;
       let sharedOrderError = null;
@@ -2143,7 +2150,7 @@ const Cart = () => {
             recipientUserId: linkInsertUserId,
             metadata: {
               created_via: 'shared_cart_link',
-              shared_cart_token: shareToken,
+              shared_cart_token: linkToken,
               shared_cart_url: shareUrl,
               shared_cart_link_id: createdLink?.id || null,
               shared_cart_client_id: shareId,
@@ -2178,7 +2185,7 @@ const Cart = () => {
             ...sharePayload.sender,
             meta: {
               created_via: 'shared_cart_link',
-              shared_cart_token: shareToken,
+              shared_cart_token: linkToken,
               shared_cart_url: shareUrl,
               shared_cart_link_id: createdLink?.id || null,
               shared_cart_client_id: shareId,
@@ -2218,7 +2225,7 @@ const Cart = () => {
             ...(sharedOrder.sender_details || {}),
             meta: {
               created_via: 'shared_cart_link',
-              shared_cart_token: shareToken,
+              shared_cart_token: linkToken,
               shared_cart_url: shareUrl,
               shared_cart_link_id: createdLink?.id || null,
               shared_cart_client_id: shareId,
