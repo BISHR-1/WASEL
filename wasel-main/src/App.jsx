@@ -265,6 +265,18 @@ const AuthenticatedApp = () => {
   React.useEffect(() => {
     let isMounted = true;
     let timeoutId = null;
+    let authCheckFinalized = false;
+
+    const finishAuthCheck = (reason, payload = {}) => {
+      if (authCheckFinalized || !isMounted) return;
+      authCheckFinalized = true;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      authTrace('AUTH_APP_CHECK_FINISHED', { reason, ...payload });
+      setCheckingAuth(false);
+    };
     
     const checkSession = async () => {
       authTrace('AUTH_APP_CHECK_SESSION_START');
@@ -280,7 +292,7 @@ const AuthenticatedApp = () => {
           setActiveIdentityScope(otpSession.email);
           setSession(resolved);
           await resolveUserRole(resolved);
-          setCheckingAuth(false);
+          finishAuthCheck('otp_session_found', { email: otpSession.email });
         }
         return;
       }
@@ -299,7 +311,10 @@ const AuthenticatedApp = () => {
             setActiveIdentityScope(supabaseSession.user.email || supabaseSession.user.id || 'guest');
             setSession(resolved);
             // افتح الواجهة فوراً ثم أكمل الاستعلامات البطيئة بالخلفية
-            setCheckingAuth(false);
+            finishAuthCheck('supabase_session_found', {
+              userId: supabaseSession.user.id,
+              email: supabaseSession.user.email || null,
+            });
             void (async () => {
               try {
                 await applyReferralCourierProvision(resolved);
@@ -321,7 +336,7 @@ const AuthenticatedApp = () => {
       if (isMounted) {
         authWarn('AUTH_APP_NO_SESSION_FOUND');
         setActiveIdentityScope('guest');
-        setCheckingAuth(false);
+        finishAuthCheck('no_session');
       }
     };
     
@@ -330,8 +345,9 @@ const AuthenticatedApp = () => {
     // حد أقصى للانتظار
     timeoutId = setTimeout(() => {
       if (!isMounted) return;
+      if (authCheckFinalized) return;
       authWarn('AUTH_APP_CHECK_TIMEOUT', { timeoutMs: 5000 });
-      setCheckingAuth((prev) => prev ? false : prev);
+      finishAuthCheck('timeout', { timeoutMs: 5000 });
     }, 5000);
     
     // الاستماع لتغييرات الجلسة
@@ -347,7 +363,10 @@ const AuthenticatedApp = () => {
           const resolved = { type: 'google', email: supabaseSession.user.email, user: supabaseSession.user };
           setActiveIdentityScope(supabaseSession.user.email || supabaseSession.user.id || 'guest');
           setSession(resolved);
-          setCheckingAuth(false);
+          finishAuthCheck('auth_state_signed_in', {
+            userId: supabaseSession.user.id,
+            email: supabaseSession.user.email || null,
+          });
           (async () => {
             await applyReferralCourierProvision(resolved);
             await resolveUserRole(resolved);
@@ -440,8 +459,8 @@ const AuthenticatedApp = () => {
 
   const isCourier = userRole === 'courier' || userRole === 'delivery_person';
   const isAdmin = ['admin', 'super_admin', 'support', 'operator', 'supervisor'].includes(userRole);
-  const GuardedDriverPanel = React.useMemo(() => withCourier(Pages.DriverPanel), []);
-  const GuardedSupervisorPanel = React.useMemo(() => withAdmin(Pages.SupervisorPanel), []);
+  const GuardedDriverPanel = withCourier(Pages.DriverPanel);
+  const GuardedSupervisorPanel = withAdmin(Pages.SupervisorPanel);
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
