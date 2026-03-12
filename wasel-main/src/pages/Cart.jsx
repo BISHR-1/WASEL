@@ -2434,6 +2434,14 @@ const Cart = () => {
   const saveOrderToSupabase = useCallback(async (orderData) => {
     try {
       console.log('💾 saveOrderToSupabase called with:', { paymentMethod: orderData.paymentMethod, totalUSD: orderData.totalUSD, itemCount: orderData.items?.length });
+
+      // Ensure the current user has a public.users row before any order INSERT
+      try {
+        await supabase.rpc('ensure_current_app_user_id');
+      } catch (e) {
+        console.warn('ensure_current_app_user_id pre-order skipped:', e);
+      }
+
       const generatedOrderNumber = await generateOrderNumber();
       const paymentStatus = (orderData.paymentMethod === 'paypal' && orderData.paypalDetails) ? 'paid' : 'pending';
       // Try dynamic compatibility RPC first.
