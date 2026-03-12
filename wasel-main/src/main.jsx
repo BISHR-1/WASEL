@@ -15,20 +15,17 @@ async function boot() {
 
   // 1) Implicit flow — #access_token=...
   if (hash.includes('access_token')) {
-    // انتظر حتى يلتقط supabase الجلسة من الـ hash
-    let session = null;
-    for (let i = 0; i < 30; i++) {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) { session = data.session; break; }
-      await new Promise(r => setTimeout(r, 200));
-    }
-    // إذا لم يلتقطها تلقائياً، اضبطها يدوياً
-    if (!session) {
-      const params = new URLSearchParams(hash.substring(1));
-      const access_token = params.get('access_token');
-      const refresh_token = params.get('refresh_token');
-      if (access_token) {
-        await supabase.auth.setSession({ access_token, refresh_token: refresh_token || '' });
+    const params = new URLSearchParams(hash.substring(1));
+    const access_token = params.get('access_token');
+    const refresh_token = params.get('refresh_token');
+    if (access_token) {
+      try {
+        await supabase.auth.setSession({
+          access_token,
+          refresh_token: refresh_token || '',
+        });
+      } catch (e) {
+        console.warn('boot: setSession from hash failed', e);
       }
     }
     window.history.replaceState({}, document.title, window.location.pathname || '/');
@@ -39,7 +36,9 @@ async function boot() {
   if (code && !hash.includes('access_token')) {
     try {
       await supabase.auth.exchangeCodeForSession(window.location.href);
-    } catch (e) { /* سيُعالج لاحقاً في App */ }
+    } catch (e) {
+      console.warn('boot: exchangeCodeForSession failed', e);
+    }
     window.history.replaceState({}, document.title, window.location.pathname || '/');
   }
 
