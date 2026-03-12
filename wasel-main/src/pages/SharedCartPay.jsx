@@ -37,6 +37,13 @@ export default function SharedCartPay() {
 
         setLoadingMsg('جاري تجهيز سلتك المشتركة...');
 
+        // Pre-ensure the payer has a public.users row (prevents FK violation on opened_by)
+        try {
+          await supabase.rpc('ensure_current_app_user_id');
+        } catch (e) {
+          console.warn('ensure_current_app_user_id pre-call skipped:', e);
+        }
+
         const { data, error } = await supabase.rpc('claim_cart_share_link', { p_token: token.trim() });
         if (error) {
            // If already opened/claimed, check localStorage for existing session
@@ -53,8 +60,9 @@ export default function SharedCartPay() {
                }
            }
 
-           // If token not found, try direct table lookup as fallback
-           if (error.message?.includes('Invalid cart share token')) {
+           // If token not found OR FK violation on opened_by, try direct table lookup as fallback
+           const isFkViolation = error.code === '23503';
+           if (error.message?.includes('Invalid cart share token') || isFkViolation) {
              const { data: directLink } = await supabase
                .from('cart_share_links')
                .select('*')
