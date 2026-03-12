@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { FileText, Search, Send, Truck, CheckCircle, MessageCircle, ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
-import AppFooter from '@/components/common/AppFooter';
 import { useLanguage } from '@/components/common/LanguageContext';
 import { useDarkMode } from '@/lib/DarkModeContext';
 
@@ -162,7 +161,6 @@ export default function HowItWorks() {
           </p>
         </motion.div>
       </section>
-      <AppFooter />
     </div>
   );
 }

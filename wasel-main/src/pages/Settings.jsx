@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Settings as SettingsIcon, Globe, Bell, Moon, Sun } from 'lucide-react';
-import AppFooter from '@/components/common/AppFooter';
 import { toast } from 'sonner';
 import { useDarkMode } from '@/lib/DarkModeContext';
 import { useLanguage } from '@/components/common/LanguageContext';
@@ -208,7 +207,6 @@ export default function Settings() {
           </p>
         </motion.div>
       </div>
-      <AppFooter />
     </div>
   );
 }

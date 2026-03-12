@@ -11,7 +11,6 @@ import {
   MessageCircle, BarChart3, Zap, AlertTriangle,
   UserPlus, RefreshCcw, Eye, MapPin, Clock, Star
 } from 'lucide-react';
-import AppFooter from '@/components/common/AppFooter';
 
 const fadeUp = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 } };
 
@@ -228,8 +227,6 @@ export default function SupervisorGuide() {
           </div>
         </motion.div>
       </div>
-
-      <AppFooter />
     </div>
   );
 }

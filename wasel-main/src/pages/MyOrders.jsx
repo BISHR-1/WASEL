@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import AppFooter from '@/components/common/AppFooter';
 
 import { supabase } from '@/lib/supabase';
 import { getUnifiedSession } from '@/lib/unifiedAuth';
@@ -1031,7 +1030,6 @@ export default function MyOrders() {
           onSubmit={handleSubmitReview}
         />
       )}
-      <AppFooter />
     </div>
   );
 }

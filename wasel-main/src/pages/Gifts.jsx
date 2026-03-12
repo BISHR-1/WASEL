@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '../api/base44Client';
-import AppFooter from '@/components/common/AppFooter';
 
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,6 +11,7 @@ import { toast } from 'sonner';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
+import AddToCartButton from '@/components/buttons/AddToCartButton';
 
 const Gifts = () => {
   const { addToCart } = useCart();
@@ -125,10 +125,12 @@ const Gifts = () => {
                         <Eye className="w-4 h-4 ml-1" />
                         عرض التفاصيل
                      </Button>
-                    <Button onClick={() => handleAddToCart(gift)} className="bg-pink-600 hover:bg-pink-700 text-white">
-                        <ShoppingBag className="w-4 h-4 ml-1" />
-                        أضف للسلة
-                     </Button>
+                    <AddToCartButton
+                      onClick={() => handleAddToCart(gift)}
+                      isLoading={addedToCartGiftId === gift.id}
+                      label="أضف للسلة"
+                      className="py-2"
+                    />
                   </div>
                 </div>
               </motion.div>
@@ -150,17 +152,14 @@ const Gifts = () => {
               </div>
               <h2 className="text-2xl font-bold text-[#1B4332]">{selectedGift.name}</h2>
               <p className="text-gray-600">{selectedGift.details || selectedGift.description || 'لا يوجد وصف متاح حالياً'}</p>
-              <Button onClick={() => { handleAddToCart(selectedGift); setSelectedGift(null); }} className="w-full bg-pink-600 hover:bg-pink-700 text-white">
-                <ShoppingBag className="w-4 h-4 ml-2" />
-                أضف للسلة
-              </Button>
+              <AddToCartButton
+                onClick={() => { handleAddToCart(selectedGift); setSelectedGift(null); }}
+                label="أضف للسلة"
+              />
             </div>
           )}
         </DialogContent>
       </Dialog>
-
-
-      <AppFooter />
     </div>
   );
 };

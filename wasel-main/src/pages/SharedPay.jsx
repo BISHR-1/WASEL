@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import AppFooter from '@/components/common/AppFooter';
 import { toast } from 'sonner';
 import { CheckCircle, Copy, CreditCard, Loader2, Link2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -193,7 +192,6 @@ export default function SharedPay() {
           </motion.div>
         )}
       </div>
-      <AppFooter />
     </div>
   );
 }

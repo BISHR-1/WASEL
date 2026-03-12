@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import AppFooter from '@/components/common/AppFooter';
 import { useMutation } from '@tanstack/react-query';
 import { fetchOrderById, createOrder, uploadFile } from '@/api/waselClient';
 
@@ -500,7 +499,6 @@ export default function Order() {
           </p>
         </motion.form>
       </section>
-      <AppFooter />
     </div>
   );
 }

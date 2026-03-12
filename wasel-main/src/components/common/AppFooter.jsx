@@ -20,7 +20,7 @@ export default function AppFooter() {
   ];
 
   return (
-    <footer className="mt-8 bg-[#184B3A] text-[#D7E8E2] border-t border-[#2A6652]" dir="rtl">
+    <footer className="bg-[#184B3A] text-[#D7E8E2] border-t border-[#2A6652]" dir="rtl">
       <div className="max-w-7xl mx-auto px-4 py-4">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-start text-sm">
           <div>

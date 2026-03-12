@@ -1,7 +1,6 @@
 // =====================================================
 // WASEL - PRODUCT DETAIL PAGE (Full Secure Implementation)
 // File: src/pages/ProductDetail.jsx
-import AppFooter from '@/components/common/AppFooter';
 // =====================================================
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -639,7 +638,6 @@ export default function ProductDetail() {
           </motion.button>
         </div>
       </div>
-      <AppFooter />
     </div>
   );
 }

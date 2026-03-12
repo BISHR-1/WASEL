@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchOrders, updateOrder } from '@/api/waselClient';
-import AppFooter from '@/components/common/AppFooter';
 
 import { Package, Upload, CheckCircle, Clock, Truck, Phone, MapPin, Calendar, MessageSquare, Navigation, MessageCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -517,7 +516,6 @@ export default function ExecutionTeam() {
           </div>
         </DialogContent>
       </Dialog>
-      <AppFooter />
     </div>
     </PasswordProtection>
   );

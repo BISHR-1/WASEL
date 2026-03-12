@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '../hooks/useUser';
 import Loyalty from '../components/Loyalty';
-import AppFooter from '@/components/common/AppFooter';
 import ProgressBar from '../components/ProgressBar';
 
 const Profile = () => {
@@ -50,7 +49,6 @@ const Profile = () => {
       </div>
       <button onClick={handleOrderForSomeone}>الطلب لشخص آخر</button>
       <button onClick={handleLogout}>تسجيل الخروج</button>
-      <AppFooter />
     </div>
   );
 };

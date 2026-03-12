@@ -16,7 +16,6 @@ import { updateUsdToSypRateCache } from '@/lib/exchangeRate';
 import { createPageUrl } from '@/utils';
 import { notifySpecificUsers, notifyOrderUsers } from '@/services/firebaseOrderNotifications';
 import { initializePushNotifications } from '@/services/pushNotifications';
-import AppFooter from '@/components/common/AppFooter';
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
 
@@ -1833,8 +1832,6 @@ export default function SupervisorPanel() {
           </section>
         )}
       </main>
-
-      <AppFooter />
     </div>
   );
 }

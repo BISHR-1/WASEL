@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import AppFooter from '@/components/common/AppFooter';
 import { ShoppingCart, Filter, Search, Plus, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from "@/components/ui/button";
@@ -299,7 +298,6 @@ export default function Supermarket() {
           </>
         )}
       </AnimatePresence>
-      <AppFooter />
     </div>
   );
 }

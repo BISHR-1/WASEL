@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import AppFooter from '@/components/common/AppFooter';
 import { Search, Package, Truck, CheckCircle, Clock, AlertCircle, Heart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Input } from '@/components/ui/input';
@@ -223,7 +222,6 @@ export default function TrackOrder() {
 					</motion.div>
 				)}
 			</div>
-			<AppFooter />
 		</div>
 	);
 }

@@ -11,7 +11,6 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
 import { useUsdToSypRate } from '@/lib/exchangeRate';
 import { createPageUrl } from '@/utils';
-import AppFooter from '@/components/common/AppFooter';
 import PayPalPayment from '@/components/payment/PayPalPayment';
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
@@ -708,8 +707,6 @@ export default function WalletPage() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      <AppFooter />
     </div>
   );
 }

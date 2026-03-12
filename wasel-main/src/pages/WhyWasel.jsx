@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { Shield, Users, MessageCircle, CreditCard, Image, Clock, Heart, ArrowLeft, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
-import AppFooter from '@/components/common/AppFooter';
 import { useLanguage } from '@/components/common/LanguageContext';
 import { useDarkMode } from '@/lib/DarkModeContext';
 
@@ -180,7 +179,6 @@ export default function WhyWasel() {
           </Link>
         </motion.div>
       </section>
-      <AppFooter />
     </div>
   );
 }

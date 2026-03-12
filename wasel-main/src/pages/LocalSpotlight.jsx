@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { MapPin, Star, User, Calendar } from 'lucide-react';
-import AppFooter from '@/components/common/AppFooter';
 
 import { supabase } from '@/lib/supabase';
 import { useLanguage } from '../components/common/LanguageContext';
@@ -98,7 +97,6 @@ export default function LocalSpotlight() {
             </div>
         )}
       </div>
-      <AppFooter />
     </div>
   );
 }

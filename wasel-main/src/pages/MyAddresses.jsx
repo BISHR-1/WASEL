@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
-import AppFooter from '@/components/common/AppFooter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -391,7 +390,6 @@ export default function MyAddresses() {
       {/* Floating decorations */}
       <div className="fixed top-20 left-10 w-20 h-20 bg-blue-200/20 rounded-full blur-2xl pointer-events-none" />
       <div className="fixed bottom-40 right-10 w-32 h-32 bg-gray-300/20 rounded-full blur-3xl pointer-events-none" />
-      <AppFooter />
     </div>
   );
 }

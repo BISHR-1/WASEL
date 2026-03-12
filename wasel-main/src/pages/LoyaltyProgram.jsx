@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { getCurrentUser } from '@/api/waselClient';
-import AppFooter from '@/components/common/AppFooter';
 
 import { motion } from 'framer-motion';
 import { Wallet, Gift, ArrowRight, History, Award, Star, Share2 } from 'lucide-react';
@@ -163,7 +162,6 @@ export default function LoyaltyProgram() {
           </>
         )}
       </div>
-      <AppFooter />
     </div>
   );
 }

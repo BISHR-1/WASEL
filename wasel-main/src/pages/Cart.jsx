@@ -1,7 +1,6 @@
 // =====================================================
 // WASEL - CART PAGE (Noon-Style High Conversion Design)
 // File: src/pages/Cart.jsx
-import AppFooter from '@/components/common/AppFooter';
 // =====================================================
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -3550,8 +3549,6 @@ const Cart = () => {
           </motion.div>
         )}
       </AnimatePresence>
-
-      <AppFooter />
     </div>
   );
 };

@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import AppFooter from '@/components/common/AppFooter';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { ArrowRight, Clock, Info, ShoppingBag, MessageCircle, Plus, ArrowLeft } from 'lucide-react';
@@ -16,6 +15,7 @@ import PriceDisplay from '../components/common/PriceDisplay';
 import { useLanguage } from '../components/common/LanguageContext';
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
+import AddToCartButton from '@/components/buttons/AddToCartButton';
 
 export default function RestaurantDetail() {
   const navigate = useNavigate();
@@ -179,14 +179,14 @@ export default function RestaurantDetail() {
           </div>
         )}
         
-        <div className={`relative ${restaurant.cover_image_url ? '' : 'bg-gradient-to-br from-[#1B4332] to-[#2D6A4F]'} py-7`}>
+        <div className={`relative ${restaurant.cover_image_url ? '' : 'bg-gradient-to-br from-[#1B4332] to-[#2D6A4F]'} py-4`}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
-            <Link to={createPageUrl('Restaurants')} className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors">
+            <Link to={createPageUrl('Restaurants')} className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-3 transition-colors">
               <ArrowRight className={`w-5 h-5 ${language === 'en' ? 'rotate-180' : ''}`} />
               {language === 'en' ? 'Back to Restaurants' : 'العودة للمطاعم'}
             </Link>
 
-            <div className="flex flex-col md:flex-row gap-6 items-start">
+            <div className="flex flex-col md:flex-row gap-4 items-start">
               {restaurant.image_url && (
                 <img 
                   src={restaurant.image_url} 
@@ -217,14 +217,14 @@ export default function RestaurantDetail() {
 
       {/* Offers Carousel */}
       {restaurantItemOffers.length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 pt-8">
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 pt-4">
           <OffersCarousel offers={restaurantItemOffers} />
         </section>
       )}
 
       {/* Loading State */}
       {(isLoadingRestaurant || isLoadingMenu) && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 py-16 flex items-center justify-center">
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex items-center justify-center">
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -244,8 +244,8 @@ export default function RestaurantDetail() {
       )}
 
       {/* Categories */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
           <Button
             variant={selectedCategory === 'all' ? 'default' : 'outline'}
             onClick={() => setSelectedCategory('all')}
@@ -267,7 +267,7 @@ export default function RestaurantDetail() {
       </section>
 
       {/* Menu Items */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 pb-20">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 pb-8">
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-5">
           {(Array.isArray(filteredItems) ? filteredItems : []).map((item, index) => (
             <motion.div
@@ -317,15 +317,13 @@ export default function RestaurantDetail() {
                   </p>
                 </div>
               </button>
-              <div className="px-3 pb-3 pt-2 flex items-end justify-between gap-2">
+              <div className="px-3 pb-3 pt-2">
                 <PriceDisplay basePrice={item.customer_price || item.base_price || item.price} size="small" />
-                <Button
+                <AddToCartButton
                   onClick={() => handleAddToCart(item)}
-                  className="h-9 px-3 rounded-xl bg-[#1B4332] hover:bg-[#163426] text-white text-xs md:text-sm font-bold"
-                >
-                  <Plus className="w-4 h-4 ml-1" />
-                  {language === 'en' ? 'Add to cart' : 'أضف إلى السلة'}
-                </Button>
+                  isLoading={addedToCartItemId === item.id}
+                  label={language === 'en' ? 'Add to cart' : 'أضف للسلة'}
+                />
               </div>
             </motion.div>
           ))}
@@ -400,25 +398,20 @@ export default function RestaurantDetail() {
                     <PriceDisplay basePrice={selectedItem.base_price || selectedItem.customer_price / 1.1} size="medium" />
                   </div>
 
-                  <Button
+                  <AddToCartButton
                     onClick={() => {
                       handleAddToCart(selectedItem);
                       setSelectedItem(null);
                     }}
-                    className="w-full bg-gradient-to-r from-[#1B4332] to-[#2D6A4F] text-white py-4 rounded-xl text-lg font-bold"
                     disabled={!selectedItem.available}
-                  >
-                    <Plus className="w-5 h-5 ml-2" />
-                    {t('addToCart')}
-                  </Button>
+                    label={t('addToCart')}
+                  />
                 </div>
               </div>
             </motion.div>
           </>
         )}
       </AnimatePresence>
-
-      <AppFooter />
     </div>
   );
 }

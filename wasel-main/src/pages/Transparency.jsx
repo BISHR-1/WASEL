@@ -1,7 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import AppFooter from '@/components/common/AppFooter';
 import { Eye, DollarSign, AlertCircle, RefreshCw, HelpCircle, ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useLanguage } from '@/components/common/LanguageContext';
@@ -186,7 +185,6 @@ export default function Transparency() {
           </Link>
         </motion.div>
       </section>
-      <AppFooter />
     </div>
   );
 }

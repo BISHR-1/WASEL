@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import AppFooter from '@/components/common/AppFooter';
 import { motion } from 'framer-motion';
 import { CheckCircle, Loader2, Package } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -146,7 +145,6 @@ export default function PaymentSuccess() {
           </p>
         </div>
       </motion.div>
-      <AppFooter />
     </div>
   );
 }

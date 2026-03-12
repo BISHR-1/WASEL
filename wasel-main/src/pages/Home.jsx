@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '../api/base44Client';
-import AppFooter from '@/components/common/AppFooter';
 
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -19,6 +18,7 @@ import { supabase } from '@/lib/supabase';
 import { interleaveByCategory, scoreItemsByBehavior } from '@/lib/recommendationSignals';
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
+import AddToCartButton from '@/components/buttons/AddToCartButton';
 
 const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
 
@@ -440,29 +440,13 @@ const Home = () => {
                       <span className="font-bold text-[#1F2933]">{Number(product.avg_rating ?? product.rating ?? 0).toFixed(1)}</span>
                       <span className="text-[#94A3B8]">({Number(product.review_count ?? 0)})</span>
                     </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 relative">
+                    <div className="flex flex-col gap-2 relative">
                       <PriceDisplay basePrice={product.price} />
-                      <div className="relative">
-                        <Button onClick={() => handleAddToCart(product)} size="sm" className="h-10 w-full sm:w-auto px-3 bg-[#111827] hover:bg-[#0F172A] text-white rounded-lg font-bold whitespace-nowrap">
-                          <Plus className="w-4 h-4 ml-1" />
-                          أضف إلى السلة
-                        </Button>
-                        <AnimatePresence>
-                          {addedToCartProductId === product.id && (
-                            <div className="absolute -top-20 left-1/2 transform -translate-x-1/2 z-50">
-                              <SmartLottie
-                                animationPath={ANIMATION_PRESETS.addToCartSuccess.path}
-                                width={100}
-                                height={100}
-                                trigger="never"
-                                autoplay={true}
-                                loop={false}
-                                hideWhenDone={true}
-                              />
-                            </div>
-                          )}
-                        </AnimatePresence>
-                      </div>
+                      <AddToCartButton
+                        onClick={() => handleAddToCart(product)}
+                        isLoading={addedToCartProductId === product.id}
+                        label="أضف للسلة"
+                      />
                     </div>
                   </div>
                 </motion.div>
@@ -500,30 +484,12 @@ const Home = () => {
                     <p className="text-xs text-[#64748B] line-clamp-2 min-h-[2rem]">{item.description || 'وصف مختصر للمنتج'}</p>
                     <div className="flex items-center justify-between mt-2">
                       <PriceDisplay basePrice={item.price} />
-                      <div className="relative">
-                        <Button
-                          size="sm"
-                          className="bg-[#111827] text-white hover:bg-[#0F172A]"
-                          onClick={() => openMixedItem(item)}
-                        >
-                          {isGiftOrPackage ? 'تخصيص' : 'أضف إلى السلة'}
-                        </Button>
-                        <AnimatePresence>
-                          {addedToCartProductId === item.id && !isGiftOrPackage && (
-                            <div className="absolute -top-20 left-1/2 transform -translate-x-1/2 z-50">
-                              <SmartLottie
-                                animationPath={ANIMATION_PRESETS.addToCartSuccess.path}
-                                width={100}
-                                height={100}
-                                trigger="never"
-                                autoplay={true}
-                                loop={false}
-                                hideWhenDone={true}
-                              />
-                            </div>
-                          )}
-                        </AnimatePresence>
-                      </div>
+                      <AddToCartButton
+                        onClick={() => openMixedItem(item)}
+                        isLoading={addedToCartProductId === item.id && !isGiftOrPackage}
+                        label={isGiftOrPackage ? 'تخصيص' : 'أضف للسلة'}
+                        className="w-auto px-4"
+                      />
                     </div>
                   </div>
                 </motion.div>
@@ -549,83 +515,13 @@ const Home = () => {
                 <div className="p-3">
                   <h4 className="font-bold text-sm mb-1 text-[#1F2933] line-clamp-1">{item.name}</h4>
                   <p className="text-xs text-[#64748B] line-clamp-2 min-h-[2rem]">{item.description || 'بدون وصف حالياً'}</p>
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-2 relative">
+                  <div className="flex flex-col gap-2 mt-2 relative">
                     <PriceDisplay basePrice={item.price} />
-                    <div className="relative w-full sm:w-auto">
-                      <Button
-                        size="sm"
-                        className="h-10 w-full sm:w-auto bg-[#111827] text-white hover:bg-[#0F172A]"
-                        onClick={() => handleAddToCart(item)}
-                      >
-                        أضف إلى السلة
-                      </Button>
-                      <AnimatePresence>
-                        {addedToCartProductId === item.id && (
-                          <div className="absolute -top-20 left-1/2 transform -translate-x-1/2 z-50">
-                            <SmartLottie
-                              animationPath={ANIMATION_PRESETS.addToCartSuccess.path}
-                              width={100}
-                              height={100}
-                              trigger="never"
-                              autoplay={true}
-                              loop={false}
-                              hideWhenDone={true}
-                            />
-                          </div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Packages Section */}
-        <div className="mt-10">
-          <h3 className="font-bold text-lg mb-3 text-[#1F2933]">الباقات</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
-            {packages.slice(0, 4).map((rawItem) => {
-              const item = normalizeShowcaseItem(rawItem, 'package');
-              return (
-              <motion.div key={`${item.id}-${item.name}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white rounded-xl shadow-sm overflow-hidden border border-[#E5E7EB] w-full max-w-[280px] mx-auto">
-                <img
-                  src={item.image_url}
-                  alt={item.name}
-                  className="w-full h-28 md:h-24 lg:h-28 object-contain bg-[#F8FAFC] p-2"
-                  loading="lazy"
-                />
-                <div className="p-3">
-                  <h4 className="font-bold text-sm mb-1 text-[#1F2933] line-clamp-1">{item.name}</h4>
-                  <p className="text-xs text-[#64748B] line-clamp-2 min-h-[2rem]">{item.description || 'بدون وصف حالياً'}</p>
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-2 relative">
-                    <PriceDisplay basePrice={item.price} />
-                    <div className="relative w-full sm:w-auto">
-                      <Button
-                        size="sm"
-                        className="h-10 w-full sm:w-auto bg-[#111827] text-white hover:bg-[#0F172A]"
-                        onClick={() => handleAddToCart(item)}
-                      >
-                        أضف إلى السلة
-                      </Button>
-                      <AnimatePresence>
-                        {addedToCartProductId === item.id && (
-                          <div className="absolute -top-20 left-1/2 transform -translate-x-1/2 z-50">
-                            <SmartLottie
-                              animationPath={ANIMATION_PRESETS.addToCartSuccess.path}
-                              width={100}
-                              height={100}
-                              trigger="never"
-                              autoplay={true}
-                              loop={false}
-                              hideWhenDone={true}
-                            />
-                          </div>
-                        )}
-                      </AnimatePresence>
-                    </div>
+                    <AddToCartButton
+                      onClick={() => handleAddToCart(item)}
+                      isLoading={addedToCartProductId === item.id}
+                      label="أضف للسلة"
+                    />
                   </div>
                 </div>
               </motion.div>
@@ -635,7 +531,6 @@ const Home = () => {
         </div>
         </div>
       </main>
-      <AppFooter />
     </div>
   );
 };

@@ -11,7 +11,6 @@ import {
   Package, Camera, Navigation, Award, Zap,
   BookOpen, MessageCircle, AlertTriangle
 } from 'lucide-react';
-import AppFooter from '@/components/common/AppFooter';
 
 const fadeUp = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 } };
 
@@ -198,8 +197,6 @@ export default function CourierGuide() {
           </div>
         </motion.div>
       </div>
-
-      <AppFooter />
     </div>
   );
 }

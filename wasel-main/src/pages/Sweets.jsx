@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '../api/base44Client';
-import AppFooter from '@/components/common/AppFooter';
 
 const Sweets = () => {
   const [items, setItems] = useState([]);
@@ -29,7 +28,6 @@ const Sweets = () => {
           </div>
         ))}
       </div>
-      <AppFooter />
     </div>
   );
 };

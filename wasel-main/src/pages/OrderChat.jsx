@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchOrders } from '@/api/waselClient';
-import AppFooter from '@/components/common/AppFooter';
 
 import { ArrowRight, Package } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -111,7 +110,6 @@ export default function OrderChatPage() {
           />
         </div>
       </section>
-      <AppFooter />
     </div>
   );
 }

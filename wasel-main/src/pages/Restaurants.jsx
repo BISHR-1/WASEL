@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '../api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import AppFooter from '@/components/common/AppFooter';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { UtensilsCrossed, Search, SlidersHorizontal, MapPin, ArrowLeft, Info } from 'lucide-react';
@@ -146,7 +145,6 @@ const Restaurants = () => {
           </div>
         )}
       </main>
-      <AppFooter />
     </div>
   );
 };

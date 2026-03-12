@@ -14,9 +14,11 @@ import {
   Menu,
   ChevronDown,
   Crown,
-  Sparkles
+  Sparkles,
+  ClipboardList
 } from 'lucide-react';
 import SupportChat from './components/common/SupportChat';
+import AppFooter from '@/components/common/AppFooter';
 import SearchBar from './components/SearchBar';
 import CartAbandonmentReminder from './components/common/CartAbandonmentReminder';
 import NotificationPermissionPrompt from './components/common/NotificationPermissionPrompt';
@@ -178,7 +180,7 @@ function LayoutContent({ children, currentPageName }) {
   const isActive = (path) => location.pathname.includes(path);
 
   return (
-    <div className={`min-h-screen bg-[#F9FAF8] pb-20 ${language === 'ar' ? "font-['Cairo',sans-serif]" : "font-sans"}`}>
+    <div className={`min-h-screen flex flex-col bg-[#F9FAF8] ${language === 'ar' ? "font-['Cairo',sans-serif]" : "font-sans"}`}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap');
         :root {
@@ -299,29 +301,32 @@ function LayoutContent({ children, currentPageName }) {
       </header>
 
       {/* Main Content */}
-      <main>
+      <main className="flex-1 pb-20">
         {children}
       </main>
+
+      {/* Footer */}
+      <AppFooter />
 
       {/* Bottom Navigation - Trust Green Style */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#E5E7EB] z-50 shadow-[0_-5px_15px_rgba(31,41,51,0.08)] pb-safe">
         <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-4">
             {/* Home - الرئيسية */}
             <Link to={createPageUrl('Home')} className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${isActive('Home') && !location.hash ? 'text-[#1F7A63]' : 'text-[#1F2933]/50'}`}>
-                <Home className={`w-6 h-6 transition-all ${isActive('Home') && !location.hash ? 'stroke-[2.5]' : 'stroke-2'}`} strokeLinecap="round" strokeLinejoin="round" />
-                <span className="text-[10px] font-medium mt-0.5">{language === 'ar' ? 'الرئيسية' : 'Home'}</span>
+                <Home className={`w-5 h-5 transition-all ${isActive('Home') && !location.hash ? 'stroke-[2.5]' : 'stroke-2'}`} strokeLinecap="round" strokeLinejoin="round" />
+                <span className="text-[9px] font-medium mt-0.5">{language === 'ar' ? 'الرئيسية' : 'Home'}</span>
             </Link>
 
-            {/* Wallet - المحفظة */}
-            <Link to={createPageUrl('Wallet')} className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${isActive('Wallet') ? 'text-[#1F7A63]' : 'text-[#1F2933]/50'}`}>
-                <Wallet className={`w-6 h-6 transition-all ${isActive('Wallet') ? 'stroke-[2.5]' : 'stroke-2'}`} strokeLinecap="round" strokeLinejoin="round" />
-                <span className="text-[10px] font-medium mt-0.5">{language === 'ar' ? 'المحفظة' : 'Wallet'}</span>
+            {/* My Orders - طلباتي */}
+            <Link to={createPageUrl('MyOrders')} className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${isActive('MyOrders') ? 'text-[#1F7A63]' : 'text-[#1F2933]/50'}`}>
+                <ClipboardList className={`w-5 h-5 transition-all ${isActive('MyOrders') ? 'stroke-[2.5]' : 'stroke-2'}`} strokeLinecap="round" strokeLinejoin="round" />
+                <span className="text-[9px] font-medium mt-0.5">{language === 'ar' ? 'طلباتي' : 'Orders'}</span>
             </Link>
 
             {/* Cart - السلة */}
             <Link to={createPageUrl('Cart')} className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${isActive('Cart') ? 'text-[#1F7A63]' : 'text-[#1F2933]/50'}`}>
                 <div className="relative">
-                    <ShoppingCart className={`w-6 h-6 transition-all ${isActive('Cart') ? 'stroke-[2.5]' : 'stroke-2'}`} strokeLinecap="round" strokeLinejoin="round" />
+                    <ShoppingCart className={`w-5 h-5 transition-all ${isActive('Cart') ? 'stroke-[2.5]' : 'stroke-2'}`} strokeLinecap="round" strokeLinejoin="round" />
                     {totalItems > 0 && (
                         <motion.span
                             initial={{ scale: 0 }}
@@ -332,13 +337,19 @@ function LayoutContent({ children, currentPageName }) {
                         </motion.span>
                     )}
                 </div>
-                <span className="text-[10px] font-medium mt-0.5">{language === 'ar' ? 'السلة' : 'Cart'}</span>
+                <span className="text-[9px] font-medium mt-0.5">{language === 'ar' ? 'السلة' : 'Cart'}</span>
+            </Link>
+
+            {/* Wallet - المحفظة */}
+            <Link to={createPageUrl('Wallet')} className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${isActive('Wallet') ? 'text-[#1F7A63]' : 'text-[#1F2933]/50'}`}>
+                <Wallet className={`w-5 h-5 transition-all ${isActive('Wallet') ? 'stroke-[2.5]' : 'stroke-2'}`} strokeLinecap="round" strokeLinejoin="round" />
+                <span className="text-[9px] font-medium mt-0.5">{language === 'ar' ? 'المحفظة' : 'Wallet'}</span>
             </Link>
 
             {/* Account - الحساب */}
             <Link to={createPageUrl('Account')} className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${isActive('Account') || isActive('Orders') || isActive('Track') ? 'text-[#1F7A63]' : 'text-[#1F2933]/50'}`}>
-                <User className={`w-6 h-6 transition-all ${isActive('Account') || isActive('Orders') || isActive('Track') ? 'stroke-[2.5]' : 'stroke-2'}`} strokeLinecap="round" strokeLinejoin="round" />
-                <span className="text-[10px] font-medium mt-0.5">{language === 'ar' ? 'الحساب' : 'Account'}</span>
+                <User className={`w-5 h-5 transition-all ${isActive('Account') || isActive('Orders') || isActive('Track') ? 'stroke-[2.5]' : 'stroke-2'}`} strokeLinecap="round" strokeLinejoin="round" />
+                <span className="text-[9px] font-medium mt-0.5">{language === 'ar' ? 'الحساب' : 'Account'}</span>
             </Link>
         </div>
       </nav>

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import AppFooter from '@/components/common/AppFooter';
 import { User, MapPin, Heart, Settings, LogOut, Package, ChevronRight, Edit2, Save, Wallet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
@@ -358,7 +357,6 @@ export default function Account() {
           </motion.button>
         </div>
       </div>
-      <AppFooter />
     </div>
   );
 }

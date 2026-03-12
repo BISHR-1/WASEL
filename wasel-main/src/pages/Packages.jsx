@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import AppFooter from '@/components/common/AppFooter';
 import { Package, X, ArrowRight, ShoppingBag, Eye } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from "@/components/ui/button";
@@ -13,6 +12,7 @@ import { useLanguage } from '../components/common/LanguageContext';
 import { toast } from 'sonner';
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
+import AddToCartButton from '@/components/buttons/AddToCartButton';
 
 export default function Packages() {
   const [selectedPackage, setSelectedPackage] = useState(null);
@@ -161,13 +161,12 @@ export default function Packages() {
                       <Eye className="w-4 h-4 ml-1" />
                       عرض المزيد
                    </Button>
-                   <Button 
-                      onClick={() => handleAddToCart(pkg)}
-                      className="w-full bg-green-600 hover:bg-green-700 text-white"
-                   >
-                      <ShoppingBag className="w-4 h-4 ml-1" />
-                      أضف للسلة
-                   </Button>
+                   <AddToCartButton
+                     onClick={() => handleAddToCart(pkg)}
+                     isLoading={addedToCartPackageId === pkg.id}
+                     label="أضف للسلة"
+                     className="py-2"
+                   />
                 </div>
               </div>
             </motion.div>
@@ -196,16 +195,14 @@ export default function Packages() {
                      <span>{selectedPackage.delivery_time}</span>
                   </p>
                </div>
-               <Button onClick={() => { handleAddToCart(selectedPackage); setSelectedPackage(null); }} className="w-full bg-[#1B4332] text-white">
-                   <ShoppingBag className="w-4 h-4 ml-2" />
-                   {t('addToCart')}
-               </Button>
+               <AddToCartButton
+                 onClick={() => { handleAddToCart(selectedPackage); setSelectedPackage(null); }}
+                 label={t('addToCart')}
+               />
             </div>
           )}
         </DialogContent>
       </Dialog>
-
-      <AppFooter />
     </div>
   );
 }

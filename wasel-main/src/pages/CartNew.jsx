@@ -1,7 +1,6 @@
 // =====================================================
 // WASEL - NEW CART PAGE (Noon-Style High Conversion)
 // File: src/pages/CartNew.jsx
-import AppFooter from '@/components/common/AppFooter';
 // =====================================================
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -739,7 +738,6 @@ export default function CartNew() {
         isLoading={isCheckingOut}
         onCheckout={handleCheckout}
       />
-      <AppFooter />
     </div>
   );
 }

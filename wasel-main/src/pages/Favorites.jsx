@@ -2,7 +2,6 @@
 // WASEL - FAVORITES PAGE (Enhanced with Trust Green + Security)
 // File: src/pages/Favorites.jsx
 // =====================================================
-import AppFooter from '@/components/common/AppFooter';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -506,7 +505,6 @@ export default function Favorites() {
       {/* Floating decorations with Trust Green */}
       <div className="fixed top-20 right-10 w-20 h-20 bg-[#1F7A63]/10 rounded-full blur-2xl pointer-events-none" />
       <div className="fixed bottom-40 left-10 w-32 h-32 bg-[#2FA36B]/10 rounded-full blur-3xl pointer-events-none" />
-      <AppFooter />
     </div>
   );
 }

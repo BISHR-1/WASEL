@@ -28,7 +28,6 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabase';
 import { createPageUrl } from '@/utils';
 import { notifyOrderUsers } from '@/services/firebaseOrderNotifications';
-import AppFooter from '@/components/common/AppFooter';
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
 
@@ -981,8 +980,6 @@ export default function DriverPanel() {
           </>
         )}
       </main>
-
-      <AppFooter />
     </div>
   );
 }

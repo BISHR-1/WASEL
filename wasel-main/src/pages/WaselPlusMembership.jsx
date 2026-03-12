@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import AppFooter from '@/components/common/AppFooter';
 import { CheckCircle2, Crown, Sparkles, CalendarDays, BadgeDollarSign, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import PayPalSubscriptionButton from '@/components/payment/PayPalSubscriptionButton';
@@ -432,7 +431,6 @@ export default function WaselPlusMembership() {
           </div>
         </div>
       </main>
-      <AppFooter />
     </div>
   );
 }

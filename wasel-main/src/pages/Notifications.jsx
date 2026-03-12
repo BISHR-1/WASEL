@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import AppFooter from '@/components/common/AppFooter';
 import { Bell, Trash2, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -186,7 +185,6 @@ export default function Notifications() {
           </div>
         )}
       </div>
-      <AppFooter />
     </div>
   );
 }
