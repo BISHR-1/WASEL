@@ -61,10 +61,9 @@ function getEventContent(eventType, order, context = {}) {
 
   if (eventType === 'shared_cart_paid_creator') {
     const payerName = String(context?.payerName || 'مرسل الهدية');
-    const recipientName = String(context?.recipientName || order?.recipient_details?.name || 'المستلم');
     return {
-      title: '💜 خبر جميل وصل',
-      body: `قام ${payerName} بإتمام دفع السلة المشتركة لـ ${recipientName}. طلبك أصبح قيد التجهيز بكل حب!`,
+      title: '💜 خبر جميل وصل!',
+      body: `قام ${payerName} بدفع سلتك المشتركة بكل حب! 🎉 طلبك الآن قيد التجهيز وسيصلك قريباً ❤️`,
       type: 'payment_success',
       data: {
         type: 'order_update',
@@ -77,8 +76,8 @@ function getEventContent(eventType, order, context = {}) {
   if (eventType === 'shared_cart_paid_payer') {
     const recipientName = String(context?.recipientName || order?.recipient_details?.name || 'المستلم');
     return {
-      title: '💳 تم الدفع بنجاح',
-      body: `أحسنت! تم دفع السلة المشتركة بنجاح، وطلب ${recipientName} دخل مرحلة التجهيز.`,
+      title: '� شكراً لكرمك!',
+      body: `تم دفع السلة المشتركة بنجاح ❤️ طلب ${recipientName} دخل مرحلة التجهيز بفضل دعمك الجميل!`,
       type: 'payment_success',
       data: {
         type: 'order_update',
@@ -89,17 +88,16 @@ function getEventContent(eventType, order, context = {}) {
   }
 
   if (eventType === 'shared_order_status_creator') {
-    const recipientName = String(context?.recipientName || order?.recipient_details?.name || 'المستلم');
     const newStatus = String(context?.newStatus || '').toLowerCase();
     const statusBody = {
-      pending: `طلب ${recipientName} قيد المراجعة حالياً.`,
-      processing: `تم قبول طلب ${recipientName} ويجري تجهيزه الآن.`,
-      delivering: `طلب ${recipientName} في الطريق للتوصيل.`,
-      completed: `تم توصيل طلب ${recipientName} بنجاح. نتمنى لكم لحظات جميلة!`,
+      pending: 'طلبك قيد المراجعة حالياً وسيتم تأكيده قريباً.',
+      processing: 'تم قبول طلبك ويجري تجهيزه الآن 🌟',
+      delivering: 'طلبك في الطريق إليك! سيصلك قريباً 🚚',
+      completed: 'تم توصيل طلبك بنجاح! نتمنى لك لحظات جميلة 🎉',
     };
     return {
-      title: '📦 تحديث على سلتك المشتركة',
-      body: statusBody[newStatus] || `صار تحديث جديد على طلب ${recipientName}.`,
+      title: '📦 تحديث على طلبك',
+      body: statusBody[newStatus] || 'صار تحديث جديد على طلبك.',
       type: 'order_update',
       data: {
         type: 'order_update',
@@ -114,14 +112,14 @@ function getEventContent(eventType, order, context = {}) {
     const recipientName = String(context?.recipientName || order?.recipient_details?.name || 'المستلم');
     const newStatus = String(context?.newStatus || '').toLowerCase();
     const statusBody = {
-      pending: `طلب ${recipientName} الآن قيد المراجعة.`,
-      processing: `بدأ تجهيز طلب ${recipientName} بعد دفعتك الجميلة ❤️`,
-      delivering: `الطلب الذي دفعته لـ ${recipientName} أصبح في الطريق.`,
-      completed: `تم توصيل طلب ${recipientName} بنجاح. شكراً لكرمك!`,
+      pending: `طلب ${recipientName} الآن قيد المراجعة بفضل دعمك ❤️`,
+      processing: `بدأ تجهيز طلب ${recipientName} بعد دفعتك الجميلة! شكراً لكرمك 💙`,
+      delivering: `الطلب الذي دفعته لـ ${recipientName} أصبح في الطريق إليه! 🚚❤️`,
+      completed: `تم توصيل طلب ${recipientName} بنجاح! شكراً لكرمك وحبك 💜🎉`,
     };
     return {
-      title: '💙 تحديث طلب المُستلم',
-      body: statusBody[newStatus] || `هناك تحديث جديد على طلب ${recipientName}.`,
+      title: '💙 تحديث على طلب المُستلم',
+      body: statusBody[newStatus] || `هناك تحديث جديد على طلب ${recipientName}. شكراً لدعمك ❤️`,
       type: 'order_update',
       data: {
         type: 'order_update',

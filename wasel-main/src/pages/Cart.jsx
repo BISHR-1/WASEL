@@ -1930,6 +1930,19 @@ const Cart = () => {
     })();
   }, [resolveCurrentAppUserId]);
 
+  const generateOrderNumber = useCallback(async () => {
+    try {
+      const { data } = await supabase.rpc('generate_order_number');
+      if (typeof data === 'string' && data.trim()) {
+        return data.trim();
+      }
+    } catch (error) {
+      console.warn('Falling back to local order number generation:', error);
+    }
+
+    return `WSL-${Date.now().toString().slice(-8)}`;
+  }, []);
+
   const handleShareCart = useCallback(async () => {
     try {
       setCreatingCartShareLink(true);
@@ -2349,19 +2362,6 @@ const Cart = () => {
       console.error('openWhatsAppSafely failed:', error);
       return false;
     }
-  }, []);
-
-  const generateOrderNumber = useCallback(async () => {
-    try {
-      const { data } = await supabase.rpc('generate_order_number');
-      if (typeof data === 'string' && data.trim()) {
-        return data.trim();
-      }
-    } catch (error) {
-      console.warn('Falling back to local order number generation:', error);
-    }
-
-    return `WSL-${Date.now().toString().slice(-8)}`;
   }, []);
 
   // حفظ الطلب في Supabase
@@ -2884,13 +2884,17 @@ const Cart = () => {
             // Show payment success animation
             const isSharedPayment = Boolean(sharedCartMode);
             setShowPaymentSuccessAnimation(true);
-            setPaymentSuccessMessage(`تم الدفع بنجاح من المحفظة! رصيدك المتبقي: ${Number(payResult.new_balance).toFixed(2)}$`);
+            setPaymentSuccessMessage(
+              isSharedPayment
+                ? `تم دفع السلة المشتركة بنجاح! 💜 سيتم إرسال إشعار فوري لـ ${recipientName || 'المستلم'} بأن طلبه قيد التجهيز.`
+                : `تم الدفع بنجاح من المحفظة! رصيدك المتبقي: ${Number(payResult.new_balance).toFixed(2)}$`
+            );
             setPaymentSuccessRedirectState({
               showInvoicePrompt: true,
               invoiceOrderId: savedOrder?.id || null,
               activeOrdersTab: isSharedPayment ? 'shared' : 'current',
             });
-            toast.success('تم الدفع بنجاح ✅', { duration: 5000 });
+            toast.success(isSharedPayment ? 'تم دفع السلة المشتركة بنجاح! 💜' : 'تم الدفع بنجاح ✅', { duration: 5000 });
 
             if (isSharedPayment && savedOrder?.id) {
               try {
@@ -2963,8 +2967,31 @@ const Cart = () => {
         }
         
         // Show payment success animation
+        const isSharedWhatsApp = Boolean(sharedCartMode);
         setShowPaymentSuccessAnimation(true);
-        setPaymentSuccessMessage('تم استقبال طلبك! جاري إرسال التفاصيل...');
+        setPaymentSuccessMessage(
+          isSharedWhatsApp
+            ? `تم إنشاء طلب السلة المشتركة بنجاح! 💜 سيتم إعلام ${recipientName || 'المستلم'} فوراً.`
+            : 'تم استقبال طلبك! جاري إرسال التفاصيل...'
+        );
+        setPaymentSuccessRedirectState({
+          showInvoicePrompt: true,
+          invoiceOrderId: savedOrder?.id || null,
+          activeOrdersTab: isSharedWhatsApp ? 'shared' : 'current',
+        });
+
+        // Notify creator if shared cart payment via WhatsApp
+        if (isSharedWhatsApp && savedOrder?.id) {
+          try {
+            await notifyOrderUsers('shared_payment_success', savedOrder, {
+              payerName: senderName || currentUserEmail || 'المُرسِل',
+              recipientName: recipientName || savedOrder?.recipient_details?.name || 'المستلم',
+              newStatus: 'processing',
+            });
+          } catch (notifySharedError) {
+            console.warn('Shared payment (whatsapp) notify warning:', notifySharedError);
+          }
+        }
         
         // Attempt to open WhatsApp popup synchronously to keep user activation
         const opened = openWhatsAppSafely(whatsappUrl);
@@ -3080,13 +3107,17 @@ const Cart = () => {
 
       // Show payment success animation
       setShowPaymentSuccessAnimation(true);
-      setPaymentSuccessMessage('تم الدفع بنجاح! جاري حفظ طلبك...');
+      setPaymentSuccessMessage(
+        sharedCartMode
+          ? `تم دفع السلة المشتركة بنجاح! 💜 سيتم إرسال إشعار فوري لـ ${recipientName || 'المستلم'} بأن طلبه قيد التجهيز.`
+          : 'تم الدفع بنجاح! جاري حفظ طلبك...'
+      );
       setPaymentSuccessRedirectState({
         showInvoicePrompt: true,
         invoiceOrderId: savedOrderId,
         activeOrdersTab: sharedCartMode ? 'shared' : 'current',
       });
-      toast.success('تم الدفع بنجاح وحفظ الطلب! شكراً لك 🎉');
+      toast.success(sharedCartMode ? 'تم دفع السلة المشتركة بنجاح! 💜' : 'تم الدفع بنجاح وحفظ الطلب! شكراً لك 🎉');
 
       if (sharedCartMode && persisted?.savedOrder?.id) {
         try {
@@ -3267,19 +3298,23 @@ const Cart = () => {
 
             {/* Shared Cart prominent banner for payer */}
             {sharedCartMode && (
-              <div className="mb-5 p-4 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl shadow-md text-white text-center" dir="rtl">
-                <div className="flex items-center justify-center gap-2 mb-1">
-                  <span className="text-2xl">💚</span>
-                  <span className="text-lg font-extrabold">أنت تدفع سلة مشتركة</span>
+              <div className="mb-5 p-5 bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-600 rounded-2xl shadow-xl text-white text-center border border-white/20" dir="rtl">
+                <div className="flex items-center justify-center gap-3 mb-3">
+                  <span className="text-4xl">🛒</span>
+                  <span className="text-xl font-extrabold">سلة مشتركة</span>
+                  <span className="text-4xl">💚</span>
                 </div>
                 {recipientName ? (
-                  <p className="text-sm font-semibold opacity-90">
-                    هذا الطلب سيُوصَّل إلى <span className="font-extrabold text-white">{recipientName}</span> داخل سوريا
-                  </p>
+                  <div className="bg-white/15 backdrop-blur-sm rounded-xl p-3 mb-3">
+                    <p className="text-sm font-semibold opacity-90 mb-1">هذا الطلب سيُوصَّل إلى</p>
+                    <p className="text-2xl font-black">{recipientName}</p>
+                    <p className="text-xs font-medium opacity-80 mt-1">📍 داخل سوريا</p>
+                  </div>
                 ) : (
-                  <p className="text-sm font-semibold opacity-90">هذا الطلب سيُوصَّل إلى مستلم داخل سوريا</p>
+                  <p className="text-base font-semibold opacity-90 mb-2">هذا الطلب سيُوصَّل إلى مستلم داخل سوريا</p>
                 )}
-                <p className="text-xs opacity-75 mt-1">بعد إتمام الدفع، ستصل رسالة تأكيد لمن أنشأ الطلب ❤️</p>
+                <p className="text-sm opacity-90">بعد إتمام الدفع، ستصل رسالة تأكيد فورية لمن أنشأ الطلب ❤️</p>
+                <p className="text-xs opacity-70 mt-1">شكراً لكرمك ودعمك لأحبابك 💙</p>
               </div>
             )}
             {!insideSyria && (
@@ -3336,10 +3371,10 @@ const Cart = () => {
             <div className="mb-6">
               <h4 className="font-bold text-gray-900 mb-3 text-base" dir="rtl">بيانات المستلم</h4>
               {sharedCartMode && (
-                <div className="mb-3 p-4 bg-gradient-to-r from-violet-50 to-purple-50 border-2 border-violet-300 rounded-xl text-violet-900 text-base text-center font-extrabold relative shadow-sm">
-                  💜 سلة مشتركة
-                  <div className="text-sm font-bold mt-1">المستلم: {recipientName || 'غير محدد'}</div>
-                  <div className="text-xs font-medium mt-1">هذا الطلب سيتم توصيله إلى المستلم داخل سوريا</div>
+                <div className="mb-3 p-4 bg-gradient-to-r from-violet-50 to-purple-50 border-2 border-violet-300 rounded-xl text-violet-900 text-center relative shadow-sm">
+                  <div className="text-lg font-extrabold mb-1">💜 سلة مشتركة</div>
+                  <div className="text-base font-bold">المستلم: <span className="text-violet-700">{recipientName || 'غير محدد'}</span></div>
+                  <div className="text-xs font-medium mt-1 text-violet-600">سيتم توصيل هذا الطلب إلى المستلم داخل سوريا 🇸🇾</div>
                   <button onClick={handleClearSharedCart} className="absolute left-2 top-2 text-xs text-red-500 underline">إلغاء</button>
                 </div>
               )}
@@ -3771,7 +3806,9 @@ const Cart = () => {
                 loop={false}
                 hideWhenDone={false}
               />
-              <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} text-center`} dir="rtl">تمت معالجة الدفع بنجاح! 🎉</h2>
+              <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} text-center`} dir="rtl">
+                {sharedCartMode ? 'تم إتمام الدفع بنجاح! 💜' : 'تمت معالجة الدفع بنجاح! 🎉'}
+              </h2>
               <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-600'} text-center text-sm`} dir="rtl">{paymentSuccessMessage}</p>
               <motion.div 
                 initial={{ opacity: 0 }}
@@ -3780,7 +3817,9 @@ const Cart = () => {
                 className="flex items-center gap-2 text-green-500 mt-2"
               >
                 <CheckCircle className="w-5 h-5" />
-                <span className="font-semibold">سيتم نقلك إلى طلباتي...</span>
+                <span className="font-semibold">
+                  {sharedCartMode ? 'سيتم نقلك إلى السلة المشتركة...' : 'سيتم نقلك إلى طلباتي...'}
+                </span>
               </motion.div>
             </motion.div>
           </motion.div>
