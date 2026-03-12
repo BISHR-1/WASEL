@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useCart } from '@/components/cart/CartContext';
 import PriceDisplay from '@/components/common/PriceDisplay';
 import { toast } from 'sonner';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import ProductDetailModal from '@/components/common/ProductDetailModal';
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
 import AddToCartButton from '@/components/buttons/AddToCartButton';
@@ -139,27 +139,13 @@ const Gifts = () => {
         )}
       </main>
 
-      <Dialog open={!!selectedGift} onOpenChange={() => setSelectedGift(null)}>
-        <DialogContent className="max-w-lg" dir="rtl">
-          {selectedGift && (
-            <div className="space-y-4">
-              <div className="aspect-video relative rounded-lg overflow-hidden">
-                <img
-                  src={selectedGift.image_url || 'https://placehold.co/600x400/f472b6/ffffff?text=Wasel'}
-                  alt={selectedGift.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <h2 className="text-2xl font-bold text-[#1B4332]">{selectedGift.name}</h2>
-              <p className="text-gray-600">{selectedGift.details || selectedGift.description || 'لا يوجد وصف متاح حالياً'}</p>
-              <AddToCartButton
-                onClick={() => { handleAddToCart(selectedGift); setSelectedGift(null); }}
-                label="أضف للسلة"
-              />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <ProductDetailModal
+        item={selectedGift}
+        isOpen={!!selectedGift}
+        onClose={() => setSelectedGift(null)}
+        onAddToCart={handleAddToCart}
+        addToCartLabel="أضف للسلة"
+      />
     </div>
   );
 };

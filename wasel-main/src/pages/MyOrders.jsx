@@ -20,6 +20,7 @@ import { getUserRegion, isInsideSyria } from '@/lib/userRegion';
 import { buildPublicAppUrl } from '@/lib/publicAppUrl';
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
+import { useDarkMode } from '@/lib/DarkModeContext';
 
 const statusOptions = {
   pending: { label: 'قيد انتظار القبول', color: 'bg-gray-100 text-gray-700', icon: Clock },
@@ -107,6 +108,7 @@ function flowBadgeClass(type) {
 
 export default function MyOrders() {
   const queryClient = useQueryClient();
+  const { isDarkMode } = useDarkMode();
   const [session, setSession] = useState(null);
   const [appUserId, setAppUserId] = useState(null);
   const [loadingSession, setLoadingSession] = useState(true);
@@ -720,10 +722,10 @@ export default function MyOrders() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FDFBF7] p-4 pb-24 font-['Cairo']">
+    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-[#FDFBF7]'} p-4 pb-24 font-['Cairo']`}>
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
-           <h1 className="text-2xl font-bold text-[#1B4332]">طلباتي</h1>
+           <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-[#1B4332]'}`}>طلباتي</h1>
            <span className="bg-[#1B4332]/10 text-[#1B4332] px-3 py-1 rounded-full text-sm font-bold">{orders.length} طلب</span>
         </div>
 
@@ -825,11 +827,11 @@ export default function MyOrders() {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: idx * 0.05 }}
-                        className="bg-white p-5 rounded-2xl shadow-sm border border-[#F5E6D3] hover:shadow-md transition-shadow"
+                        className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-[#F5E6D3]'} p-5 rounded-2xl shadow-sm border hover:shadow-md transition-shadow`}
                     >
                         <div className="flex justify-between items-start mb-4">
                             <div className="flex-1">
-                                <h3 className="font-bold text-[#1B4332] text-lg">
+                                <h3 className={`font-bold ${isDarkMode ? 'text-white' : 'text-[#1B4332]'} text-lg`}>
                                   {language === 'ar' ? 'طلب' : 'Order'} #{order.order_number || order.id.slice(0, 8)}
                                 </h3>
                                 <p className="text-xs text-gray-400 mt-1">
@@ -865,7 +867,7 @@ export default function MyOrders() {
                           </motion.div>
                         )}
                         
-                        <div className="bg-gray-50 rounded-xl p-3 text-sm text-gray-600 mb-4">
+                        <div className={`${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-xl p-3 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'} mb-3`}>
                            <div className="flex items-center gap-2 mb-1">
                               <MapPin className="w-4 h-4 text-[#1B4332]" />
                               <span>{order.recipient_details?.name || (language === 'ar' ? 'مستلم' : 'Recipient')} - {order.recipient_details?.address}</span>
@@ -891,6 +893,22 @@ export default function MyOrders() {
                                );
                              })()}
                         </div>
+
+                        {/* Mini items preview (collapsed) */}
+                        {!expandedOrders.has(order.id) && Array.isArray(order.items) && order.items.length > 0 && (
+                          <div className="flex items-center gap-2 mb-3 flex-wrap">
+                            {order.items.slice(0, 3).map((item, idx) => (
+                              <span key={idx} className={`text-xs px-2.5 py-1 rounded-full ${isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
+                                {item?.product_name || item?.name_ar || item?.name || `صنف ${idx + 1}`} ×{item?.quantity || 1}
+                              </span>
+                            ))}
+                            {order.items.length > 3 && (
+                              <span className={`text-xs px-2 py-1 rounded-full ${isDarkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-500'}`}>
+                                +{order.items.length - 3} {language === 'ar' ? 'أصناف' : 'more'}
+                              </span>
+                            )}
+                          </div>
+                        )}
 
                         <div className="flex gap-2">
                            <Button
@@ -937,23 +955,63 @@ export default function MyOrders() {
 
 
                         {expandedOrders.has(order.id) && (
-                          <div className="mt-3 p-3 rounded-xl border border-[#E5E7EB] bg-[#FAFCFB] text-sm">
-                            <p className="font-bold text-[#1B4332] mb-2">{language === 'ar' ? 'تفاصيل الطلب' : 'Order details'}</p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-[#475569]">
-                              <p>{language === 'ar' ? 'المرسل:' : 'Sender:'} {order.sender_details?.name || '-'}</p>
-                              <p>{language === 'ar' ? 'هاتف المرسل:' : 'Sender phone:'} {order.sender_details?.phone || '-'}</p>
-                              <p>{language === 'ar' ? 'المستلم:' : 'Recipient:'} {order.recipient_details?.name || '-'}</p>
-                              <p>{language === 'ar' ? 'هاتف المستلم:' : 'Recipient phone:'} {order.recipient_details?.phone || '-'}</p>
-                              <p className="sm:col-span-2">{language === 'ar' ? 'العنوان:' : 'Address:'} {order.recipient_details?.address || order.delivery_address || '-'}</p>
-                              <p>{language === 'ar' ? 'طريقة الدفع:' : 'Payment:'} {order.payment_method || '-'}</p>
-                              <p>{language === 'ar' ? 'حالة الدفع:' : 'Payment status:'} {order.payment_status || '-'}</p>
+                          <div className={`mt-3 p-4 rounded-xl border ${isDarkMode ? 'border-gray-700 bg-gray-800/60' : 'border-[#E5E7EB] bg-[#FAFCFB]'} text-sm`}>
+                            <p className={`font-bold ${isDarkMode ? 'text-white' : 'text-[#1B4332]'} mb-3`}>{language === 'ar' ? 'تفاصيل الطلب' : 'Order details'}</p>
+
+                            {/* Sender & Recipient cards */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                              <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-gray-700/60' : 'bg-white'} border ${isDarkMode ? 'border-gray-600' : 'border-gray-200'}`}>
+                                <p className={`text-[11px] font-bold uppercase tracking-wide mb-1.5 ${isDarkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>{language === 'ar' ? '📤 المرسل' : '📤 Sender'}</p>
+                                <p className={`text-xs font-semibold ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{order.sender_details?.name || '-'}</p>
+                                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>{order.sender_details?.phone || '-'}</p>
+                              </div>
+                              <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-gray-700/60' : 'bg-white'} border ${isDarkMode ? 'border-gray-600' : 'border-gray-200'}`}>
+                                <p className={`text-[11px] font-bold uppercase tracking-wide mb-1.5 ${isDarkMode ? 'text-blue-400' : 'text-blue-700'}`}>{language === 'ar' ? '📥 المستلم' : '📥 Recipient'}</p>
+                                <p className={`text-xs font-semibold ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{order.recipient_details?.name || '-'}</p>
+                                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>{order.recipient_details?.phone || '-'}</p>
+                              </div>
                             </div>
+
+                            {/* Address */}
+                            <div className={`flex items-start gap-2 p-2.5 rounded-lg text-xs mb-3 ${isDarkMode ? 'bg-gray-700/40 text-gray-300' : 'bg-gray-50 text-gray-600'}`}>
+                              <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                              <span>{order.recipient_details?.address || order.delivery_address || '-'}</span>
+                            </div>
+
+                            {/* Payment info */}
+                            <div className={`flex items-center gap-4 text-xs mb-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                              <span>{language === 'ar' ? 'الدفع:' : 'Payment:'} <strong className={isDarkMode ? 'text-gray-200' : 'text-gray-800'}>{order.payment_method || '-'}</strong></span>
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${order.payment_status === 'paid' ? 'bg-green-100 text-green-700' : isDarkMode ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
+                                {order.payment_status || '-'}
+                              </span>
+                            </div>
+
+                            {/* Items list with images */}
                             {Array.isArray(order.items) && order.items.length > 0 && (
-                              <div className="mt-3 space-y-2">
+                              <div className="space-y-2">
+                                <p className={`text-xs font-bold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{language === 'ar' ? `الأصناف (${order.items.length})` : `Items (${order.items.length})`}</p>
                                 {order.items.map((item, itemIdx) => (
-                                  <div key={`${order.id}-item-${itemIdx}`} className="flex items-center justify-between rounded-lg border border-[#E5E7EB] bg-white px-3 py-2 text-xs">
-                                    <span className="font-semibold text-[#1B4332]">{item?.product_name || item?.name_ar || item?.name || `Item ${itemIdx + 1}`}</span>
-                                    <span className="text-[#64748B]">x{item?.quantity || 1}</span>
+                                  <div key={`${order.id}-item-${itemIdx}`} className={`flex items-center gap-3 rounded-xl border ${isDarkMode ? 'border-gray-600 bg-gray-700/40' : 'border-gray-200 bg-white'} p-2.5`}>
+                                    {(item?.image_url || item?.image) && (
+                                      <img
+                                        src={item.image_url || item.image}
+                                        alt={item?.product_name || ''}
+                                        className="w-11 h-11 rounded-lg object-cover shrink-0 bg-gray-200"
+                                        loading="lazy"
+                                      />
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <p className={`text-xs font-semibold truncate ${isDarkMode ? 'text-gray-200' : 'text-[#1B4332]'}`}>
+                                        {item?.is_gift && '🎁 '}{item?.product_name || item?.name_ar || item?.name || `Item ${itemIdx + 1}`}
+                                      </p>
+                                      {item?.notes && <p className={`text-[10px] truncate ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>{item.notes}</p>}
+                                    </div>
+                                    <div className="text-left shrink-0">
+                                      <span className={`text-xs font-bold ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>×{item?.quantity || 1}</span>
+                                      {(item?.price || item?.price_usd) && (
+                                        <p className={`text-[10px] ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>{(item.price || item.price_usd)?.toLocaleString()} {order.currency || 'USD'}</p>
+                                      )}
+                                    </div>
                                   </div>
                                 ))}
                               </div>
@@ -962,43 +1020,49 @@ export default function MyOrders() {
                         )}
 
                         {Array.isArray(order.deliveryProofs) && order.deliveryProofs.length > 0 && (
-                          <div className="mt-3 p-3 rounded-xl bg-green-50 border border-green-200">
-                            <div className="flex items-center gap-2 text-green-800 font-bold text-sm mb-2">
+                          <div className={`mt-3 p-4 rounded-2xl ${isDarkMode ? 'bg-green-900/30 border-green-800' : 'bg-green-50 border-green-200'} border`}>
+                            <div className={`flex items-center gap-2 ${isDarkMode ? 'text-green-400' : 'text-green-800'} font-bold text-sm mb-3`}>
                               <Camera className="w-4 h-4" />
-                              {language === 'ar' ? 'أدلة التسليم' : 'Delivery proofs'}
+                              {language === 'ar' ? '📸 إثبات التسليم' : '📸 Delivery Proof'}
                             </div>
-                            <div className="space-y-2">
+                            <div className="space-y-3">
                               {order.deliveryProofs.slice(0, 3).map((proof) => {
                                 const proofUrl = proof.public_url || proof.file_path || '#';
                                 const isVideo = String(proof.proof_type || '').toLowerCase().includes('video') || /\.(mp4|mov|webm)$/i.test(proofUrl);
                                 return (
-                                  <div key={proof.id} className="rounded-lg border border-green-200 bg-white p-2">
+                                  <div key={proof.id} className={`rounded-xl border ${isDarkMode ? 'border-green-800 bg-gray-800' : 'border-green-200 bg-white'} overflow-hidden`}>
                                     {isVideo ? (
-                                      <div className="w-full mb-2 rounded-md overflow-hidden bg-black/5">
+                                      <div className="w-full rounded-t-xl overflow-hidden bg-black">
                                         <video
                                           controls
-                                          className="w-full h-auto max-h-[70vh] object-contain"
+                                          className="w-full h-auto max-h-[60vh] object-contain"
                                           src={proofUrl}
                                         />
                                       </div>
                                     ) : (
-                                      <div className="w-full mb-2 rounded-md overflow-hidden bg-black/5">
+                                      <div className="w-full rounded-t-xl overflow-hidden bg-black/5">
                                         <img
-                                          className="w-full h-auto max-h-[70vh] object-contain"
+                                          className="w-full h-auto max-h-[60vh] object-contain"
                                           src={proofUrl}
                                           alt="delivery-proof"
                                           loading="lazy"
                                         />
                                       </div>
                                     )}
-                                    <a
-                                      href={proofUrl}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="block text-xs text-green-700 underline"
-                                    >
-                                      {proof.proof_type} - {new Date(proof.captured_at || proof.created_at).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')}
-                                    </a>
+                                    <div className="flex items-center justify-between p-2.5">
+                                      <span className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                        {proof.proof_type === 'photo' ? '📷 صورة' : proof.proof_type === 'video' ? '🎥 فيديو' : proof.proof_type} - {new Date(proof.captured_at || proof.created_at).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')}
+                                      </span>
+                                      <a
+                                        href={proofUrl}
+                                        download
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className={`flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg ${isDarkMode ? 'bg-green-800 text-green-200 hover:bg-green-700' : 'bg-green-100 text-green-700 hover:bg-green-200'} transition-colors`}
+                                      >
+                                        ⬇️ {language === 'ar' ? 'تحميل' : 'Download'}
+                                      </a>
+                                    </div>
                                   </div>
                                 );
                               })}
@@ -1007,9 +1071,9 @@ export default function MyOrders() {
                         )}
 
                         {order.status === 'completed' && (
-                          <div className="mt-3 p-3 rounded-xl bg-green-50 border border-green-200 text-green-800 text-sm">
+                          <div className={`mt-3 p-3 rounded-xl ${isDarkMode ? 'bg-green-900/30 border-green-800 text-green-400' : 'bg-green-50 border-green-200 text-green-800'} border text-sm`}>
                             <p className="font-bold">{language === 'ar' ? 'شكرا لك، تم استلام الطلب بنجاح' : 'Thank you, your order has been delivered successfully'}</p>
-                            <p className="text-xs mt-1">{language === 'ar' ? 'يمكنك مراجعة صور/فيديو التوثيق أعلاه.' : 'You can review delivery proof photos/videos above.'}</p>
+                            <p className="text-xs mt-1 opacity-80">{language === 'ar' ? 'يمكنك مراجعة صور/فيديو التوثيق أعلاه.' : 'You can review delivery proof photos/videos above.'}</p>
                             {isOrderReviewed(order) && (
                               <p className="text-xs mt-1 font-semibold">{language === 'ar' ? 'شكرا لتقييمك، تم استلام ملاحظاتك.' : 'Thank you for your rating, we received your feedback.'}</p>
                             )}

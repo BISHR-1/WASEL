@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCart } from '../components/cart/CartContext';
 import PriceDisplay from '../components/common/PriceDisplay';
+import ProductDetailModal from '@/components/common/ProductDetailModal';
 import { useLanguage } from '../components/common/LanguageContext';
 import { toast } from 'sonner';
 import SmartLottie from '@/components/animations/SmartLottie';
@@ -176,33 +177,31 @@ export default function Packages() {
       </div>
 
       {/* Details Modal */}
-      <Dialog open={!!selectedPackage} onOpenChange={() => setSelectedPackage(null)}>
-        <DialogContent className="max-w-lg" dir={dir}>
-          {selectedPackage && (
-            <div className="space-y-4">
-               <div className="aspect-video relative rounded-lg overflow-hidden">
-                   <img src={selectedPackage.image_url} className="w-full h-full object-cover" />
-               </div>
-               <h2 className="text-2xl font-bold text-[#1B4332]">{selectedPackage.name}</h2>
-               <p className="text-gray-600">{selectedPackage.details || selectedPackage.description}</p>
-               <div className="bg-gray-50 p-4 rounded-xl space-y-2">
-                  <p className="flex justify-between">
-                     <span className="font-bold">{language === 'en' ? 'Contents:' : 'المحتويات:'}</span>
-                     <span>{selectedPackage.contents}</span>
-                  </p>
-                  <p className="flex justify-between">
-                     <span className="font-bold">{language === 'en' ? 'Delivery Time:' : 'وقت التوصيل:'}</span>
-                     <span>{selectedPackage.delivery_time}</span>
-                  </p>
-               </div>
-               <AddToCartButton
-                 onClick={() => { handleAddToCart(selectedPackage); setSelectedPackage(null); }}
-                 label={t('addToCart')}
-               />
+      <ProductDetailModal
+        item={selectedPackage}
+        isOpen={!!selectedPackage}
+        onClose={() => setSelectedPackage(null)}
+        onAddToCart={handleAddToCart}
+        addToCartLabel={t('addToCart')}
+        extraContent={
+          selectedPackage ? (
+            <div className="bg-gray-50 p-4 rounded-xl space-y-2 mb-4">
+              {selectedPackage.contents && (
+                <p className="flex justify-between">
+                  <span className="font-bold">{language === 'en' ? 'Contents:' : 'المحتويات:'}</span>
+                  <span>{selectedPackage.contents}</span>
+                </p>
+              )}
+              {selectedPackage.delivery_time && (
+                <p className="flex justify-between">
+                  <span className="font-bold">{language === 'en' ? 'Delivery Time:' : 'وقت التوصيل:'}</span>
+                  <span>{selectedPackage.delivery_time}</span>
+                </p>
+              )}
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+          ) : null
+        }
+      />
     </div>
   );
 }

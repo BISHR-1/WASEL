@@ -19,12 +19,14 @@ import { interleaveByCategory, scoreItemsByBehavior } from '@/lib/recommendation
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
 import AddToCartButton from '@/components/buttons/AddToCartButton';
+import { useDarkMode } from '@/lib/DarkModeContext';
 
 const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
 
 const Home = () => {
   const navigate = useNavigate();
   const { addToCart } = useCart();
+  const { isDarkMode } = useDarkMode();
   const [isWaselPlusMember, setIsWaselPlusMember] = useState(false);
   const [favoriteProductIds, setFavoriteProductIds] = useState([]);
   const [likedProductId, setLikedProductId] = useState(null);
@@ -215,12 +217,12 @@ const Home = () => {
 
   const { data: gifts = [] } = useQuery({
     queryKey: ['home-gifts'],
-    queryFn: () => base44.entities.Gift.list({ limit: 4, sort: { created_date: -1 } })
+    queryFn: () => base44.entities.Gift.list({ limit: 12, sort: { created_date: -1 } })
   });
 
   const { data: packages = [] } = useQuery({
     queryKey: ['home-packages'],
-    queryFn: () => base44.entities.Package.list({ limit: 4, sort: { created_date: -1 } })
+    queryFn: () => base44.entities.Package.list({ limit: 12, sort: { created_date: -1 } })
   });
 
   const categories = [
@@ -260,13 +262,13 @@ const Home = () => {
 
   const mixedRecommendations = useMemo(() => {
     const mixed = [
-      ...products.slice(0, 10).map((item) => normalizeShowcaseItem(item, 'product')),
-      ...gifts.slice(0, 8).map((item) => normalizeShowcaseItem(item, 'gift')),
-      ...packages.slice(0, 8).map((item) => normalizeShowcaseItem(item, 'package')),
+      ...products.slice(0, 15).map((item) => normalizeShowcaseItem(item, 'product')),
+      ...gifts.slice(0, 12).map((item) => normalizeShowcaseItem(item, 'gift')),
+      ...packages.slice(0, 12).map((item) => normalizeShowcaseItem(item, 'package')),
     ].filter((item) => item?.id && item?.name);
 
     const ranked = scoreItemsByBehavior(mixed);
-    return interleaveByCategory(ranked, 8);
+    return interleaveByCategory(ranked, 10);
   }, [products, gifts, packages]);
 
   const openMixedItem = (item) => {
@@ -287,7 +289,7 @@ const Home = () => {
   };
 
   return (
-    <div className="bg-[#F7F8FC] min-h-screen pb-24 font-['Cairo']">
+    <div className={`${isDarkMode ? 'bg-gray-900' : 'bg-[#F7F8FC]'} min-h-screen pb-24 font-['Cairo']`}>
       <main className="max-w-[1400px] mx-auto">
         {/* Search Bar - Noon/Amazon style */}
         <div className="sticky top-0 z-20 bg-gradient-to-l from-[#1B4332] to-[#2D6A4F] px-4 py-3 shadow-md">
@@ -358,10 +360,10 @@ const Home = () => {
 
         {/* Shop by Category - enhanced grid */}
         <div className="mb-10">
-          <h3 className="font-black text-xl mb-5 text-[#1F2933]" dir="rtl">تسوق حسب الفئات</h3>
+          <h3 className={`font-black text-xl mb-5 ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`} dir="rtl">تسوق حسب الفئات</h3>
           <div className="grid grid-cols-4 gap-3">
             {shopByCategory.map(cat => (
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} key={cat.name} onClick={() => navigate(createPageUrl(cat.link))} className="flex flex-col items-center gap-2 text-center cursor-pointer p-2 rounded-2xl hover:bg-white hover:shadow-md transition-all">
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} key={cat.name} onClick={() => navigate(createPageUrl(cat.link))} className={`flex flex-col items-center gap-2 text-center cursor-pointer p-2 rounded-2xl ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-white'} hover:shadow-md transition-all`}>
                 <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-[#E5E7EB] shadow-sm bg-gradient-to-br from-[#F8FAFC] to-white">
                   <img
                     src={cat.image}
@@ -372,7 +374,7 @@ const Home = () => {
                     }}
                   />
                 </div>
-                <span className="text-xs font-bold text-[#1F2933] leading-tight">{cat.name}</span>
+                <span className={`text-xs font-bold ${isDarkMode ? 'text-gray-200' : 'text-[#1F2933]'} leading-tight`}>{cat.name}</span>
               </motion.div>
             ))}
           </div>
@@ -380,7 +382,7 @@ const Home = () => {
 
         {/* Product Grid */}
         <div>
-          <h3 className="font-black text-xl mb-3 text-[#1F2933]" dir="rtl">أحدث المنتجات</h3>
+          <h3 className={`font-black text-xl mb-3 ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`} dir="rtl">أحدث المنتجات</h3>
           {productsLoading ? (
             <div className="flex items-center justify-center p-12">
               <div className="flex flex-col items-center gap-4">
@@ -398,7 +400,7 @@ const Home = () => {
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4">
               {products.map(product => (
-                <motion.div key={product.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white rounded-xl shadow-sm overflow-hidden border border-[#E5E7EB] w-full max-w-[260px] mx-auto">
+                <motion.div key={product.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-[#E5E7EB]'} rounded-xl shadow-sm overflow-hidden border w-full max-w-[260px] mx-auto`}>
                   <div className="relative">
                     <img
                       src={product.image_url || 'https://placehold.co/400x400/F9FAF8/1F2933?text=Wasel'}
@@ -467,7 +469,7 @@ const Home = () => {
               const isGiftOrPackage = itemType === 'gift' || itemType === 'package';
 
               return (
-                <motion.div key={`mix-${item.item_type}-${item.id}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white rounded-xl shadow-sm overflow-hidden border border-[#E5E7EB] w-full max-w-[280px] mx-auto">
+                <motion.div key={`mix-${item.item_type}-${item.id}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-[#E5E7EB]'} rounded-xl shadow-sm overflow-hidden border w-full max-w-[280px] mx-auto`}>
                   <img
                     src={item.image_url}
                     alt={item.name}
@@ -505,7 +507,7 @@ const Home = () => {
             {gifts.slice(0, 4).map((rawItem) => {
               const item = normalizeShowcaseItem(rawItem, 'gift');
               return (
-              <motion.div key={`${item.id}-${item.name}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white rounded-xl shadow-sm overflow-hidden border border-[#E5E7EB] w-full max-w-[280px] mx-auto">
+              <motion.div key={`${item.id}-${item.name}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-[#E5E7EB]'} rounded-xl shadow-sm overflow-hidden border w-full max-w-[280px] mx-auto`}>
                 <img
                   src={item.image_url}
                   alt={item.name}

@@ -28,6 +28,7 @@ import { LanguageProvider, useLanguage } from './components/common/LanguageConte
 import { motion } from 'framer-motion';
 import { getUnreadCount } from './lib/inAppNotifications';
 import { getSelectedAddress } from './utils/senderReceiverStorage';
+import { useDarkMode } from './lib/DarkModeContext';
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
 
@@ -177,10 +178,11 @@ function LayoutContent({ children, currentPageName }) {
     loadMembershipState();
   }, [user?.email]);
 
+  const { isDarkMode } = useDarkMode();
   const isActive = (path) => location.pathname.includes(path);
 
   return (
-    <div className={`min-h-screen flex flex-col bg-[#F9FAF8] ${language === 'ar' ? "font-['Cairo',sans-serif]" : "font-sans"}`}>
+    <div className={`min-h-screen flex flex-col ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-[#F9FAF8]'} ${language === 'ar' ? "font-['Cairo',sans-serif]" : "font-sans"}`}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap');
         :root {
@@ -197,7 +199,7 @@ function LayoutContent({ children, currentPageName }) {
       `}</style>
       
       {/* Top Header - Trust Green Style */}
-      <header className={`w-full bg-white z-50 shadow-sm border-b border-[#E5E7EB] pt-safe sticky top-0 transition-transform duration-300 ${showTopBar ? 'translate-y-0' : '-translate-y-full'}`}>
+      <header className={`w-full ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-[#E5E7EB]'} z-50 shadow-sm border-b pt-safe sticky top-0 transition-transform duration-300 ${showTopBar ? 'translate-y-0' : '-translate-y-full'}`}>
         
         {/* Search & Address Bar */}
         <div className="px-3 py-1.5 space-y-1.5">
@@ -309,22 +311,22 @@ function LayoutContent({ children, currentPageName }) {
       <AppFooter />
 
       {/* Bottom Navigation - Trust Green Style */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#E5E7EB] z-50 shadow-[0_-5px_15px_rgba(31,41,51,0.08)] pb-safe">
+      <nav className={`fixed bottom-0 left-0 right-0 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-[#E5E7EB]'} border-t z-50 shadow-[0_-5px_15px_rgba(31,41,51,0.08)] pb-safe`}>
         <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-4">
             {/* Home - الرئيسية */}
-            <Link to={createPageUrl('Home')} className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${isActive('Home') && !location.hash ? 'text-[#1F7A63]' : 'text-[#1F2933]/50'}`}>
+            <Link to={createPageUrl('Home')} className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${isActive('Home') && !location.hash ? 'text-[#1F7A63]' : isDarkMode ? 'text-gray-400' : 'text-[#1F2933]/50'}`}>
                 <Home className={`w-5 h-5 transition-all ${isActive('Home') && !location.hash ? 'stroke-[2.5]' : 'stroke-2'}`} strokeLinecap="round" strokeLinejoin="round" />
                 <span className="text-[9px] font-medium mt-0.5">{language === 'ar' ? 'الرئيسية' : 'Home'}</span>
             </Link>
 
             {/* My Orders - طلباتي */}
-            <Link to={createPageUrl('MyOrders')} className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${isActive('MyOrders') ? 'text-[#1F7A63]' : 'text-[#1F2933]/50'}`}>
+            <Link to={createPageUrl('MyOrders')} className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${isActive('MyOrders') ? 'text-[#1F7A63]' : isDarkMode ? 'text-gray-400' : 'text-[#1F2933]/50'}`}>
                 <ClipboardList className={`w-5 h-5 transition-all ${isActive('MyOrders') ? 'stroke-[2.5]' : 'stroke-2'}`} strokeLinecap="round" strokeLinejoin="round" />
                 <span className="text-[9px] font-medium mt-0.5">{language === 'ar' ? 'طلباتي' : 'Orders'}</span>
             </Link>
 
             {/* Cart - السلة */}
-            <Link to={createPageUrl('Cart')} className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${isActive('Cart') ? 'text-[#1F7A63]' : 'text-[#1F2933]/50'}`}>
+            <Link to={createPageUrl('Cart')} className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${isActive('Cart') ? 'text-[#1F7A63]' : isDarkMode ? 'text-gray-400' : 'text-[#1F2933]/50'}`}>
                 <div className="relative">
                     <ShoppingCart className={`w-5 h-5 transition-all ${isActive('Cart') ? 'stroke-[2.5]' : 'stroke-2'}`} strokeLinecap="round" strokeLinejoin="round" />
                     {totalItems > 0 && (
@@ -341,13 +343,13 @@ function LayoutContent({ children, currentPageName }) {
             </Link>
 
             {/* Wallet - المحفظة */}
-            <Link to={createPageUrl('Wallet')} className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${isActive('Wallet') ? 'text-[#1F7A63]' : 'text-[#1F2933]/50'}`}>
+            <Link to={createPageUrl('Wallet')} className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${isActive('Wallet') ? 'text-[#1F7A63]' : isDarkMode ? 'text-gray-400' : 'text-[#1F2933]/50'}`}>
                 <Wallet className={`w-5 h-5 transition-all ${isActive('Wallet') ? 'stroke-[2.5]' : 'stroke-2'}`} strokeLinecap="round" strokeLinejoin="round" />
                 <span className="text-[9px] font-medium mt-0.5">{language === 'ar' ? 'المحفظة' : 'Wallet'}</span>
             </Link>
 
             {/* Account - الحساب */}
-            <Link to={createPageUrl('Account')} className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${isActive('Account') || isActive('Orders') || isActive('Track') ? 'text-[#1F7A63]' : 'text-[#1F2933]/50'}`}>
+            <Link to={createPageUrl('Account')} className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${isActive('Account') || isActive('Orders') || isActive('Track') ? 'text-[#1F7A63]' : isDarkMode ? 'text-gray-400' : 'text-[#1F2933]/50'}`}>
                 <User className={`w-5 h-5 transition-all ${isActive('Account') || isActive('Orders') || isActive('Track') ? 'stroke-[2.5]' : 'stroke-2'}`} strokeLinecap="round" strokeLinejoin="round" />
                 <span className="text-[9px] font-medium mt-0.5">{language === 'ar' ? 'الحساب' : 'Account'}</span>
             </Link>

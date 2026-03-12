@@ -27,7 +27,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabase';
 import { createPageUrl } from '@/utils';
-import { notifyOrderUsers } from '@/services/firebaseOrderNotifications';
+import { notifyOrderUsers, notifyAdminUsers } from '@/services/firebaseOrderNotifications';
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
 
@@ -487,6 +487,10 @@ export default function DriverPanel() {
     try {
       await updateAssignmentAndOrder(order, 'rejected', 'paid');
       toast.success('تم رفض الطلب وإعادته للمشرف');
+      // Notify supervisor that courier rejected
+      try {
+        await notifyAdminUsers('order_status_changed', order, { newStatus: 'rejected_by_courier', courierName: currentUser?.name || 'الموصل' });
+      } catch (e) { console.warn('Reject notify error:', e); }
       await loadAssignedOrders(currentUser);
     } catch {
       toast.error('فشل رفض الطلب');
@@ -519,7 +523,7 @@ export default function DriverPanel() {
       }
 
       // Check how many completed orders driver has now
-      const { count } = await supabase.from('order_assignments').select('*', { count: 'exact', head: true }).eq('courier_id', currentUser.id).eq('status', 'completed');
+      const { count } = await supabase.from('order_assignments').select('*', { count: 'exact', head: true }).eq('delivery_person_id', currentUser.assignment_id || currentUser.id).eq('status', 'completed');
       
       if (count >= 3) {
         // Unlock referral bonus for the referrer
@@ -902,15 +906,36 @@ export default function DriverPanel() {
 
                     <div className="p-5 border-t border-[#E7ECEA]">
                       <p className="text-sm font-black text-[#1B4332] mb-3 flex items-center gap-1"><Package className="w-4 h-4" />محتويات الطلب ({extractOrderItems(focusedOrder).length} صنف)</p>
+                      
+                      {/* Gift indicator if order contains gifts */}
+                      {extractOrderItems(focusedOrder).some(i => /gift|هدي|باقة|package/i.test(String(i?.category || i?.item_type || ''))) && (
+                        <div className="mb-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm font-bold flex items-center gap-2">
+                          🎁 هذا الطلب يحتوي على هدايا - يرجى التعامل بعناية
+                        </div>
+                      )}
+                      
+                      {/* Cash gift message if present */}
+                      {(focusedOrder.cash_gift_amount || focusedOrder.gift_message) && (
+                        <div className="mb-3 p-3 rounded-xl bg-pink-50 border border-pink-200 text-pink-800 text-sm">
+                          <p className="font-bold flex items-center gap-2">💝 هدية نقدية مرفقة</p>
+                          {focusedOrder.cash_gift_amount > 0 && <p className="mt-1">المبلغ: <span className="font-bold">${focusedOrder.cash_gift_amount}</span></p>}
+                          {focusedOrder.gift_message && <p className="mt-1 italic">"{focusedOrder.gift_message}"</p>}
+                        </div>
+                      )}
+                      
                       <div className="space-y-2">
                         {extractOrderItems(focusedOrder).map((item, idx) => {
                           const imageUrl = getItemImageUrl(item);
                           const name = item.product_name || item.item_name || item.name_ar || item.name || `صنف ${idx + 1}`;
                           const qty = Number(item.quantity || item.qty || 1);
+                          const isGift = /gift|هدي/i.test(String(item?.category || item?.item_type || ''));
                           return (
-                            <div key={`${focusedOrder.id}-item-${idx}`} className="flex items-center gap-3 rounded-xl border border-[#E7ECEA] bg-[#FAFCFB] p-3">
+                            <div key={`${focusedOrder.id}-item-${idx}`} className={`flex items-center gap-3 rounded-xl border ${isGift ? 'border-amber-300 bg-amber-50' : 'border-[#E7ECEA] bg-[#FAFCFB]'} p-3`}>
                               {imageUrl ? <img src={imageUrl} alt={name} className="h-14 w-14 rounded-lg object-cover border border-[#E5E7EB] shrink-0" /> : <div className="h-14 w-14 rounded-lg bg-[#F1F5F9] border border-[#E5E7EB] flex items-center justify-center shrink-0"><Package className="w-5 h-5 text-[#94A3B8]" /></div>}
-                              <div className="flex-1 min-w-0"><p className="text-sm font-bold text-[#1B4332] truncate">{name}</p><p className="text-xs text-[#64748B]">الكمية: {qty}</p></div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-bold text-[#1B4332] truncate">{isGift ? '🎁 ' : ''}{name}</p>
+                                <p className="text-xs text-[#64748B]">الكمية: {qty}</p>
+                              </div>
                             </div>
                           );
                         })}

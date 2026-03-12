@@ -7,7 +7,7 @@ import {
   Search, Settings2, ShieldCheck, Truck, Users, MessageCircle,
   Package, Phone, MapPin, User, ChevronDown, ChevronUp,
   Image as ImageIcon, Crown, Link as LinkIcon, RefreshCcw, Trash2, BookOpen,
-  Wallet, Plus, Minus,
+  Wallet, Plus, Minus, BarChart3, TrendingUp, Calendar, Download,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -57,6 +57,7 @@ function normalizeOrderStatus(status, paymentStatus) {
 
 const PANEL_SECTIONS = [
   { key: 'overview', label: 'نظرة عامة', icon: LayoutDashboard },
+  { key: 'analytics', label: 'تحليلات', icon: BarChart3 },
   { key: 'orders', label: 'الطلبات', icon: ClipboardList },
   { key: 'couriers', label: 'الموصلون', icon: Users },
   { key: 'memberships', label: 'Wasel+', icon: Crown },
@@ -1079,8 +1080,72 @@ export default function SupervisorPanel() {
   const processingOrdersCount = orders.filter((o) => normalizeOrderStatus(o.status, o.payment_status) === 'processing').length;
   const pendingOrdersCount = orders.filter((o) => normalizeOrderStatus(o.status, o.payment_status) === 'pending').length;
   const deliveringOrdersCount = orders.filter((o) => normalizeOrderStatus(o.status, o.payment_status) === 'delivering').length;
+  const completedOrdersCount = orders.filter((o) => normalizeOrderStatus(o.status, o.payment_status) === 'completed').length;
+  const cancelledOrdersCount = orders.filter((o) => normalizeOrderStatus(o.status, o.payment_status) === 'cancelled').length;
   const activeCouriersCount = couriers.filter((c) => c.is_available !== false).length;
   const pendingMembershipsCount = memberships.filter((m) => m.status === 'pending_whatsapp').length;
+
+  // Analytics computations
+  const analyticsData = useMemo(() => {
+    const completedOrders = orders.filter(o => normalizeOrderStatus(o.status, o.payment_status) === 'completed');
+    const totalRevenueUSD = completedOrders.reduce((sum, o) => sum + getOrderTotalUSD(o), 0);
+    const totalRevenueSYP = completedOrders.reduce((sum, o) => sum + getOrderTotalSYP(o), 0);
+    const avgOrderValueUSD = completedOrders.length > 0 ? totalRevenueUSD / completedOrders.length : 0;
+
+    // Orders by day (last 30 days)
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const recentOrders = orders.filter(o => new Date(o.created_at) >= thirtyDaysAgo);
+    const ordersByDay = {};
+    recentOrders.forEach(o => {
+      const day = new Date(o.created_at).toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' });
+      ordersByDay[day] = (ordersByDay[day] || 0) + 1;
+    });
+
+    // Revenue by payment method
+    const revenueByMethod = {};
+    completedOrders.forEach(o => {
+      const method = o.payment_method || o.paymentMethod || 'غير محدد';
+      revenueByMethod[method] = (revenueByMethod[method] || 0) + getOrderTotalUSD(o);
+    });
+
+    // Courier performance
+    const courierPerf = couriers.map(c => ({
+      name: c.full_name || c.name || c.email || 'موصل',
+      completedOrders: Number(c.completed_orders_count || 0),
+      balance: Number(c.balance_usd || 0),
+    })).sort((a, b) => b.completedOrders - a.completedOrders);
+
+    // Conversion rate
+    const conversionRate = orders.length > 0 ? ((completedOrders.length / orders.length) * 100).toFixed(1) : '0';
+
+    return { totalRevenueUSD, totalRevenueSYP, avgOrderValueUSD, ordersByDay, revenueByMethod, courierPerf, conversionRate, completedOrders };
+  }, [orders, couriers]);
+
+  // Export to CSV
+  const exportOrdersCSV = () => {
+    const headers = ['رقم الطلب', 'التاريخ', 'الحالة', 'طريقة الدفع', 'المبلغ USD', 'المبلغ SYP', 'المرسل', 'المستلم'];
+    const rows = orders.map(o => [
+      o.order_number || o.id?.slice(0, 8),
+      new Date(o.created_at).toLocaleDateString('ar-EG'),
+      STATUS_LABELS_AR[normalizeOrderStatus(o.status, o.payment_status)] || o.status,
+      o.payment_method || '',
+      getOrderTotalUSD(o).toFixed(2),
+      getOrderTotalSYP(o).toFixed(0),
+      o.sender_details?.name || '',
+      o.recipient_details?.name || '',
+    ]);
+    const csvContent = [headers.join(','), ...rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))].join('\n');
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `wasel-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('تم تصدير البيانات بنجاح');
+  };
 
   return (
     <div className="min-h-screen bg-[#F7FAF9] font-['Cairo']" dir="rtl">
@@ -1130,6 +1195,8 @@ export default function SupervisorPanel() {
             { title: 'قيد انتظار القبول', value: pendingOrdersCount, icon: Package, gradient: 'from-[#D97706] to-[#FBBF24]' },
             { title: 'تم القبول ويتم تجهيز الطلب', value: processingOrdersCount, icon: Bell, gradient: 'from-[#059669] to-[#34D399]' },
             { title: 'جاري التوصيل', value: deliveringOrdersCount, icon: ShieldCheck, gradient: 'from-[#7C3AED] to-[#A78BFA]' },
+            { title: 'مكتملة', value: completedOrdersCount, icon: TrendingUp, gradient: 'from-[#10B981] to-[#6EE7B7]' },
+            { title: 'الإيرادات ($)', value: `$${analyticsData.totalRevenueUSD.toFixed(0)}`, icon: BarChart3, gradient: 'from-[#3B82F6] to-[#93C5FD]' },
             { title: 'اشتراكات Wasel+', value: `${pendingMembershipsCount}/${memberships.length}`, icon: Crown, gradient: 'from-[#F59E0B] to-[#F97316]' },
           ].map((card, i) => (
             <motion.div key={card.title} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
@@ -1205,6 +1272,140 @@ export default function SupervisorPanel() {
                 <Button onClick={() => navigate(createPageUrl('Home'))} variant="outline" className="w-full rounded-xl border-[#1B4332]/20 text-[#1B4332]">فتح الموقع كعميل</Button>
               </div>
             </motion.article>
+          </section>
+        )}
+
+        {/* Analytics Section - تحليلات متقدمة */}
+        {activeSection === 'analytics' && (
+          <section className="space-y-4">
+            {/* Export Button */}
+            <div className="flex justify-end gap-2">
+              <Button onClick={exportOrdersCSV} className="bg-[#1B4332] hover:bg-[#2D6A4F] rounded-xl text-sm">
+                <Download className="w-4 h-4 ml-1" />
+                تصدير CSV
+              </Button>
+            </div>
+
+            {/* Revenue Cards */}
+            <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                className="rounded-2xl bg-gradient-to-br from-emerald-600 to-emerald-400 text-white p-4">
+                <p className="text-xs opacity-80">إجمالي الإيرادات (USD)</p>
+                <p className="text-2xl font-black mt-1">${analyticsData.totalRevenueUSD.toFixed(2)}</p>
+              </motion.div>
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+                className="rounded-2xl bg-gradient-to-br from-blue-600 to-blue-400 text-white p-4">
+                <p className="text-xs opacity-80">إجمالي الإيرادات (ل.س)</p>
+                <p className="text-2xl font-black mt-1">{analyticsData.totalRevenueSYP.toLocaleString()}</p>
+              </motion.div>
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+                className="rounded-2xl bg-gradient-to-br from-amber-500 to-amber-300 text-white p-4">
+                <p className="text-xs opacity-80">متوسط قيمة الطلب</p>
+                <p className="text-2xl font-black mt-1">${analyticsData.avgOrderValueUSD.toFixed(2)}</p>
+              </motion.div>
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+                className="rounded-2xl bg-gradient-to-br from-purple-600 to-purple-400 text-white p-4">
+                <p className="text-xs opacity-80">معدل التحويل</p>
+                <p className="text-2xl font-black mt-1">{analyticsData.conversionRate}%</p>
+              </motion.div>
+            </div>
+
+            {/* Status breakdown */}
+            <div className="rounded-2xl border border-[#E7ECEA] bg-white p-5">
+              <h3 className="text-lg font-black text-[#1B4332] mb-4 flex items-center gap-2">
+                <BarChart3 className="w-5 h-5" />
+                توزيع الطلبات حسب الحالة
+              </h3>
+              <div className="space-y-3">
+                {[
+                  { label: 'قيد الانتظار', count: pendingOrdersCount, color: 'bg-amber-500', total: orders.length },
+                  { label: 'تم القبول', count: processingOrdersCount, color: 'bg-blue-500', total: orders.length },
+                  { label: 'جاري التوصيل', count: deliveringOrdersCount, color: 'bg-purple-500', total: orders.length },
+                  { label: 'مكتمل', count: completedOrdersCount, color: 'bg-green-500', total: orders.length },
+                  { label: 'ملغي', count: cancelledOrdersCount, color: 'bg-red-500', total: orders.length },
+                ].map(item => (
+                  <div key={item.label} className="flex items-center gap-3">
+                    <span className="text-sm font-bold text-[#475569] w-24 text-right">{item.label}</span>
+                    <div className="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden">
+                      <div className={`${item.color} h-full rounded-full flex items-center justify-end px-2 transition-all duration-500`}
+                        style={{ width: `${item.total > 0 ? Math.max((item.count / item.total) * 100, 2) : 0}%` }}>
+                        <span className="text-xs font-bold text-white">{item.count}</span>
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-[#94A3B8] w-12">{item.total > 0 ? ((item.count / item.total) * 100).toFixed(0) : 0}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Orders by day (visual bar chart) */}
+            <div className="rounded-2xl border border-[#E7ECEA] bg-white p-5">
+              <h3 className="text-lg font-black text-[#1B4332] mb-4 flex items-center gap-2">
+                <Calendar className="w-5 h-5" />
+                الطلبات (آخر 30 يوم)
+              </h3>
+              <div className="flex items-end gap-1 h-40 overflow-x-auto pb-8">
+                {Object.entries(analyticsData.ordersByDay).slice(-15).map(([day, count]) => {
+                  const maxCount = Math.max(...Object.values(analyticsData.ordersByDay), 1);
+                  return (
+                    <div key={day} className="flex flex-col items-center gap-1 min-w-[2.5rem] flex-1">
+                      <span className="text-xs font-bold text-[#1B4332]">{count}</span>
+                      <div className="w-full bg-[#1B4332]/80 rounded-t-lg" style={{ height: `${(count / maxCount) * 100}%`, minHeight: '4px' }} />
+                      <span className="text-[9px] text-[#94A3B8] truncate w-full text-center">{day}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              {Object.keys(analyticsData.ordersByDay).length === 0 && (
+                <p className="text-center text-gray-400 text-sm py-8">لا توجد طلبات في آخر 30 يوم</p>
+              )}
+            </div>
+
+            {/* Revenue by payment method */}
+            <div className="rounded-2xl border border-[#E7ECEA] bg-white p-5">
+              <h3 className="text-lg font-black text-[#1B4332] mb-4 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5" />
+                الإيرادات حسب طريقة الدفع
+              </h3>
+              <div className="space-y-2">
+                {Object.entries(analyticsData.revenueByMethod).sort(([,a],[,b]) => b - a).map(([method, amount]) => (
+                  <div key={method} className="flex items-center justify-between p-3 rounded-xl bg-[#FAFCFB] border border-[#E7ECEA]">
+                    <span className="text-sm font-bold text-[#1B4332]">
+                      {method === 'paypal' ? '💳 PayPal' : method === 'wallet' ? '👛 المحفظة' : method === 'whatsapp' ? '📱 واتساب' : method === 'shared_cart' ? '🛒 سلة مشتركة' : method}
+                    </span>
+                    <span className="font-black text-[#1B4332]">${amount.toFixed(2)}</span>
+                  </div>
+                ))}
+                {Object.keys(analyticsData.revenueByMethod).length === 0 && (
+                  <p className="text-center text-gray-400 text-sm py-4">لا توجد إيرادات بعد</p>
+                )}
+              </div>
+            </div>
+
+            {/* Top couriers */}
+            <div className="rounded-2xl border border-[#E7ECEA] bg-white p-5">
+              <h3 className="text-lg font-black text-[#1B4332] mb-4 flex items-center gap-2">
+                <Truck className="w-5 h-5" />
+                أداء الموصلين
+              </h3>
+              <div className="space-y-2">
+                {analyticsData.courierPerf.slice(0, 10).map((courier, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-[#FAFCFB] border border-[#E7ECEA]">
+                    <div className="flex items-center gap-3">
+                      <span className="w-7 h-7 rounded-full bg-[#1B4332] text-white flex items-center justify-center text-xs font-bold">{idx + 1}</span>
+                      <span className="text-sm font-bold text-[#1B4332]">{courier.name}</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className="text-xs text-[#64748B]">{courier.completedOrders} طلب مكتمل</span>
+                      <span className="font-bold text-[#1B4332]">${courier.balance.toFixed(2)}</span>
+                    </div>
+                  </div>
+                ))}
+                {analyticsData.courierPerf.length === 0 && (
+                  <p className="text-center text-gray-400 text-sm py-4">لا توجد بيانات موصلين</p>
+                )}
+              </div>
+            </div>
           </section>
         )}
 

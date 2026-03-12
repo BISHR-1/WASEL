@@ -18,7 +18,7 @@ import { base44 } from '@/api/base44Client';
 import PayPalPayment from '@/components/payment/PayPalPayment';
 import PayPalModal from '@/components/payment/PayPalModal';
 import EnvelopeGift from '@/components/cart/EnvelopeGift';
-import { getCountriesArabicNames, getCountryByArabicName, getCallingCode } from '@/utils/countryData';
+import { getCountriesArabicNames, getCountryByArabicName, getCallingCode, getCountryByCode, COUNTRIES } from '@/utils/countryData';
 import {
   getSavedSenderInfo,
   getSavedReceiverInfo,
@@ -28,8 +28,10 @@ import {
   saveAddressFromRecipient,
 } from '@/utils/senderReceiverStorage';
 import { supabase } from '@/lib/supabase';
+import ProductDetailModal from '@/components/common/ProductDetailModal';
+import { useDarkMode } from '@/lib/DarkModeContext';
 import { useUsdToSypRate } from '@/lib/exchangeRate';
-import { interleaveByCategory, scoreItemsByBehavior } from '@/lib/recommendationSignals';
+import { interleaveByCategory, scoreItemsByBehavior, trackPurchase } from '@/lib/recommendationSignals';
 import { getUserRegion, isInsideSyria } from '@/lib/userRegion';
 import { notifyAdminUsers } from '@/services/firebaseOrderNotifications';
 import { buildPublicAppUrl } from '@/lib/publicAppUrl';
@@ -1194,106 +1196,15 @@ function OrderSummary({ displayedSubtotalSYP, originalTotalSYP, membershipDiscou
 }
 
 // =====================================================
-// PRODUCT DETAIL MODAL - عرض تفاصيل المنتج
+// PRODUCT DETAIL MODAL - عرض تفاصيل المنتج (يستخدم المكون الموحد)
 // =====================================================
-function ProductDetailModal({ item, isOpen, onClose, onAddToCart, exchangeRate = EXCHANGE_RATE }) {
-  if (!isOpen || !item) return null;
-
-  // السعر من Base44 بالليرة أصلاً
-  const priceSYP = item.customer_price || item.price || 0;
-  const priceUSD = priceSYP / exchangeRate;
-
-  const getImageUrl = () => {
-    if (item.image_url && typeof item.image_url === 'string' && item.image_url.trim()) return item.image_url;
-    if (item.image && typeof item.image === 'string' && item.image.startsWith('http')) return item.image;
-    if (item.images && Array.isArray(item.images) && item.images.length > 0) {
-      const img = item.images[0];
-      return typeof img === 'string' ? img : img?.url;
-    }
-    return 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=400&fit=crop';
-  };
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-end justify-center bg-black/50"
-        onClick={onClose}
-      >
-        <motion.div
-          initial={{ y: '100%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '100%' }}
-          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="bg-white rounded-t-3xl w-full max-w-lg max-h-[85vh] overflow-y-auto"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Close Handle */}
-          <div className="flex justify-center pt-3 pb-2">
-            <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
-          </div>
-
-          {/* Image */}
-          <div className="w-full h-64 bg-gray-100">
-            <img 
-              src={getImageUrl()} 
-              alt={item.name_ar || item.name}
-              className="w-full h-full object-cover"
-              onError={(e) => { 
-                e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=400&fit=crop'; 
-              }}
-            />
-          </div>
-
-          {/* Content */}
-          <div className="p-5" dir="rtl">
-            <h2 className="text-xl font-bold text-gray-900 mb-2">
-              {item.name_ar || item.name}
-            </h2>
-            
-            {(item.description_ar || item.description) && (
-              <p className="text-gray-600 text-sm mb-4">
-                {item.description_ar || item.description}
-              </p>
-            )}
-
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <span className="text-2xl font-bold text-[#C2185B]">
-                  {priceSYP.toLocaleString('en-US')} ل.س
-                </span>
-                <span className="text-sm text-gray-500 block">
-                  (${priceUSD.toFixed(2)})
-                </span>
-              </div>
-            </div>
-
-            {/* Add to Cart Button */}
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => {
-                onAddToCart(item);
-                onClose();
-              }}
-              className="w-full py-4 bg-[#C2185B] text-white rounded-xl font-bold hover:bg-[#A01550] transition-colors"
-            >
-              إضافة إلى السلة
-            </motion.button>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  );
-}
 
 // =====================================================
 // MAIN CART COMPONENT
 // =====================================================
 const Cart = () => {
   const navigate = useNavigate();
+  const { isDarkMode } = useDarkMode();
   const { cartItems = [], updateQuantity, removeFromCart, addToCart, clearCart } = useCart() || {};
   
   const [isUpdating, setIsUpdating] = useState(false);
@@ -1337,12 +1248,15 @@ const Cart = () => {
     return () => clearTimeout(timer);
   }, [showCouponAnimation]);
 
-  // Auto-hide payment success animation after 2.5 seconds
+  // Auto-hide payment success animation after 3 seconds and redirect to MyOrders
   useEffect(() => {
     if (!showPaymentSuccessAnimation) return;
+    trackPurchase(cartItems);
     const timer = setTimeout(() => {
       setShowPaymentSuccessAnimation(false);
-    }, 2500);
+      clearCart();
+      navigate('/MyOrders', { state: { showInvoicePrompt: true } });
+    }, 3000);
     return () => clearTimeout(timer);
   }, [showPaymentSuccessAnimation]);
 
@@ -1525,10 +1439,13 @@ const Cart = () => {
     const savedReceiver = getSavedReceiverInfo();
     const selectedAddress = getSelectedAddress();
 
+    let countryWasSet = false;
+
     if (savedSender) {
       setSenderName(savedSender.name || '');
       setSenderCountry(savedSender.country || 'الإمارات');
       setSenderPhone(savedSender.phone || '');
+      if (savedSender.country) countryWasSet = true;
     }
 
     if (savedReceiver) {
@@ -1544,6 +1461,25 @@ const Cart = () => {
       setSenderName(selectedAddress.sender_name || savedSender?.name || '');
       setSenderPhone(selectedAddress.sender_phone || savedSender?.phone || '');
       setSenderCountry(selectedAddress.sender_country || savedSender?.country || 'الإمارات');
+      if (selectedAddress.sender_country || savedSender?.country) countryWasSet = true;
+    }
+
+    // Auto-detect country via IP geolocation for first-time users
+    if (!countryWasSet && !insideSyria) {
+      fetch('https://ip2c.org/s')
+        .then(res => res.text())
+        .then(data => {
+          // Format: "1;CC;CCC;Country Name" e.g. "1;AE;ARE;United Arab Emirates"
+          const parts = data.split(';');
+          if (parts[0] === '1' && parts[1]) {
+            const countryCode = parts[1]; // ISO 2-letter code
+            const match = COUNTRIES.find(c => c.code === countryCode);
+            if (match) {
+              setSenderCountry(match.name_ar);
+            }
+          }
+        })
+        .catch(() => { /* silently fail, keep default */ });
     }
   }, []);
 
@@ -2692,11 +2628,16 @@ const Cart = () => {
             setShowPaymentSuccessAnimation(true);
             setPaymentSuccessMessage(`تم الدفع بنجاح من المحفظة! رصيدك المتبقي: ${Number(payResult.new_balance).toFixed(2)}$`);
             toast.success(`${setPaymentSuccessMessage} ✅`, { duration: 5000 });
-            
-            // Navigate to orders after animation completes (2.5s)
-            setTimeout(() => {
-              navigate('/MyOrders', { state: { showInvoicePrompt: true, invoiceOrderId: savedOrder?.id || null } });
-            }, 2500);
+
+            // Notify admin/supervisor of the completed payment
+            try {
+              await notifyAdminUsers('new_order_created', savedOrder, {
+                paymentMethod: 'wallet',
+                source: sharedCartMode ? 'shared_cart_payment' : 'wallet_payment'
+              });
+            } catch (notifyErr) {
+              console.warn('notifyAdminUsers wallet warning:', notifyErr);
+            }
           } else {
             const errMsg = payResult?.error === 'insufficient_balance'
               ? `رصيد غير كافٍ. رصيدك: ${payResult.balance}$ والمطلوب: ${payResult.required}$`
@@ -2752,11 +2693,6 @@ const Cart = () => {
         
         // Attempt to open WhatsApp popup synchronously to keep user activation
         const opened = openWhatsAppSafely(whatsappUrl);
-        
-        // Navigate to orders after animation (2.5s)
-        setTimeout(() => {
-          navigate('/MyOrders', { state: { showInvoicePrompt: true, invoiceOrderId: savedOrder?.id || null } });
-        }, 2500);
         
         if (!opened) {
           try {
@@ -2870,11 +2806,6 @@ const Cart = () => {
       clearCart?.();
       localStorage.removeItem('wasel_shared_cart_session');
       setShowPayPal(false);
-      
-      // Navigate after animation (2.5s)
-      setTimeout(() => {
-        navigate('/MyOrders', { state: { showInvoicePrompt: true, invoiceOrderId: savedOrderId } });
-      }, 2500);
     } catch (error) {
       console.error('❌ خطأ في حفظ الطلب بعد الدفع:', error);
       const paypalCaptureId = extractPayPalCaptureId(details);
@@ -2939,12 +2870,12 @@ const Cart = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] font-['Cairo'] pb-32" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 7rem)' }}>
+    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-[#F9FAFB]'} font-['Cairo'] pb-32`} style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 7rem)' }}>
       {/* Header */}
       <motion.div 
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="sticky top-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between z-40 shadow-sm"
+        className={`sticky top-0 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'} border-b px-4 py-3 flex items-center justify-between z-40 shadow-sm`}
       >
         <motion.button 
           whileHover={{ scale: 1.1 }}
@@ -3512,7 +3443,6 @@ const Cart = () => {
         isOpen={showDetailModal}
         onClose={() => setShowDetailModal(false)}
         onAddToCart={handleAddUpsellItem}
-        exchangeRate={exchangeRate}
       />
 
       {/* Payment Success Animation Overlay */}
@@ -3522,13 +3452,14 @@ const Cart = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
           >
             <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
+              initial={{ scale: 0.5, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
-              className="bg-white rounded-3xl p-8 flex flex-col items-center gap-4 max-w-sm mx-4 shadow-2xl"
+              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+              className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-3xl p-8 flex flex-col items-center gap-4 max-w-sm mx-4 shadow-2xl`}
             >
               <SmartLottie
                 animationPath={ANIMATION_PRESETS.paymentSuccess.path}
@@ -3539,12 +3470,17 @@ const Cart = () => {
                 loop={false}
                 hideWhenDone={false}
               />
-              <h2 className="text-2xl font-bold text-gray-900 text-center" dir="rtl">تمت معالجة الدفع</h2>
-              <p className="text-gray-600 text-center text-sm" dir="rtl">{paymentSuccessMessage}</p>
-              <div className="flex items-center gap-2 text-green-600 mt-2">
+              <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} text-center`} dir="rtl">تمت معالجة الدفع بنجاح! 🎉</h2>
+              <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-600'} text-center text-sm`} dir="rtl">{paymentSuccessMessage}</p>
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.5 }}
+                className="flex items-center gap-2 text-green-500 mt-2"
+              >
                 <CheckCircle className="w-5 h-5" />
-                <span className="font-semibold">سيتم نقلك إلى الطلبات...</span>
-              </div>
+                <span className="font-semibold">سيتم نقلك إلى طلباتي...</span>
+              </motion.div>
             </motion.div>
           </motion.div>
         )}

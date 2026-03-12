@@ -1,6 +1,8 @@
 const SEARCH_KEY = 'wasel_behavior_searches_v1';
 const PAGE_VISITS_KEY = 'wasel_behavior_page_visits_v1';
 const PAGE_DWELL_KEY = 'wasel_behavior_page_dwell_ms_v1';
+const PURCHASE_KEY = 'wasel_behavior_purchases_v1';
+const FAVORITES_KEY = 'wasel_favorites';
 const MAX_SEARCH_ENTRIES = 60;
 
 function safeParseObject(value, fallback = {}) {
@@ -145,26 +147,62 @@ export function trackPageDwell(pageName, durationMs) {
   safeSetItem(PAGE_DWELL_KEY, dwell);
 }
 
+export function trackPurchase(items = []) {
+  if (typeof window === 'undefined') return;
+  const purchases = safeParseObject(localStorage.getItem(PURCHASE_KEY), {});
+  (items || []).forEach((item) => {
+    const category = inferItemCategory(item);
+    purchases[category] = Number(purchases[category] || 0) + Number(item?.quantity || 1);
+  });
+  safeSetItem(PURCHASE_KEY, purchases);
+}
+
+function getFavoritesAffinity() {
+  if (typeof window === 'undefined') return {};
+  const favs = safeParseArray(localStorage.getItem(FAVORITES_KEY), []);
+  const score = {};
+  favs.forEach((fav) => {
+    const category = inferItemCategory(fav);
+    score[category] = Number(score[category] || 0) + 3;
+  });
+  return score;
+}
+
 export function getBehaviorAffinity() {
   const searches = getSearchEntries();
   const visits = getPageVisits();
   const dwell = getPageDwell();
+  const purchases = safeParseObject(localStorage.getItem(PURCHASE_KEY), {});
+  const favAffinity = getFavoritesAffinity();
 
   const score = {};
 
+  // Search scoring: newest queries get higher weight
   searches.forEach((entry, index) => {
     const weight = Math.max(1, 8 - Math.floor(index / 6));
     const category = entry?.category || queryToCategory(entry?.query);
     score[category] = Number(score[category] || 0) + weight;
   });
 
+  // Page visit scoring: 2x weight
   Object.entries(visits).forEach(([category, count]) => {
     score[category] = Number(score[category] || 0) + Number(count || 0) * 2;
   });
 
+  // Dwell time scoring: minutes capped at 12 per category
   Object.entries(dwell).forEach(([category, totalMs]) => {
     const minutes = Number(totalMs || 0) / 60000;
     score[category] = Number(score[category] || 0) + Math.min(12, minutes);
+  });
+
+  // Purchase history: strong signal (5x per item bought)
+  Object.entries(purchases).forEach(([category, count]) => {
+    score[category] = Number(score[category] || 0) + Math.min(40, Number(count || 0) * 5);
+  });
+
+  // Favorites signal
+  Object.entries(favAffinity).forEach(([category, pts]) => {
+    score[category] = Number(score[category] || 0) + Number(pts || 0);
   });
 
   return score;
@@ -187,17 +225,31 @@ export function inferItemCategory(item) {
 export function scoreItemsByBehavior(items = [], options = {}) {
   const affinity = getBehaviorAffinity();
   const now = Date.now();
+  const { cartCategories = [] } = options;
 
   return (items || [])
     .map((item, index) => {
       const category = inferItemCategory(item);
       const behaviorScore = Number(affinity[category] || 0);
+
+      // Freshness: newer items get a boost that decays over 28 days
       const freshnessRaw = Date.parse(item?.updated_date || item?.created_date || '');
       const ageDays = Number.isFinite(freshnessRaw) ? Math.max(0, (now - freshnessRaw) / 86400000) : 30;
       const freshnessBoost = Math.max(0, 4 - Math.min(4, ageDays / 7));
 
+      // Popularity: items with order_count or popularity fields
+      const popularity = Number(item?.order_count || item?.popularity || item?.sales_count || 0);
+      const popularityBoost = Math.min(6, Math.log2(popularity + 1) * 2);
+
+      // Rating boost
+      const rating = Number(item?.rating || item?.avg_rating || 0);
+      const ratingBoost = rating >= 4 ? (rating - 3) * 1.5 : 0;
+
+      // Cross-sell: boost items NOT in current cart categories for diversity
+      const crossSellBoost = cartCategories.length > 0 && !cartCategories.includes(category) ? 2 : 0;
+
       const randomTieBreaker = (index % 5) * 0.05;
-      const score = behaviorScore * 3 + freshnessBoost + randomTieBreaker;
+      const score = behaviorScore * 3 + freshnessBoost + popularityBoost + ratingBoost + crossSellBoost + randomTieBreaker;
 
       return {
         ...item,

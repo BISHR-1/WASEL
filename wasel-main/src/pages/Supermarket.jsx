@@ -15,6 +15,7 @@ import OffersCarousel from '../components/common/OffersCarousel';
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
 import AddToCartButton from '@/components/buttons/AddToCartButton';
+import ProductDetailModal from '@/components/common/ProductDetailModal';
 
 export default function Supermarket() {
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -241,63 +242,15 @@ export default function Supermarket() {
       </div>
 
       {/* Details Modal */}
-      <AnimatePresence>
-        {selectedProduct && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedProduct(null)}
-              className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="fixed inset-0 flex items-center justify-center p-4 z-50 pointer-events-none"
-              dir={dir}
-            >
-              <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden pointer-events-auto shadow-2xl">
-                 <div className="relative h-64 bg-gray-50 group overflow-hidden">
-                    <img 
-                      src={selectedProduct?.image_url || ''} 
-                      alt={selectedProduct?.name || 'product'} 
-                      className="w-full h-full object-contain p-6 transition-transform duration-500 hover:scale-150 cursor-zoom-in" 
-                    />
-                    <button 
-                      onClick={() => setSelectedProduct(null)}
-                      className="absolute top-4 right-4 w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300"
-                    >
-                      <span className="text-xl">&times;</span>
-                    </button>
-                 </div>
-                 <div className="p-6">
-                    <h2 className="text-2xl font-bold text-[#1B4332] mb-2">
-                        {language === 'en' ? (selectedProduct?.name_en || selectedProduct?.name) : selectedProduct?.name}
-                    </h2>
-                    <div className="mb-4">
-                        <PriceDisplay basePrice={Number(selectedProduct?.price) || 0} size="large" />
-                    </div>
-                    <p className="text-gray-600 mb-6 leading-relaxed">
-                        {language === 'en' ? (selectedProduct?.description_en || selectedProduct?.description || '') : selectedProduct?.description || ''}
-                    </p>
-                    <Button
-                        onClick={() => {
-                            handleAddToCart(selectedProduct);
-                            setSelectedProduct(null);
-                        }}
-                        disabled={!selectedProduct?.available}
-                        className="w-full h-12 text-lg bg-[#1B4332] hover:bg-[#2D6A4F] rounded-xl"
-                    >
-                        {t('addToCart')}
-                    </Button>
-                 </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      <ProductDetailModal
+        item={selectedProduct}
+        isOpen={!!selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+        onAddToCart={(product) => {
+          handleAddToCart(product);
+        }}
+        addToCartLabel={t('addToCart')}
+      />
     </div>
   );
 }

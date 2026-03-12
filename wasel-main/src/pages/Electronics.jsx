@@ -14,6 +14,7 @@ import OffersCarousel from '../components/common/OffersCarousel';
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
 import AddToCartButton from '@/components/buttons/AddToCartButton';
+import ProductDetailModal from '@/components/common/ProductDetailModal';
 
 export default function Electronics() {
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -238,87 +239,29 @@ export default function Electronics() {
       </div>
 
       {/* Details Modal */}
-      <AnimatePresence>
-        {selectedProduct && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedProduct(null)}
-              className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ opacity: 0, y: 100 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 100 }}
-              className="fixed inset-0 flex items-center justify-center p-4 z-50 pointer-events-none"
-              dir={dir}
-            >
-              <div className="bg-white rounded-[2rem] w-full max-w-2xl max-h-[90vh] overflow-y-auto pointer-events-auto shadow-2xl flex flex-col md:flex-row">
-                 <div className="w-full md:w-1/2 bg-gray-50 h-64 md:h-auto p-8 flex items-center justify-center relative overflow-hidden group">
-                    <img 
-                      src={selectedProduct?.image_url || ''} 
-                      alt={selectedProduct?.name || 'product'} 
-                      className="w-full h-full object-contain transition-transform duration-500 hover:scale-150 cursor-zoom-in" 
-                    />
-                    <button 
-                      onClick={() => setSelectedProduct(null)}
-                      className="absolute top-4 right-4 w-10 h-10 bg-white rounded-full flex items-center justify-center hover:bg-gray-100 shadow-sm md:hidden"
-                    >
-                      <span className="text-xl">&times;</span>
-                    </button>
-                 </div>
-                 <div className="w-full md:w-1/2 p-6 md:p-8 flex flex-col">
-                    <button 
-                      onClick={() => setSelectedProduct(null)}
-                      className="self-end w-8 h-8 bg-gray-100 rounded-full md:flex items-center justify-center hover:bg-gray-200 hidden mb-2"
-                    >
-                      <span className="text-xl">&times;</span>
-                    </button>
-                    
-                    <h2 className="text-2xl font-bold text-[#1B4332] mb-1">
-                        {language === 'en' ? (selectedProduct?.name_en || selectedProduct?.name) : selectedProduct?.name}
-                    </h2>
-                    <p className="text-sm text-gray-500 mb-4 font-medium uppercase tracking-wider">{selectedProduct?.brand || ''}</p>
-                    
-                    <div className="mb-6">
-                        <PriceDisplay basePrice={Number(selectedProduct?.price) || 0} size="large" />
-                    </div>
-
-                    <div className="space-y-4 mb-8 flex-1">
-                        <p className="text-gray-600 leading-relaxed">
-                            {language === 'en' ? (selectedProduct?.description_en || selectedProduct?.description || '') : selectedProduct?.description || ''}
-                        </p>
-                        
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                            <div className="bg-gray-50 p-2 rounded-lg flex items-center gap-2">
-                                <CheckCircle2 className="w-4 h-4 text-green-500" />
-                                <span>{language === 'en' ? 'Original' : 'أصلي 100%'}</span>
-                            </div>
-                            <div className="bg-gray-50 p-2 rounded-lg flex items-center gap-2">
-                                <CheckCircle2 className="w-4 h-4 text-green-500" />
-                                <span>{language === 'en' ? 'Warranty' : 'كفالة حقيقية'}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <Button
-                        onClick={() => {
-                            handleAddToCart(selectedProduct);
-                            setSelectedProduct(null);
-                        }}
-                        disabled={!selectedProduct?.available}
-                        className="w-full h-14 text-lg bg-[#1B4332] hover:bg-[#2D6A4F] rounded-xl font-bold mt-auto shadow-xl shadow-green-900/10"
-                    >
-                        {t('addToCart')}
-                    </Button>
-                 </div>
+      <ProductDetailModal
+        item={selectedProduct}
+        isOpen={!!selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+        onAddToCart={(product) => {
+          handleAddToCart(product);
+        }}
+        addToCartLabel={t('addToCart')}
+        extraContent={
+          selectedProduct ? (
+            <div className="grid grid-cols-2 gap-2 text-sm mb-4">
+              <div className="bg-gray-50 p-2 rounded-lg flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                <span>{language === 'en' ? 'Original' : 'أصلي 100%'}</span>
               </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+              <div className="bg-gray-50 p-2 rounded-lg flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                <span>{language === 'en' ? 'Warranty' : 'كفالة حقيقية'}</span>
+              </div>
+            </div>
+          ) : null
+        }
+      />
     </div>
   );
 }

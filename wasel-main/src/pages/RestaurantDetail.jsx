@@ -16,6 +16,7 @@ import { useLanguage } from '../components/common/LanguageContext';
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
 import AddToCartButton from '@/components/buttons/AddToCartButton';
+import ProductDetailModal from '@/components/common/ProductDetailModal';
 
 export default function RestaurantDetail() {
   const navigate = useNavigate();
@@ -341,77 +342,13 @@ export default function RestaurantDetail() {
       </a>
 
       {/* Item Detail Modal */}
-      <AnimatePresence>
-        {selectedItem && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedItem(null)}
-              className="fixed inset-0 bg-black/60 z-50"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="fixed inset-0 flex items-center justify-center p-4 z-50 pointer-events-none"
-              dir={dir}
-            >
-              <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto pointer-events-auto flex flex-col">
-                {/* Image */}
-                <div className="relative h-80 bg-gray-100 shrink-0">
-                  {selectedItem.image_url && (
-                    <img 
-                      src={selectedItem.image_url} 
-                      alt={selectedItem.name}
-                      className="w-full h-full object-cover"
-                    />
-                  )}
-                  <button
-                    onClick={() => setSelectedItem(null)}
-                    className={`absolute top-4 ${language === 'ar' ? 'left-4' : 'right-4'} w-10 h-10 bg-white/90 hover:bg-white rounded-full flex items-center justify-center transition-all shadow-lg`}
-                  >
-                    ✕
-                  </button>
-                  <div className={`absolute top-4 ${language === 'ar' ? 'right-4' : 'left-4'}`}>
-                    <span className="bg-gradient-to-r from-red-500 to-red-600 text-white px-3 py-1.5 rounded-full text-sm font-bold shadow-lg">
-                      {language === 'en' ? '50% OFF' : 'خصم 50%'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <h2 className="text-2xl font-bold text-[#1B4332]">{selectedItem.name}</h2>
-                    {selectedItem.available && (
-                      <Badge className="bg-[#52B788]/10 text-[#52B788] border-0">{language === 'en' ? 'Available' : 'متوفر'}</Badge>
-                    )}
-                  </div>
-
-                  {selectedItem.description && (
-                    <p className="text-[#1B4332]/70 mb-6 leading-relaxed">{selectedItem.description}</p>
-                  )}
-
-                  <div className="mb-6">
-                    <PriceDisplay basePrice={selectedItem.base_price || selectedItem.customer_price / 1.1} size="medium" />
-                  </div>
-
-                  <AddToCartButton
-                    onClick={() => {
-                      handleAddToCart(selectedItem);
-                      setSelectedItem(null);
-                    }}
-                    disabled={!selectedItem.available}
-                    label={t('addToCart')}
-                  />
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      <ProductDetailModal
+        item={selectedItem}
+        isOpen={!!selectedItem}
+        onClose={() => setSelectedItem(null)}
+        onAddToCart={handleAddToCart}
+        addToCartLabel={t('addToCart')}
+      />
     </div>
   );
 }
