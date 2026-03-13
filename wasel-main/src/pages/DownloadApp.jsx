@@ -67,7 +67,7 @@ export default function DownloadApp() {
             transition={{ delay: 0.4 }}
             className="text-white/90 text-sm md:text-base leading-relaxed mb-8"
           >
-            وصل هي منصة سورية شاملة للتسوّق والتوصيل.
+            واصل هي منصة سورية شاملة للتسوّق والتوصيل.
             تجمع بين السوبرماركت، المطاعم، الحلويات، الإلكترونيات، الهدايا والباقات في مكان واحد.
             الهدف هو تسهيل الحياة اليومية عبر تجربة طلب سريعة وآمنة، مع فريق توصيل مخصص وأسعار شفافة.
             تعمل المنصة داخل سوريا وتتوسع تدريجياً لتشمل مناطق أكثر.
@@ -117,7 +117,7 @@ export default function DownloadApp() {
           viewport={{ once: true }}
           className="text-2xl font-black text-center mb-4 text-[#1B4332]"
         >
-          ما هي منصة وصل؟
+          ما هي منصة واصل؟
         </motion.h2>
         <motion.p
           initial={{ opacity: 0, y: 15 }}
@@ -226,7 +226,7 @@ export default function DownloadApp() {
           className="inline-flex items-center gap-3 bg-gradient-to-r from-[#1B4332] to-[#2D6A4F] text-white font-extrabold text-base px-8 py-4 rounded-2xl shadow-xl hover:shadow-2xl transition-shadow"
         >
           <Download className="w-5 h-5" />
-          تحميل وصل الآن
+          تحميل واصل الآن
         </motion.a>
         <p className="text-xs mt-3 text-gray-400">الإصدار الأحدث — مجاني بالكامل</p>
       </section>
