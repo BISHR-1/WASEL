@@ -23,6 +23,66 @@ const clearWebNotificationPolling = () => {
   }
 };
 
+const requestBrowserNotificationPermission = async () => {
+  try {
+    if (typeof window === 'undefined' || !('Notification' in window)) return 'unsupported';
+    if (Notification.permission === 'granted') return 'granted';
+    if (Notification.permission === 'denied') return 'denied';
+    return await Notification.requestPermission();
+  } catch (error) {
+    console.warn('Browser notification permission warning:', error);
+    return 'error';
+  }
+};
+
+const showWebSystemNotification = async (title, body, link) => {
+  try {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    const permission = await requestBrowserNotificationPermission();
+    if (permission !== 'granted') return;
+
+    const notif = new Notification(title || 'اشعار جديد', {
+      body: body || '',
+      icon: '/logo/wasel-logo.png',
+      badge: '/logo/wasel-logo.png',
+      tag: `wasel-${Date.now()}`,
+      renotify: false,
+    });
+
+    notif.onclick = () => {
+      try {
+        window.focus();
+      } catch {}
+      openNotificationLink(link || '/MyOrders');
+      notif.close();
+    };
+  } catch (error) {
+    console.warn('Web system notification warning:', error);
+  }
+};
+
+const deliverWebNotification = async (row) => {
+  if (!row) return;
+  const title = row.title || 'اشعار جديد';
+  const body = row.message || '';
+  const link = row.link || '/MyOrders';
+
+  // Visible in-app feedback even if browser-level notifications are blocked.
+  try {
+    toast.info(`${title}${body ? `\n${body}` : ''}`, {
+      duration: 8000,
+      action: {
+        label: 'فتح',
+        onClick: () => openNotificationLink(link),
+      },
+    });
+  } catch (error) {
+    console.warn('Toast notification warning:', error);
+  }
+
+  await showWebSystemNotification(title, body, link);
+};
+
 const openNotificationLink = (link) => {
   if (typeof window === 'undefined') return;
   if (link && typeof link === 'string') {
@@ -111,8 +171,9 @@ const setupWebNotifications = async () => {
           markDelivered(row.id);
           if (row.created_at) webNotificationsLastSeenAt = row.created_at;
 
-          const title = row.title || 'اشعار جديد';
-          const body = row.message || '';
+          deliverWebNotification(row).catch((error) => {
+            console.warn('deliverWebNotification realtime warning:', error);
+          });
 
         }
       )
@@ -143,8 +204,9 @@ const setupWebNotifications = async () => {
           markDelivered(row.id);
           if (row.created_at) webNotificationsLastSeenAt = row.created_at;
 
-          const title = row.title || 'اشعار جديد';
-          const body = row.message || '';
+          deliverWebNotification(row).catch((error) => {
+            console.warn('deliverWebNotification poll warning:', error);
+          });
         });
       } catch (pollError) {
         console.warn('Web notifications polling exception:', pollError);
