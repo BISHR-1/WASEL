@@ -2379,6 +2379,10 @@ const Cart = () => {
 
             if (appUserId) {
               directPayload.user_id = appUserId;
+              if (orderData?.sharedCart) {
+                directPayload.payer_user_id = appUserId;
+                directPayload.paid_by_user_id = appUserId;
+              }
             }
 
             const { data: insertedOrder, error: directInsertError } = await supabase

@@ -34,7 +34,7 @@ BEGIN
   END IF;
 
   v_creator_id := NEW.recipient_user_id;
-  v_payer_id   := COALESCE(NEW.paid_by_user_id, NEW.payer_user_id);
+  v_payer_id   := COALESCE(NEW.paid_by_user_id, NEW.payer_user_id, NEW.user_id);
   v_order_link := '/TrackOrder?order=' || COALESCE(NEW.order_number, NEW.id::text);
 
   v_recipient_name := COALESCE(
