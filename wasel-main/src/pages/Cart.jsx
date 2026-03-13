@@ -32,7 +32,6 @@ import { useDarkMode } from '@/lib/DarkModeContext';
 import { useUsdToSypRate } from '@/lib/exchangeRate';
 import { interleaveByCategory, scoreItemsByBehavior, trackPurchase } from '@/lib/recommendationSignals';
 import { getUserRegion, isInsideSyria } from '@/lib/userRegion';
-import { notifyAdminUsers } from '@/services/firebaseOrderNotifications';
 import { buildPublicAppUrl } from '@/lib/publicAppUrl';
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
@@ -2917,12 +2916,6 @@ const Cart = () => {
             });
             toast.success(isSharedPayment ? 'تم دفع السلة المشتركة بنجاح! 💜' : 'تم الدفع بنجاح ✅', { duration: 5000 });
 
-            // Send push notification to admins only
-            try {
-              await notifyAdminUsers('new_order_created', savedOrder, { paymentMethod: 'wallet' });
-            } catch (notifErr) {
-              console.warn('⚠️ Push notification failed (wallet):', notifErr);
-            }
           } else {
             const errMsg = payResult?.error === 'insufficient_balance'
               ? `رصيد غير كافٍ. رصيدك: ${payResult.balance}$ والمطلوب: ${payResult.required}$`
@@ -2986,13 +2979,6 @@ const Cart = () => {
           activeOrdersTab: isSharedWhatsApp ? 'shared' : 'current',
         });
 
-        // Send push notification to admins only
-        try {
-          await notifyAdminUsers('new_order_created', savedOrder, { paymentMethod: 'whatsapp' });
-        } catch (notifErr) {
-          console.warn('⚠️ Push notification failed (whatsapp):', notifErr);
-        }
-        
         // فتح واتساب مباشرة (navigator.share لا يعمل بعد await)
         const opened = openWhatsAppSafely(whatsappUrl);
         if (!opened) {
@@ -3117,14 +3103,6 @@ const Cart = () => {
         activeOrdersTab: sharedCartMode ? 'shared' : 'current',
       });
       toast.success(sharedCartMode ? 'تم دفع السلة المشتركة بنجاح! 💜' : 'تم الدفع بنجاح وحفظ الطلب! شكراً لك 🎉');
-
-      // Send push notification to admins only
-      try {
-        const paypalSavedOrder = persisted?.savedOrder || { id: savedOrderId };
-        await notifyAdminUsers('new_order_created', paypalSavedOrder, { paymentMethod: 'paypal' });
-      } catch (notifErr) {
-        console.warn('⚠️ Push notification failed (paypal):', notifErr);
-      }
 
       clearCart?.();
       localStorage.removeItem('wasel_shared_cart_session');
