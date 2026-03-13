@@ -303,6 +303,29 @@ function isTokenInvalidError(message?: string): boolean {
     || lower.includes('mismatchsenderid');
 }
 
+async function resolveDeviceUserIds(supabase: any, rawIds: Array<string | null | undefined>): Promise<string[]> {
+  const ids = toUniqueStrings(rawIds);
+  if (!ids.length) return [];
+
+  // Some rows in user_devices may store auth.users.id, while others may store public.users.id.
+  // Resolve and query both forms to maximize delivery reliability.
+  const { data: usersRows, error } = await supabase
+    .from('users')
+    .select('id, auth_id')
+    .or(`id.in.(${ids.join(',')}),auth_id.in.(${ids.join(',')})`);
+
+  if (error) {
+    console.warn('resolveDeviceUserIds warning:', error.message || error);
+    return ids;
+  }
+
+  return toUniqueStrings([
+    ...ids,
+    ...((usersRows || []).map((row: any) => row?.id)),
+    ...((usersRows || []).map((row: any) => row?.auth_id)),
+  ]);
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -332,19 +355,21 @@ Deno.serve(async (req) => {
     let tokens: string[] = [];
 
     if (userId) {
+      const candidateUserIds = await resolveDeviceUserIds(supabase, [userId]);
       const { data: devices } = await supabase
         .from('user_devices')
         .select('fcm_token, is_active')
-        .eq('user_id', userId);
+        .in('user_id', candidateUserIds);
 
       tokens = (devices || [])
         .filter((d: any) => d?.is_active !== false && d?.fcm_token)
         .map((d: any) => d.fcm_token);
     } else if (userIds && userIds.length > 0) {
+      const candidateUserIds = await resolveDeviceUserIds(supabase, userIds);
       const { data: devices } = await supabase
         .from('user_devices')
         .select('fcm_token, is_active')
-        .in('user_id', userIds);
+        .in('user_id', candidateUserIds);
 
       tokens = devices
         ?.filter((d) => d?.is_active !== false)
