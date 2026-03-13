@@ -42,45 +42,68 @@ BEGIN
   notif_body  := 'قام ' || v_payer_name || ' بدفع سلتك المشتركة بمبلغ $' || v_total || ' 🎉 طلبك الآن قيد التجهيز وسيصلك قريباً ❤️';
   order_link  := '/TrackOrder?order=' || COALESCE(NEW.order_number, NEW.id::text);
 
-  -- 1) إشعار ويب داخلي (Realtime يلتقطه مباشرة)
-  INSERT INTO public.notifications (user_id, title, message, type, is_read, link, created_at)
-  VALUES (v_creator_id, notif_title, notif_body, 'payment_success', false, order_link, NOW());
-
-  -- 2) FCM push عبر Edge Function
+  -- معرفات إضافية للدافع
+  DECLARE
+    v_payer_id     UUID;
+    v_payer_auth   TEXT;
+    v_recipient_name TEXT;
+    payer_title    TEXT;
+    payer_body     TEXT;
   BEGIN
-    -- نحتاج auth_id لإرسال FCM (user_devices مربوط بـ auth.users.id)
-    SELECT u.auth_id INTO v_creator_auth
-    FROM public.users u
-    WHERE u.id = v_creator_id;
+    v_payer_id := COALESCE(NEW.paid_by_user_id, NEW.payer_user_id);
+    v_recipient_name := COALESCE(NEW.recipient_details->>'name', 'المستلم');
+    payer_title := '💚 شكرا لكرمك!';
+    payer_body  := 'تم دفع السلة المشتركة بنجاح طلب ' || v_recipient_name || ' دخل مرحلة التجهيز بفضل دعمك الجميل';
 
-    IF v_creator_auth IS NOT NULL THEN
-      v_supabase_url := (SELECT value FROM public.app_config WHERE key = 'supabase_url');
-      v_service_key  := (SELECT value FROM public.app_config WHERE key = 'service_role_key');
+    -- 1) إشعار ويب للمنشئ
+    INSERT INTO public.notifications (user_id, title, message, type, is_read, link, created_at)
+    VALUES (v_creator_id, notif_title, notif_body, 'payment_success', false, order_link, NOW());
 
-      IF v_supabase_url IS NOT NULL AND v_service_key IS NOT NULL THEN
+    -- 2) إشعار ويب للدافع (إذا مختلف عن المنشئ)
+    IF v_payer_id IS NOT NULL AND v_payer_id IS DISTINCT FROM v_creator_id THEN
+      INSERT INTO public.notifications (user_id, title, message, type, is_read, link, created_at)
+      VALUES (v_payer_id, payer_title, payer_body, 'payment_success', false, order_link, NOW());
+    END IF;
+
+    -- 3) FCM push للطرفين
+    v_supabase_url := (SELECT value FROM public.app_config WHERE key = 'supabase_url');
+    v_service_key  := (SELECT value FROM public.app_config WHERE key = 'service_role_key');
+
+    IF v_supabase_url IS NOT NULL AND v_service_key IS NOT NULL THEN
+      -- FCM للمنشئ
+      SELECT u.auth_id INTO v_creator_auth FROM public.users u WHERE u.id = v_creator_id;
+      IF v_creator_auth IS NOT NULL THEN
         PERFORM net.http_post(
           url     := v_supabase_url || '/functions/v1/send-notification',
-          headers := jsonb_build_object(
-            'Content-Type', 'application/json',
-            'Authorization', 'Bearer ' || v_service_key
-          ),
+          headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer ' || v_service_key),
           body    := jsonb_build_object(
-            'userIds', jsonb_build_array(v_creator_auth),
-            'title', notif_title,
-            'body',  notif_body,
-            'data',  jsonb_build_object(
-              'type', 'order_update',
-              'order_id', COALESCE(NEW.id::text, ''),
-              'event', 'shared_cart_paid_creator',
-              'payment_method', COALESCE(NEW.payment_method, '')
-            )
+            'userIds', jsonb_build_array(v_creator_auth::text),
+            'title', notif_title, 'body', notif_body,
+            'data', jsonb_build_object('type', 'order_update', 'order_id', COALESCE(NEW.id::text, ''), 'event', 'shared_cart_paid_creator', 'payment_method', COALESCE(NEW.payment_method, ''))
           )
         );
       END IF;
+
+      -- FCM للدافع
+      IF v_payer_id IS NOT NULL AND v_payer_id IS DISTINCT FROM v_creator_id THEN
+        SELECT u.auth_id INTO v_payer_auth FROM public.users u WHERE u.id = v_payer_id;
+        IF v_payer_auth IS NOT NULL THEN
+          PERFORM net.http_post(
+            url     := v_supabase_url || '/functions/v1/send-notification',
+            headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer ' || v_service_key),
+            body    := jsonb_build_object(
+              'userIds', jsonb_build_array(v_payer_auth::text),
+              'title', payer_title, 'body', payer_body,
+              'data', jsonb_build_object('type', 'order_update', 'order_id', COALESCE(NEW.id::text, ''), 'event', 'shared_cart_paid_payer', 'payment_method', COALESCE(NEW.payment_method, ''))
+            )
+          );
+        END IF;
+      END IF;
     END IF;
+  END;
+  -- END FCM block
   EXCEPTION WHEN OTHERS THEN
     RAISE WARNING 'notify_creator_on_shared_payment FCM: %', SQLERRM;
-  END;
 
   RETURN NEW;
 EXCEPTION WHEN OTHERS THEN
