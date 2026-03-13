@@ -58,7 +58,7 @@ export default function ProductReviews({ productId, productType = 'product', isD
 
       setReviews((data || []).map(r => ({
         ...r,
-        displayName: userMap[r.user_id] || userMap[r.reviewer_user_id] || 'مستخدم واصل',
+        displayName: userMap[r.user_id] || userMap[r.reviewer_user_id] || 'مستخدم واصل ستور',
         displayComment: r.comment || r.content || '',
       })));
     } catch (err) {

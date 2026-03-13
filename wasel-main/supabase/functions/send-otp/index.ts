@@ -80,7 +80,7 @@ Deno.serve(async (req: Request) => {
           body: JSON.stringify({
             from: fromEmail,
             to: [email],
-            subject: 'رمز التحقق - واصل',
+            subject: 'رمز التحقق - واصل ستور',
             html: `<div style="font-family: Arial, sans-serif;">
               <h2>رمز التحقق الخاص بك</h2>
               <p>استخدم الرمز التالي لإكمال تسجيل الدخول:</p>

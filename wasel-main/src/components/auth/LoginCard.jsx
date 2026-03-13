@@ -76,7 +76,7 @@ export default function LoginCard({
                 transition={{ delay: 0.4 }}
                 className="text-5xl font-bold text-[#1F2933] tracking-wider drop-shadow-lg"
               >
-                واصل || Wasel
+                واصل ستور || Wasel Store
               </motion.h1>
               <motion.p
                 initial={{ opacity: 0 }}

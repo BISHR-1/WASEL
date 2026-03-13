@@ -76,9 +76,9 @@ export async function downloadOrderInvoicePdf(order, options = {}) {
         <div style="display: flex; gap: 16px; align-items: center;">
           <img src="${logoUrl}" style="width: 70px; height: 70px; object-fit: contain; border-radius: 12px; border: 1px solid #e5e7eb; padding: 4px;" alt="Logo" crossorigin="anonymous" />
           <div>
-            <h1 style="margin: 0; font-size: 28px; color: #111827; font-weight: 800;">${isAr ? 'فاتورة واصل' : 'Wasel Invoice'}</h1>
+            <h1 style="margin: 0; font-size: 28px; color: #111827; font-weight: 800;">${isAr ? 'فاتورة واصل ستور' : 'Wasel Store Invoice'}</h1>
             <p style="margin: 4px 0 0 0; font-size: 14px; color: #6b7280;">
-              ${isAr ? 'منصة واصل للتسوق والتوصيل السريع' : 'Wasel Shopping & Fast Delivery'}
+              ${isAr ? 'منصة واصل ستور للتسوق والتوصيل السريع' : 'Wasel Store Shopping & Fast Delivery'}
             </p>
           </div>
         </div>
@@ -159,7 +159,7 @@ export async function downloadOrderInvoicePdf(order, options = {}) {
       </div>
 
       <div style="text-align: center; margin-top: 50px; padding-top: 20px; border-top: 1px solid #f3f4f6; color: #9ca3af; font-size: 12px;">
-        ${isAr ? 'شكراً لتعاملكم مع واصل. هذه الفاتورة إلكترونية ولا تحتاج لتوقيع.' : 'Thank you for choosing Wasel. This is an electronic invoice and does not require a signature.'}
+        ${isAr ? 'شكراً لتعاملكم مع واصل ستور. هذه الفاتورة إلكترونية ولا تحتاج لتوقيع.' : 'Thank you for choosing Wasel Store. This is an electronic invoice and does not require a signature.'}
       </div>
     </div>
   `;
@@ -205,7 +205,7 @@ export async function downloadOrderInvoicePdf(order, options = {}) {
         try {
           await navigator.share({
             files: [new File([blob], fileName, { type: 'application/pdf' })],
-            title: isAr ? 'فاتورة واصل' : 'Wasel Invoice',
+            title: isAr ? 'فاتورة واصل ستور' : 'Wasel Store Invoice',
           });
         } catch {
           // User cancelled share or share failed - open in new tab

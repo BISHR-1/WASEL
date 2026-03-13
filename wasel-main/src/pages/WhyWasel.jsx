@@ -62,10 +62,10 @@ export default function WhyWasel() {
               <Shield className="w-10 h-10 text-white" />
             </div>
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">
-              لماذا واصل؟
+              لماذا واصل ستور؟
             </h1>
             <p className="text-white/70 text-lg max-w-2xl mx-auto">
-              نعرض لك طريقة عمل واصل الحالية بشكل واضح، بدون تفاصيل غير مهمة.
+              نعرض لك طريقة عمل واصل ستور الحالية بشكل واضح، بدون تفاصيل غير مهمة.
             </p>
           </motion.div>
         </div>
@@ -82,7 +82,7 @@ export default function WhyWasel() {
           <h2 className={`text-2xl font-bold mb-6 ${isDarkMode ? 'text-white' : 'text-[#1B4332]'}`}>قصتنا</h2>
           <div className={`space-y-4 leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-[#1B4332]/80'}`}>
             <p>
-              واصل اليوم يعمل على مسارين واضحين: طلب مباشر داخل التطبيق، أو مشاركة سلة مع طرف خارج سوريا عبر رابط آمن.
+              واصل ستور اليوم يعمل على مسارين واضحين: طلب مباشر داخل التطبيق، أو مشاركة سلة مع طرف خارج سوريا عبر رابط آمن.
             </p>
             <p>
               عند إنشاء الطلب يتم إرساله فورًا إلى لوحة المشرف، ويتم إرسال تنبيه Firebase حتى تبدأ المتابعة بسرعة.

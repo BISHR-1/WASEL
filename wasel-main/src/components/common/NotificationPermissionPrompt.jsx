@@ -66,7 +66,7 @@ export default function NotificationPermissionPrompt() {
         if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
           navigator.serviceWorker.controller.postMessage({
             type: 'SHOW_NOTIFICATION',
-            title: language === 'ar' ? '🎊 مرحباً بك في واصل!' : '🎊 Welcome to Wasel!',
+            title: language === 'ar' ? '🎊 مرحباً بك في واصل ستور!' : '🎊 Welcome to Wasel Store!',
             body: language === 'ar' 
               ? 'سنبقيك على اطلاع بأحدث العروض والخصومات الحصرية لك ولعائلتك' 
               : 'We\'ll keep you updated with the latest offers and exclusive deals for you and your family',

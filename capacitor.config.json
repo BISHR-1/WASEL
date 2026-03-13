@@ -1,6 +1,6 @@
 {
   "appId": "com.wasel.app",
-  "appName": "Wasel",
+  "appName": "Wasel Store",
   "webDir": "wasel-main/dist",
   "bundledWebRuntime": false
 }

@@ -131,7 +131,7 @@ export default function ReviewModal({ order, onClose, onSubmit }) {
 
             <div className="bg-[#FFF7E6] rounded-xl p-4 space-y-3 border border-[#FCD34D]">
               <h3 className="font-bold text-gray-800">تقييم الخدمة ككل</h3>
-              <p className="text-xs text-gray-600">قيّم تجربتك العامة مع واصل (السرعة، الدقة، المتابعة)</p>
+              <p className="text-xs text-gray-600">قيّم تجربتك العامة مع واصل ستور (السرعة، الدقة، المتابعة)</p>
 
               <div className="flex items-center justify-center gap-2 py-2">
                 {[1, 2, 3, 4, 5].map((star) => (

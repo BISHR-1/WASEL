@@ -27,7 +27,7 @@ export default function AIChat({ isOpen, onClose }) {
         {
           role: 'bot',
           content: language === 'ar' 
-            ? 'مرحباً! أنا مساعد واصل الذكي. كيف يمكنني مساعدتك اليوم؟ 😊'
+            ? 'مرحباً! أنا مساعد واصل ستور الذكي. كيف يمكنني مساعدتك اليوم؟ 😊'
             : 'Hello! I\'m Wasel\'s smart assistant. How can I help you today? 😊'
         }
       ]);
@@ -42,12 +42,12 @@ export default function AIChat({ isOpen, onClose }) {
     if (language === 'ar') {
       // Greetings
       if (msg.includes('مرحبا') || msg.includes('السلام') || msg.includes('أهلا')) {
-        return 'أهلاً وسهلاً بك! 😊 كيف يمكنني مساعدتك في معرفة المزيد عن تطبيق واصل؟';
+        return 'أهلاً وسهلاً بك! 😊 كيف يمكنني مساعدتك في معرفة المزيد عن تطبيق واصل ستور؟';
       }
       
       // What is Wasel
       if (msg.includes('واصل') && (msg.includes('ما هو') || msg.includes('ماهو') || msg.includes('تعريف'))) {
-        return 'واصل هي منصة تمكّنك من إرسال الوجبات والهدايا لعائلتك في درعا بكل سهولة وأمان. نحن نهتم بكل التفاصيل من الطلب حتى التوصيل 🎁❤️';
+        return 'واصل ستور هي منصة تمكّنك من إرسال الوجبات والهدايا لعائلتك في درعا بكل سهولة وأمان. نحن نهتم بكل التفاصيل من الطلب حتى التوصيل 🎁❤️';
       }
       
       // How it works
@@ -92,11 +92,11 @@ export default function AIChat({ isOpen, onClose }) {
       
       // Off-topic response
       if (!msg.includes('واصل') && !msg.includes('تطبيق') && !msg.includes('منصة')) {
-        return 'عذراً، أنا متخصص فقط في الإجابة عن أسئلة تتعلق بتطبيق واصل. هل لديك أي سؤال عن خدماتنا؟ 🤔';
+        return 'عذراً، أنا متخصص فقط في الإجابة عن أسئلة تتعلق بتطبيق واصل ستور. هل لديك أي سؤال عن خدماتنا؟ 🤔';
       }
       
       // Default response
-      return 'شكراً لسؤالك! يمكنك سؤالي عن:\n• كيف يعمل واصل\n• طرق الدفع\n• مناطق التوصيل\n• أنواع المنتجات\n• الأمان والثقة\n\nأو تواصل معنا مباشرة عبر واتساب 😊';
+      return 'شكراً لسؤالك! يمكنك سؤالي عن:\n• كيف يعمل واصل ستور\n• طرق الدفع\n• مناطق التوصيل\n• أنواع المنتجات\n• الأمان والثقة\n\nأو تواصل معنا مباشرة عبر واتساب 😊';
     }
     
     // English responses
@@ -208,7 +208,7 @@ export default function AIChat({ isOpen, onClose }) {
             </div>
             <div>
               <h3 className="text-white font-bold">
-                {language === 'ar' ? 'مساعد واصل الذكي' : 'Wasel AI Assistant'}
+                {language === 'ar' ? 'مساعد واصل ستور الذكي' : 'Wasel Store AI Assistant'}
               </h3>
               <p className="text-white/80 text-xs">
                 {language === 'ar' ? 'متاح دائماً' : 'Always available'}

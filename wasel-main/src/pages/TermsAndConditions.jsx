@@ -9,7 +9,7 @@ export default function TermsAndConditions() {
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-6 text-gray-700 leading-relaxed">
           <section>
             <h2 className="text-xl font-bold text-[#2D6A4F] mb-3">1. مقدمة</h2>
-            <p>مرحباً بك في منصة "واصل". باستخدامك لتطبيقنا أو موقعنا الإلكتروني، فإنك توافق على الامتثال لهذه الشروط والأحكام. إذا كنت لا توافق على أي جزء منها، يُرجى التوقف عن استخدام المنصة.</p>
+            <p>مرحباً بك في منصة "واصل ستور". باستخدامك لتطبيقنا أو موقعنا الإلكتروني، فإنك توافق على الامتثال لهذه الشروط والأحكام. إذا كنت لا توافق على أي جزء منها، يُرجى التوقف عن استخدام المنصة.</p>
           </section>
 
           <section>

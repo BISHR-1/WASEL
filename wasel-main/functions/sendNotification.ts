@@ -54,7 +54,7 @@ const corsHeadersNotif = {
           <div dir="rtl" style="${containerStyle}">
             <div style="${headerStyle}">
               <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 800; font-family: 'Cairo', sans-serif;">تم استلام الطلب</h1>
-              <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;">شكراً لثقتك بمنصة واصل</p>
+              <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;">شكراً لثقتك بمنصة واصل ستور</p>
             </div>
             
             <div style="${contentStyle}">
@@ -81,7 +81,7 @@ const corsHeadersNotif = {
             
             <div style="${footerStyle}">
               <p style="margin: 0 0 10px 0;">نحن هنا للمساعدة! إذا كان لديك أي استفسار، لا تتردد في التواصل معنا.</p>
-              <p style="margin: 0;">© ${new Date().getFullYear()} واصل - Wasel. جميع الحقوق محفوظة.</p>
+              <p style="margin: 0;">© ${new Date().getFullYear()} \u0648\u0627\u0635\u0644 \u0633\u062a\u0648\u0631 - Wasel Store. جميع الحقوق محفوظة.</p>
             </div>
           </div>
         `;
@@ -112,7 +112,7 @@ const corsHeadersNotif = {
             </div>
             
             <div style="${footerStyle}">
-              <p style="margin: 0;">© ${new Date().getFullYear()} واصل - Wasel</p>
+              <p style="margin: 0;">© ${new Date().getFullYear()} \u0648\u0627\u0635\u0644 \u0633\u062a\u0648\u0631 - Wasel Store</p>
             </div>
           </div>
         `;
@@ -132,7 +132,7 @@ const corsHeadersNotif = {
               
               <div style="${infoBoxStyle}">
                 <p style="margin: 0 0 5px 0; color: #718096; font-size: 12px;">من:</p>
-                <p style="margin: 0; color: #1B4332; font-weight: bold;">${additionalData?.senderName || 'فريق واصل'}</p>
+                <p style="margin: 0; color: #1B4332; font-weight: bold;">${additionalData?.senderName || 'فريق واصل ستور'}</p>
               </div>
               
               <div style="background-color: #f8f9fa; border-right: 4px solid #1B4332; padding: 15px; margin-bottom: 25px; border-radius: 4px;">
@@ -145,7 +145,7 @@ const corsHeadersNotif = {
             </div>
             
             <div style="${footerStyle}">
-              <p style="margin: 0;">© ${new Date().getFullYear()} واصل - Wasel</p>
+              <p style="margin: 0;">© ${new Date().getFullYear()} \u0648\u0627\u0635\u0644 \u0633\u062a\u0648\u0631 - Wasel Store</p>
             </div>
           </div>
         `;
@@ -176,7 +176,7 @@ const corsHeadersNotif = {
             </div>
             
             <div style="${footerStyle}">
-              <p style="margin: 0;">© ${new Date().getFullYear()} واصل - Wasel</p>
+              <p style="margin: 0;">© ${new Date().getFullYear()} \u0648\u0627\u0635\u0644 \u0633\u062a\u0648\u0631 - Wasel Store</p>
             </div>
           </div>
         `;
@@ -189,7 +189,7 @@ const corsHeadersNotif = {
     // Send the email via Base44/Supabase Integration or similar provider
     // Note: Base44 integration disabled for now
     // await base44.integrations.Core.SendEmail({
-    //   from_name: 'واصل - Wasel',
+    //   from_name: '\u0648\u0627\u0635\u0644 \u0633\u062a\u0648\u0631 - Wasel Store',
     //   to: recipientEmail,
     //   subject,
     //   body,

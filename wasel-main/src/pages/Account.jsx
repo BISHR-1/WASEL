@@ -55,7 +55,7 @@ export default function Account() {
           console.error('Failed to load profile from users table:', error);
         }
 
-        const fallbackName = user.user_metadata?.full_name || user.user_metadata?.name || (user.email ? user.email.split('@')[0] : 'عميل واصل');
+        const fallbackName = user.user_metadata?.full_name || user.user_metadata?.name || (user.email ? user.email.split('@')[0] : 'عميل واصل ستور');
         const mergedProfile = {
           name: dbProfile?.full_name || fallbackName,
           email: dbProfile?.email || user.email || '',
@@ -180,7 +180,7 @@ export default function Account() {
               </div>
             </motion.div>
             <h2 className="text-2xl font-bold text-gray-800 mb-1">
-              أهلاً بك، {profile.name || 'عميل واصل'}
+              أهلاً بك، {profile.name || 'عميل واصل ستور'}
             </h2>
             <p className="text-gray-600 text-sm">
               نوصل حبك لحد الباب 💙

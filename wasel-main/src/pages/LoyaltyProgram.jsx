@@ -57,7 +57,7 @@ export default function LoyaltyProgram() {
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Header */}
         <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold text-[#1B4332]">{language === 'ar' ? 'برنامج ولاء واصل' : 'Wasel Loyalty Program'}</h1>
+          <h1 className="text-4xl font-bold text-[#1B4332]">{language === 'ar' ? 'برنامج ولاء واصل ستور' : 'Wasel Store Loyalty Program'}</h1>
           <p className="text-xl text-gray-600">{language === 'ar' ? 'اجمع النقاط واستبدلها بمكافآت حصرية' : 'Collect points and redeem exclusive rewards'}</p>
         </div>
 

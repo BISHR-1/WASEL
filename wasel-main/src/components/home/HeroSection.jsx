@@ -34,7 +34,7 @@ export default function HeroSection() {
             </h1>
             
             <p className="text-lg text-[#1B4332]/70 leading-relaxed mb-8 max-w-lg">
-              منصة واصل تتيح لك إرسال الهدايا والطعام لأحبابك في سوريا بكل سهولة وثقة. فريقنا المحلي يتكفل بكل التفاصيل.
+              منصة واصل ستور تتيح لك إرسال الهدايا والطعام لأحبابك في سوريا بكل سهولة وثقة. فريقنا المحلي يتكفل بكل التفاصيل.
             </p>
             
             <div className="flex flex-col gap-4">

@@ -184,7 +184,7 @@ export default function AiChat() {
       setMessages([{
         id: 'welcome',
         role: 'assistant',
-        content: 'مرحباً بك في واصل! 👋\nأنا مساعدك الذكي، كيف يمكنني مساعدتك اليوم؟',
+        content: 'مرحباً بك في واصل ستور! 👋\nأنا مساعدك الذكي، كيف يمكنني مساعدتك اليوم؟',
         timestamp: new Date().toISOString()
       }]);
     }
@@ -417,7 +417,7 @@ export default function AiChat() {
                     <Bot className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-sm">مساعد واصل</h3>
+                    <h3 className="font-bold text-sm">مساعد واصل ستور</h3>
                     <p className="text-xs text-white/80">متصل الآن</p>
                   </div>
                 </div>

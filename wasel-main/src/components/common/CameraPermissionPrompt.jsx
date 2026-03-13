@@ -66,7 +66,7 @@ export default function CameraPermissionPrompt() {
 
             <h3 className="text-lg font-black text-gray-900 text-center mb-2">السماح باستخدام الكاميرا</h3>
             <p className="text-sm text-gray-500 text-center mb-4">
-              يحتاج تطبيق واصل إلى الكاميرا لمسح بطاقات الشحن
+              يحتاج تطبيق واصل ستور إلى الكاميرا لمسح بطاقات الشحن
             </p>
 
             <div className="space-y-2 mb-5">

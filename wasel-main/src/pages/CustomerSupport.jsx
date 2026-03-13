@@ -19,7 +19,7 @@ const FAQ_ITEMS = [
   },
   {
     question: 'ما هي طرق الدفع المتاحة؟',
-    answer: 'يمكنك الدفع عبر PayPal أو البطاقة الائتمانية أو محفظة واصل أو الدفع المشترك (سلة مشتركة).',
+    answer: 'يمكنك الدفع عبر PayPal أو البطاقة الائتمانية أو محفظة واصل ستور أو الدفع المشترك (سلة مشتركة).',
   },
   {
     question: 'كم يستغرق التوصيل؟',
@@ -34,7 +34,7 @@ const FAQ_ITEMS = [
     answer: 'يمكنك إلغاء الطلب من صفحة "طلباتي" إذا لم يتم قبوله بعد. بعد القبول، تواصل مع الدعم.',
   },
   {
-    question: 'كيف أستخدم محفظة واصل؟',
+    question: 'كيف أستخدم محفظة واصل ستور؟',
     answer: 'شحن المحفظة يتم عبر PayPal. يمكنك استخدام الرصيد للدفع عند أي طلب. اذهب إلى "المحفظة" في القائمة.',
   },
   {
@@ -304,7 +304,7 @@ export default function CustomerSupport() {
                   <MessageCircle className="w-5 h-5 text-white" />
                   <div>
                     <p className="text-sm font-bold text-white">المحادثة المباشرة</p>
-                    <p className="text-[10px] text-white/70">فريق دعم واصل</p>
+                    <p className="text-[10px] text-white/70">فريق دعم واصل ستور</p>
                   </div>
                 </div>
                 <button

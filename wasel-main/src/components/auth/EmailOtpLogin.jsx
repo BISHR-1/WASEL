@@ -342,7 +342,7 @@ export default function EmailOtpLogin({ onSuccess }) {
           }
           // Add welcome notification
           addNotification({
-            title: 'مرحباً بك في واصل!',
+            title: 'مرحباً بك في واصل ستور!',
             message: 'تم تسجيل حسابك بنجاح. استمتع بتجربة التسوق السهلة!',
             type: 'success'
           });
@@ -639,7 +639,7 @@ export default function EmailOtpLogin({ onSuccess }) {
             {/* Title */}
             <div className="relative z-10 text-center">
               <h1 className="text-3xl font-bold text-[#1F2933] drop-shadow-lg">
-                واصل || Wasel
+                واصل ستور || Wasel Store
               </h1>
               <p className="text-[#1F7A63] text-sm mt-1">
                 {email}

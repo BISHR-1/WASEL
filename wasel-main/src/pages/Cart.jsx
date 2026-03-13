@@ -1870,7 +1870,7 @@ const Cart = () => {
     const orderNumber = options.orderNumber || 'قيد الإنشاء';
 
     const lines = [];
-    lines.push('اهلاً فريق واصل،');
+    lines.push('اهلاً فريق واصل ستور،');
     lines.push('ارغب بإكمال الطلب التالي عبر واتساب:');
     lines.push('');
     lines.push(`رقم الطلب: ${orderNumber}`);
@@ -2142,11 +2142,11 @@ const Cart = () => {
       const moreItemsNote = cartItems.length > 8 ? `\n   ... +${cartItems.length - 8} منتجات إضافية` : '';
 
       const shareText = [
-        '🛍️  *سلّة واصل*',
+        '🛍️  *سلّة واصل ستور*',
         '━━━━━━━━━━━━━━━━',
         '',
         'أهلاً! قمت بتجهيز سلة مشتريات خاصة',
-        'عبر تطبيق *واصل* ويمكنك إتمامها بسهولة:',
+        'عبر تطبيق *واصل ستور* ويمكنك إتمامها بسهولة:',
         '',
         `🆔 *رقم السلة:* ${linkShortCode || shareId}`,
         '',
@@ -2162,7 +2162,7 @@ const Cart = () => {
         shareUrl,
         '',
         '━━━━━━━━━━━━━━━━',
-        'واصل - نوصّل لأحبابك 💙',
+        'واصل ستور - نوصّل لأحبابك 💙',
       ].filter(Boolean).join('\n');
 
       // فتح واتساب مباشرة مع رابط السلة (navigator.share لا يعمل بعد await)
@@ -2242,7 +2242,7 @@ const Cart = () => {
             <div>
               <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
                 <img src="${logoUrl}" alt="Wasel" style="width:52px;height:52px;object-fit:contain;border-radius:8px;border:1px solid #eee;padding:3px;" onerror="this.onerror=null;this.src='${fallbackLogoUrl}';" />
-                <h1 style="margin:0;font-size:30px;">Wasel Invoice</h1>
+                <h1 style="margin:0;font-size:30px;">Wasel Store Invoice</h1>
               </div>
               <div style="font-size:14px;">Invoice Number: ${invoiceNumber}</div>
               <div style="font-size:14px;">Date: ${now.toLocaleString()}</div>

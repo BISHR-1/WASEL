@@ -1124,11 +1124,11 @@ export default function SupervisorPanel() {
     const message = [
       `مرحباً ${recipientName} 👋`,
       ``,
-      `نحن فريق واصل (Wasel) نتواصل معك بخصوص طلبك رقم ${orderLabel}.`,
+      `نحن فريق واصل ستور (Wasel Store) نتواصل معك بخصوص طلبك رقم ${orderLabel}.`,
       ``,
       `كيف يمكننا مساعدتك؟`,
       ``,
-      `شكراً لثقتك بواصل 🚚`,
+      `شكراً لثقتك بواصل ستور 🚚`,
     ].join('\n');
     const url = `https://wa.me/${encodeURIComponent(waPhone)}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
@@ -1501,7 +1501,7 @@ export default function SupervisorPanel() {
             <img src="/logo/wasel-logo.png" alt="Wasel" className="h-10 w-10 rounded-xl border border-white/30 bg-white p-1"
               onError={(e) => { e.currentTarget.style.display = 'none'; }} />
             <div>
-              <h1 className="text-xl font-black text-white tracking-tight">لوحة إدارة واصل</h1>
+              <h1 className="text-xl font-black text-white tracking-tight">لوحة إدارة واصل ستور</h1>
               <p className="text-xs text-white/70">مرحبًا {currentUser?.name} - إدارة كاملة للطلبات</p>
             </div>
           </div>

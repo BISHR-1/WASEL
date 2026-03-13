@@ -111,7 +111,7 @@ export default function CartDrawer({ isOpen = false, onClose = () => {} }) {
         sender_country: orderDetails.sender_country,
         sender_whatsapp: orderDetails.sender_whatsapp,
         order_type: 'mixed',
-        package_type: 'طلب عبر منصة واصل',
+        package_type: 'طلب عبر منصة واصل ستور',
         preferred_delivery_date: orderDetails.preferred_delivery_date,
         preferred_delivery_time: orderDetails.preferred_delivery_time,
         recipient_name: orderDetails.recipient_name,

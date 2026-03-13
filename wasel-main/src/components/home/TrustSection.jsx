@@ -42,7 +42,7 @@ export default function TrustSection() {
           className="text-center mb-16"
         >
           <span className="inline-block bg-white/10 text-white px-4 py-2 rounded-full text-sm font-medium mb-4">
-            لماذا واصل؟
+            لماذا واصل ستور؟
           </span>
           <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
             ثقتك أولويتنا

@@ -184,7 +184,7 @@ export default function Order() {
           </p>
           <div className="bg-[#F5E6D3] rounded-xl p-4 mb-6">
             <p className="text-[#1B4332] text-sm">
-              تم إرسال الطلب إلى فريق واصل. سنتواصل معك عبر واتساب لتأكيد السعر والدفع.
+              تم إرسال الطلب إلى فريق واصل ستور. سنتواصل معك عبر واتساب لتأكيد السعر والدفع.
             </p>
           </div>
           <div className="flex flex-col gap-3">

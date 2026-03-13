@@ -124,7 +124,7 @@ export default function AdminAdvisor() {
                     <Bot className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                    <h1 className="font-bold text-[#1B4332] text-lg">مستشار واصل الذكي</h1>
+                    <h1 className="font-bold text-[#1B4332] text-lg">مستشار واصل ستور الذكي</h1>
                     <p className="text-xs text-gray-500">مساعدك الشخصي لتطوير الأعمال</p>
                 </div>
              </div>

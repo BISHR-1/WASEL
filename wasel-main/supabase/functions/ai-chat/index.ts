@@ -120,7 +120,7 @@ function buildSystemPrompt(products: any[], orders: any[], language: string): st
   const isArabic = language === 'ar'
   
   let context = isArabic 
-    ? 'أنت مساعد ذكي لتطبيق واصل للتوصيل. ساعد العملاء في طلباتهم واستفساراتهم.\n\n'
+    ? 'أنت مساعد ذكي لتطبيق واصل ستور للتوصيل. ساعد العملاء في طلباتهم واستفساراتهم.\n\n'
     : 'You are a helpful assistant for Wasel delivery app. Help customers with their orders and inquiries.\n\n'
   
   if (products.length > 0) {

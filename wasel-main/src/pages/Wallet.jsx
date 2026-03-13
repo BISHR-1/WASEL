@@ -182,7 +182,7 @@ export default function WalletPage() {
       return;
     }
     const msg = encodeURIComponent(
-      `مرحباً، أريد شحن محفظتي في تطبيق واصل بمبلغ ${amount}$ (${Math.round(amount * exchangeRate).toLocaleString()} ل.س)\n` +
+      `مرحباً، أريد شحن محفظتي في تطبيق واصل ستور بمبلغ ${amount}$ (${Math.round(amount * exchangeRate).toLocaleString()} ل.س)\n` +
       `البريد: ${session?.user?.email || '-'}\n` +
       `معرف المستخدم: ${session?.user?.id || '-'}`
     );
@@ -221,7 +221,7 @@ export default function WalletPage() {
       <div className="min-h-screen bg-[#F7FAF9] flex items-center justify-center p-4" dir="rtl">
         <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-xl text-center">
           <WalletIcon className="w-16 h-16 text-[#1B4332] mx-auto mb-4" />
-          <h2 className="text-xl font-black text-gray-800 mb-2">محفظة واصل</h2>
+          <h2 className="text-xl font-black text-gray-800 mb-2">محفظة واصل ستور</h2>
           <p className="text-gray-500 mb-6">سجّل دخولك لاستخدام المحفظة</p>
           <Button onClick={() => navigate(createPageUrl('Home'))} className="w-full bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl h-12">
             العودة للرئيسية
@@ -240,7 +240,7 @@ export default function WalletPage() {
       <div className="bg-gradient-to-br from-[#1B4332] via-[#2D6A4F] to-[#40916C] pt-8 pb-16 px-4 rounded-b-[2.5rem]">
         <div className="max-w-lg mx-auto">
           <div className="flex items-center justify-between mb-6">
-            <h1 className="text-xl font-black text-white">محفظة واصل</h1>
+            <h1 className="text-xl font-black text-white">محفظة واصل ستور</h1>
             <Button variant="ghost" onClick={loadWallet} className="text-white/80 hover:text-white hover:bg-white/10 rounded-xl">
               <RefreshCcw className="w-4 h-4" />
             </Button>
@@ -489,10 +489,10 @@ export default function WalletPage() {
           transition={{ delay: 0.1 }}
           className="bg-gradient-to-br from-[#F0FDF4] to-[#DCFCE7] rounded-2xl p-5 border border-[#BBF7D0]"
         >
-          <h3 className="font-bold text-[#166534] mb-3">كيف تعمل بطاقات واصل؟</h3>
+          <h3 className="font-bold text-[#166534] mb-3">كيف تعمل بطاقات واصل ستور؟</h3>
           <div className="space-y-2">
             {[
-              { step: '1', text: 'اشترِ بطاقة واصل من أي محل معتمد' },
+              { step: '1', text: 'اشترِ بطاقة واصل ستور من أي محل معتمد' },
               { step: '2', text: 'امسح رمز QR أو أدخل الكود يدوياً' },
               { step: '3', text: 'يتم إضافة الرصيد فوراً لمحفظتك' },
               { step: '4', text: 'ادفع طلباتك مباشرة من المحفظة' },
@@ -706,7 +706,7 @@ export default function WalletPage() {
             className="fixed inset-0 bg-black z-50 flex flex-col"
           >
             <div className="flex items-center justify-between p-4">
-              <h3 className="text-white font-bold text-lg">مسح بطاقة واصل</h3>
+              <h3 className="text-white font-bold text-lg">مسح بطاقة واصل ستور</h3>
               <button onClick={stopScanner} className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
                 <X className="w-5 h-5 text-white" />
               </button>

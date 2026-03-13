@@ -274,7 +274,7 @@ export default function StaffLogin() {
         >
           <div className="flex items-center justify-center gap-2 mb-4">
             <Shield className="w-8 h-8 text-purple-400" />
-            <h1 className="text-3xl font-bold text-white">واصل</h1>
+            <h1 className="text-3xl font-bold text-white">واصل ستور</h1>
           </div>
           <p className="text-purple-300 text-sm">لوحة تحكم المشرفين والموصلين</p>
         </motion.div>

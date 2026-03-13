@@ -43,7 +43,7 @@ export default function HowItWorksSection() {
             خطوات بسيطة
           </span>
           <h2 className="text-3xl sm:text-4xl font-bold text-[#1B4332] mb-4">
-            كيف يعمل واصل؟
+            كيف يعمل واصل ستور؟
           </h2>
           <p className="text-[#1B4332]/60 max-w-2xl mx-auto">
             أربع خطوات فقط تفصلك عن إسعاد أحبابك في سوريا

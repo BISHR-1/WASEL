@@ -107,7 +107,7 @@ export default function AdminReports() {
   }, [orders, timeRange]);
 
   const exportReport = () => {
-    const report = `📊 تقرير واصل - ${timeRange === 'week' ? 'أسبوعي' : timeRange === 'month' ? 'شهري' : 'سنوي'}
+    const report = `📊 تقرير واصل ستور - ${timeRange === 'week' ? 'أسبوعي' : timeRange === 'month' ? 'شهري' : 'سنوي'}
 التاريخ: ${new Date().toLocaleDateString('ar-SA')}
 
 📈 الإحصائيات العامة:

@@ -141,7 +141,7 @@ export default function AdminOrders() {
 المجموع: ${cb.total?.toLocaleString() || 0} ل.س`;
     }
     
-    return `🎁 *طلب جديد من واصل*
+    return `🎁 *طلب جديد من واصل ستور*
 
 📋 *رقم الطلب:* ${order.order_number}
 📅 *التاريخ:* ${new Date(order.created_date).toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -176,7 +176,7 @@ ${order.execution_notes}` : ''}${costInfo}
 
   const handleExportToEmail = (order) => {
     const text = formatOrderForExport(order);
-    const subject = `طلب واصل ${order.order_number}`;
+    const subject = `طلب واصل ستور ${order.order_number}`;
     const body = text.replace(/\*/g, '');
     window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };

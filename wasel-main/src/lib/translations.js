@@ -85,7 +85,7 @@ export const translations = {
   
   // Pages
   howItWorks: { ar: 'كيف نعمل', en: 'How It Works' },
-  whyWasel: { ar: 'لماذا واصل', en: 'Why Wasel' },
+  whyWasel: { ar: 'لماذا واصل ستور', en: 'Why Wasel Store' },
   termsAndConditions: { ar: 'الشروط والأحكام', en: 'Terms & Conditions' },
   transparency: { ar: 'الشفافية', en: 'Transparency' },
   contact: { ar: 'تواصل معنا', en: 'Contact Us' },
@@ -108,7 +108,7 @@ export const translations = {
   sort: { ar: 'ترتيب', en: 'Sort' },
   
   // Support Chat
-  supportChat: { ar: 'دعم واصل', en: 'Wasel Support' },
+  supportChat: { ar: 'دعم واصل ستور', en: 'Wasel Store Support' },
   askQuestion: { ar: 'اسأل سؤالك...', en: 'Ask your question...' },
   send: { ar: 'إرسال', en: 'Send' },
   

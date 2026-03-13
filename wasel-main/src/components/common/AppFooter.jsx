@@ -51,13 +51,13 @@ export default function AppFooter() {
               onError={(e) => { e.currentTarget.style.display = "none"; }}
             />
             <p className="text-xs text-[#E4F1EC] max-w-sm leading-5">
-              واصل صُنع بحب ليجمع القلوب ❤️ نوصّل شعورك وهداياك بأمان ✨
+              واصل ستور صُنع بحب ليجمع القلوب ❤️ نوصّل شعورك وهداياك بأمان ✨
             </p>
           </div>
         </div>
 
         <div className="border-t border-[#2A6652] mt-3 pt-2 text-center text-[#C6DBD3] text-xs">
-          <p>© {new Date().getFullYear()} واصل Wasel 🌸</p>
+          <p>© {new Date().getFullYear()} واصل ستور Wasel Store 🌸</p>
         </div>
       </div>
     </footer>

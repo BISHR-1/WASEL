@@ -197,7 +197,7 @@ export default function Settings() {
             }}
           />
           <h3 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-            Wasel || واصل
+            Wasel Store || واصل ستور
           </h3>
           <p className={`text-sm mt-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
             {language === 'ar' ? 'نوصّل حبك لحد الباب 💙' : 'Delivering love to your doorstep 💙'}

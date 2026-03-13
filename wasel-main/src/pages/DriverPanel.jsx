@@ -708,7 +708,7 @@ export default function DriverPanel() {
     const orderLabel = order?.order_number || order?.id;
     const message = [
       `مرحباً ${recipientName} 👋`,
-      `أنا ${driverName || 'موصل واصل'}، مع طلبك رقم ${orderLabel}.`,
+      `أنا ${driverName || 'موصل واصل ستور'}، مع طلبك رقم ${orderLabel}.`,
       'أرجو تأكيد عنوان التسليم.',
     ].join('\n');
 
@@ -785,7 +785,7 @@ export default function DriverPanel() {
       const startedAt = firstCompletedAt ? firstCompletedAt.toLocaleDateString('ar-EG') : '-';
       const untilAt = new Date().toLocaleDateString('ar-EG');
       const message = [
-        'مرحباً مشرف واصل،',
+        'مرحباً مشرف واصل ستور،',
         `أنا الموصل: ${driverName || currentUser?.name || '-'}`,
         `أطلب استلام راتبي ${cycleLabel}.`,
         `عدد الطلبات المكتملة: ${completedCount}`,

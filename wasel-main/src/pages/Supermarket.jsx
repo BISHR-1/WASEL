@@ -106,7 +106,7 @@ export default function Supermarket() {
           <div className="w-20 h-20 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mx-auto mb-4">
             <ShoppingCart className="w-10 h-10 text-white" />
           </div>
-          <h1 className="text-3xl md:text-5xl font-bold mb-2">{language === 'en' ? 'Supermarket' : 'سوبر ماركت واصل'}</h1>
+          <h1 className="text-3xl md:text-5xl font-bold mb-2">{language === 'en' ? 'Supermarket' : 'سوبر ماركت واصل ستور'}</h1>
           <p className="text-white/90 text-lg">{language === 'en' ? 'Groceries delivered to your door' : 'مقاضي البيت توصلك لباب البيت'}</p>
         </div>
       </section>

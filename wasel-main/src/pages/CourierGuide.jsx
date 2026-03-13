@@ -58,7 +58,7 @@ const tips = [
   { icon: Camera, text: 'وثّق كل تسليم بصورة واضحة كإثبات' },
   { icon: Shield, text: 'حافظ على سلامة المنتجات أثناء النقل' },
   { icon: MapPin, text: 'تأكد من العنوان بدقة قبل الانطلاق' },
-  { icon: MessageCircle, text: 'كن لبقًا مع العملاء — خدمتك تمثل واصل' },
+  { icon: MessageCircle, text: 'كن لبقًا مع العملاء — خدمتك تمثل واصل ستور' },
 ];
 
 const earnings = [
@@ -93,7 +93,7 @@ export default function CourierGuide() {
               دليل الموصّل
             </h1>
             <p className="text-white/80 text-lg max-w-xl mx-auto">
-              كل ما تحتاج معرفته للبدء في التوصيل مع واصل وتحقيق أرباح ممتازة
+              كل ما تحتاج معرفته للبدء في التوصيل مع واصل ستور وتحقيق أرباح ممتازة
             </p>
           </motion.div>
         </div>

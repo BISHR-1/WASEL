@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.wasel.app',
-  appName: 'Wasel',
+  appName: 'Wasel Store',
   webDir: 'dist',
   // ✅ تكوين الخادم للموبايل مع دعم PayPal Live
   server: {

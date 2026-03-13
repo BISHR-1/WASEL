@@ -211,7 +211,7 @@ serve(async (req) => {
           items: processedItems
         }],
         application_context: {
-          brand_name: 'واصل - Wasel',
+          brand_name: 'واصل ستور - Wasel Store',
           landing_page: 'BILLING',
           user_action: 'PAY_NOW',
           // ✅ Fixed: Return to app's cart page, not external website

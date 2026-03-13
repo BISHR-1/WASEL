@@ -38,7 +38,7 @@ export const createPayPalOrder = async (amount, currency = 'USD', items) => {
         })) || []
       }],
       application_context: {
-        brand_name: 'واصل - Wasel',
+        brand_name: 'واصل ستور - Wasel Store',
         landing_page: 'BILLING',
         user_action: 'PAY_NOW',
         return_url: `${window.location.origin}/payment-success`,
