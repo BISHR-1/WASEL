@@ -76,7 +76,7 @@ function getEventContent(eventType, order, context = {}) {
   if (eventType === 'shared_cart_paid_payer') {
     const recipientName = String(context?.recipientName || order?.recipient_details?.name || 'المستلم');
     return {
-      title: '� شكراً لكرمك!',
+      title: '\u{1F49A} شكراً لكرمك!',
       body: `تم دفع السلة المشتركة بنجاح ❤️ طلب ${recipientName} دخل مرحلة التجهيز بفضل دعمك الجميل!`,
       type: 'payment_success',
       data: {

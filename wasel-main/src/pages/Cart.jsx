@@ -2875,15 +2875,7 @@ const Cart = () => {
               }
             }
 
-            // Notify admin/supervisor of the completed payment
-            try {
-              await notifyAdminUsers('new_order_created', savedOrder, {
-                paymentMethod: 'wallet',
-                source: sharedCartMode ? 'shared_cart_payment' : 'wallet_payment'
-              });
-            } catch (notifyErr) {
-              console.warn('notifyAdminUsers wallet warning:', notifyErr);
-            }
+            // Notify admin/supervisor is already handled by saveOrderToSupabase
           } else {
             const errMsg = payResult?.error === 'insufficient_balance'
               ? `رصيد غير كافٍ. رصيدك: ${payResult.balance}$ والمطلوب: ${payResult.required}$`
