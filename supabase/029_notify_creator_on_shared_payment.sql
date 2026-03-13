@@ -9,15 +9,20 @@
 CREATE OR REPLACE FUNCTION public.notify_creator_on_shared_payment()
 RETURNS TRIGGER AS $$
 DECLARE
-  v_creator_id   UUID;
-  v_payer_name   TEXT;
-  v_total        NUMERIC;
-  v_creator_auth TEXT;
-  notif_title    TEXT;
-  notif_body     TEXT;
-  order_link     TEXT;
-  v_supabase_url TEXT;
-  v_service_key  TEXT;
+  v_creator_id     UUID;
+  v_payer_id       UUID;
+  v_payer_name     TEXT;
+  v_recipient_name TEXT;
+  v_total          NUMERIC;
+  v_creator_auth   TEXT;
+  v_payer_auth     TEXT;
+  notif_title      TEXT;
+  notif_body       TEXT;
+  payer_title      TEXT;
+  payer_body       TEXT;
+  order_link       TEXT;
+  v_supabase_url   TEXT;
+  v_service_key    TEXT;
 BEGIN
   -- فقط الطلبات المشتركة
   IF COALESCE(NEW.collaboration_mode, '') <> 'shared' THEN
@@ -30,42 +35,35 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  -- اسم الدافع (المغترب)
-  v_payer_name := COALESCE(
-    NEW.sender_details->>'name',
-    'المُرسِل'
-  );
+  -- الدافع (المغترب)
+  v_payer_id := COALESCE(NEW.paid_by_user_id, NEW.payer_user_id);
 
-  v_total := ROUND(COALESCE(NEW.total_usd, NEW.total_amount, 0)::numeric, 2);
+  -- أسماء
+  v_payer_name     := COALESCE(NEW.sender_details->>'name', 'المرسل');
+  v_recipient_name := COALESCE(NEW.recipient_details->>'name', 'المستلم');
+  v_total          := ROUND(COALESCE(NEW.total_usd, NEW.total_amount, 0)::numeric, 2);
 
+  -- رسالة المنشئ
   notif_title := '💜 خبر جميل وصل!';
-  notif_body  := 'قام ' || v_payer_name || ' بدفع سلتك المشتركة بمبلغ $' || v_total || ' 🎉 طلبك الآن قيد التجهيز وسيصلك قريباً ❤️';
+  notif_body  := 'قام ' || v_payer_name || ' بدفع سلتك المشتركة بمبلغ $' || v_total || ' طلبك الان قيد التجهيز وسيصلك قريبا';
   order_link  := '/TrackOrder?order=' || COALESCE(NEW.order_number, NEW.id::text);
 
-  -- معرفات إضافية للدافع
-  DECLARE
-    v_payer_id     UUID;
-    v_payer_auth   TEXT;
-    v_recipient_name TEXT;
-    payer_title    TEXT;
-    payer_body     TEXT;
-  BEGIN
-    v_payer_id := COALESCE(NEW.paid_by_user_id, NEW.payer_user_id);
-    v_recipient_name := COALESCE(NEW.recipient_details->>'name', 'المستلم');
-    payer_title := '💚 شكرا لكرمك!';
-    payer_body  := 'تم دفع السلة المشتركة بنجاح طلب ' || v_recipient_name || ' دخل مرحلة التجهيز بفضل دعمك الجميل';
+  -- رسالة الدافع
+  payer_title := '💚 شكرا لكرمك!';
+  payer_body  := 'تم دفع السلة المشتركة بنجاح طلب ' || v_recipient_name || ' دخل مرحلة التجهيز بفضل دعمك الجميل';
 
-    -- 1) إشعار ويب للمنشئ
+  -- 1) إشعار ويب للمنشئ
+  INSERT INTO public.notifications (user_id, title, message, type, is_read, link, created_at)
+  VALUES (v_creator_id, notif_title, notif_body, 'payment_success', false, order_link, NOW());
+
+  -- 2) إشعار ويب للدافع (إذا مختلف عن المنشئ)
+  IF v_payer_id IS NOT NULL AND v_payer_id IS DISTINCT FROM v_creator_id THEN
     INSERT INTO public.notifications (user_id, title, message, type, is_read, link, created_at)
-    VALUES (v_creator_id, notif_title, notif_body, 'payment_success', false, order_link, NOW());
+    VALUES (v_payer_id, payer_title, payer_body, 'payment_success', false, order_link, NOW());
+  END IF;
 
-    -- 2) إشعار ويب للدافع (إذا مختلف عن المنشئ)
-    IF v_payer_id IS NOT NULL AND v_payer_id IS DISTINCT FROM v_creator_id THEN
-      INSERT INTO public.notifications (user_id, title, message, type, is_read, link, created_at)
-      VALUES (v_payer_id, payer_title, payer_body, 'payment_success', false, order_link, NOW());
-    END IF;
-
-    -- 3) FCM push للطرفين
+  -- 3) FCM push للطرفين
+  BEGIN
     v_supabase_url := (SELECT value FROM public.app_config WHERE key = 'supabase_url');
     v_service_key  := (SELECT value FROM public.app_config WHERE key = 'service_role_key');
 
@@ -100,10 +98,9 @@ BEGIN
         END IF;
       END IF;
     END IF;
-  END;
-  -- END FCM block
   EXCEPTION WHEN OTHERS THEN
     RAISE WARNING 'notify_creator_on_shared_payment FCM: %', SQLERRM;
+  END;
 
   RETURN NEW;
 EXCEPTION WHEN OTHERS THEN
