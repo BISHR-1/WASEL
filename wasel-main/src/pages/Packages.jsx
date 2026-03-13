@@ -114,7 +114,8 @@ export default function Packages() {
                 <img 
                   src={pkg.image_url} 
                   alt={pkg.name} 
-                  className="w-full h-56 object-cover"
+                  className="w-full h-56 object-cover cursor-pointer"
+                  onClick={() => setSelectedPackage(pkg)}
                   onError={(e) => { e.target.src = 'https://placehold.co/600x400/f0f0f0/333?text=Wasel'; }}
                 />
                 

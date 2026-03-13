@@ -87,9 +87,6 @@ export default function ProductCard({
     e.stopPropagation();
     if (onAddToCart) {
       onAddToCart(product);
-      toast.success(language === 'ar' ? 'تمت الإضافة للسلة' : 'Added to cart', {
-        duration: 2000,
-      });
     }
   };
 

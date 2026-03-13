@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import {
   Wallet as WalletIcon, QrCode, Plus, ArrowDownLeft, ArrowUpRight,
   Camera, X, Loader2, MessageCircle, CreditCard, History,
-  ChevronRight, DollarSign, RefreshCcw, CheckCircle, AlertCircle, ScanLine
+  ChevronRight, DollarSign, RefreshCcw, CheckCircle, AlertCircle, ScanLine, Lock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
@@ -29,6 +29,7 @@ export default function WalletPage() {
   const [balanceUsd, setBalanceUsd] = useState(0);
   const [transactions, setTransactions] = useState([]);
   const [showTopup, setShowTopup] = useState(false);
+  const [showPaypalDirect, setShowPaypalDirect] = useState(false);
   const [topupAmount, setTopupAmount] = useState(10);
   const [customAmount, setCustomAmount] = useState('');
   const [topupMethod, setTopupMethod] = useState('paypal');
@@ -388,9 +389,31 @@ export default function WalletPage() {
             </p>
           )}
 
-          {/* Payment Button */}
-          {topupMethod === 'paypal' ? (
-            <div className="bg-white/10 border border-white/20 rounded-2xl p-3">
+          {/* Secure Checkout Button */}
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => {
+              if (topupMethod === 'paypal') {
+                setShowPaypalDirect(prev => !prev);
+              } else {
+                handleWhatsAppTopup();
+              }
+            }}
+            className="relative w-full h-14 rounded-2xl font-extrabold text-lg text-white flex items-center justify-center gap-3 shadow-xl overflow-hidden transition-all"
+            style={{ background: 'linear-gradient(135deg, #059669 0%, #047857 50%, #065F46 100%)' }}
+          >
+            <motion.div
+              className="absolute inset-0 opacity-20"
+              style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)' }}
+              animate={{ x: ['-100%', '100%'] }}
+              transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }}
+            />
+            <Lock className="w-5 h-5 relative z-10" />
+            <span className="relative z-10" dir="rtl">شحن الرصيد بأمان</span>
+          </motion.button>
+          {showPaypalDirect && topupMethod === 'paypal' && (
+            <div className="bg-white/10 border border-white/20 rounded-2xl p-3 mt-3">
               <PayPalPayment
                 amount={`${(customAmount ? Number(customAmount) : topupAmount).toFixed(2)}`}
                 onSuccess={async (details) => {
@@ -400,6 +423,7 @@ export default function WalletPage() {
                   }
                   try {
                     setShowCoinAnimation(true);
+                    setShowPaypalDirect(false);
                     const { data, error } = await supabase.rpc('wallet_topup', {
                       p_user_id: session.user.id,
                       p_amount_usd: customAmount ? Number(customAmount) : topupAmount,
@@ -419,14 +443,6 @@ export default function WalletPage() {
                 }}
               />
             </div>
-          ) : (
-            <Button
-              onClick={handleWhatsAppTopup}
-              className="w-full h-12 rounded-xl bg-white text-[#1B4332] hover:bg-white/90 font-bold text-base"
-            >
-              <MessageCircle className="w-5 h-5 ml-2" />
-              أرسل ملخص الدفع عبر WhatsApp
-            </Button>
           )}
         </motion.div>
 
@@ -618,15 +634,31 @@ export default function WalletPage() {
                 </button>
               </div>
 
-              {topupMethod === 'whatsapp' ? (
-                <Button
-                  onClick={handleWhatsAppTopup}
-                  disabled={!finalTopupAmount || finalTopupAmount <= 0}
-                  className="w-full h-12 rounded-xl bg-[#1B4332] hover:bg-[#2D6A4F] text-white font-bold text-base"
-                >
-                  <MessageCircle className="w-5 h-5 ml-2" />إكمال الشحن عبر واتساب
-                </Button>
-              ) : (
+              {/* Secure Checkout Button */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => {
+                  if (topupMethod === 'paypal') {
+                    setShowPaypalDirect(prev => !prev);
+                  } else {
+                    handleWhatsAppTopup();
+                  }
+                }}
+                disabled={!finalTopupAmount || finalTopupAmount <= 0}
+                className="relative w-full h-14 rounded-2xl font-extrabold text-lg text-white flex items-center justify-center gap-3 shadow-xl overflow-hidden transition-all disabled:opacity-50"
+                style={{ background: 'linear-gradient(135deg, #059669 0%, #047857 50%, #065F46 100%)' }}
+              >
+                <motion.div
+                  className="absolute inset-0 opacity-20"
+                  style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)' }}
+                  animate={{ x: ['-100%', '100%'] }}
+                  transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }}
+                />
+                <Lock className="w-5 h-5 relative z-10" />
+                <span className="relative z-10" dir="rtl">شحن الرصيد بأمان</span>
+              </motion.button>
+              {showPaypalDirect && topupMethod === 'paypal' && (
                 <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mt-2 shadow-sm">
                   <PayPalPayment
                     amount={finalTopupAmount > 0 ? Number(finalTopupAmount).toFixed(2) : '0.00'}
@@ -643,6 +675,7 @@ export default function WalletPage() {
                         });
                         if (error) throw error;
                         setShowTopup(false);
+                        setShowPaypalDirect(false);
                         toast.success(`تم شحن ${finalTopupAmount}$ عبر PayPal بنجاح! 🎉`);
                         loadWallet();
                       } catch (err) {

@@ -94,7 +94,8 @@ const Gifts = () => {
                   <img 
                     src={gift.image_url || 'https://placehold.co/600x400/f472b6/ffffff?text=Wasel'}
                     alt={gift.name}
-                    className="w-full h-56 object-cover"
+                    className="w-full h-56 object-cover cursor-pointer"
+                    onClick={() => setSelectedGift(gift)}
                   />
                   
                   {/* Add-to-Cart Animation */}

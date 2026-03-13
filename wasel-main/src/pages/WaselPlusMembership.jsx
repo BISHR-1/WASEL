@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle2, Crown, Sparkles, CalendarDays, BadgeDollarSign, MessageCircle, Wallet } from 'lucide-react';
+import { CheckCircle2, Crown, Sparkles, CalendarDays, BadgeDollarSign, MessageCircle, Wallet, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import PayPalSubscriptionButton from '@/components/payment/PayPalSubscriptionButton';
 import { supabase } from '@/lib/supabase';
@@ -494,48 +494,53 @@ export default function WaselPlusMembership() {
             </div>
           )}
 
-          {paymentMethod === 'paypal' && !insideSyria ? (
-            <div className="rounded-2xl border border-[#FDE68A] bg-[#FFFBEB] p-4">
-              <div className="flex items-center justify-between mb-3" dir="rtl">
-                <span className="text-sm text-[#78350F] font-bold">قيمة الاشتراك الآن</span>
-                <span className="text-xl font-extrabold text-[#92400E]">${plan.priceUSD.toFixed(2)}</span>
-              </div>
+          {/* Unified Secure Checkout Button */}
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => {
+              if (paymentMethod === 'paypal' && !insideSyria) {
+                if (!plan.planId) {
+                  toast.error('لم يتم ضبط خطة الدفع بعد');
+                  return;
+                }
+                // PayPal subscription flow - open in modal
+                const container = document.getElementById('paypal-sub-container');
+                if (container) container.style.display = container.style.display === 'none' ? 'block' : 'none';
+                return;
+              }
+              if (paymentMethod === 'wallet') return handleWalletCheckout();
+              handleWhatsAppCheckout();
+            }}
+            disabled={loadingWallet || loadingWhatsApp}
+            className="relative w-full h-14 rounded-2xl font-extrabold text-lg text-white flex items-center justify-center gap-3 shadow-xl overflow-hidden transition-all disabled:opacity-70"
+            style={{ background: 'linear-gradient(135deg, #059669 0%, #047857 50%, #065F46 100%)' }}
+          >
+            <motion.div
+              className="absolute inset-0 opacity-20"
+              style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)' }}
+              animate={{ x: ['-100%', '100%'] }}
+              transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }}
+            />
+            <Lock className="w-5 h-5 relative z-10" />
+            <span className="relative z-10" dir="rtl">
+              {loadingWallet ? 'جاري الخصم...' : loadingWhatsApp ? 'جاري التجهيز...' : 'إتمام الاشتراك بأمان'}
+            </span>
+          </motion.button>
+          {paymentMethod === 'paypal' && !insideSyria && plan.planId && (
+            <div id="paypal-sub-container" style={{ display: 'none' }} className="mt-3 rounded-2xl border border-[#FDE68A] bg-[#FFFBEB] p-4">
               {plan.key === 'monthly' && (
                 <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-sm text-emerald-800 mb-3" dir="rtl">
                   أول شهر مجاني تلقائيا. يبدأ الخصم الشهري (10$) من الشهر الثاني.
                 </div>
               )}
-              {!plan.planId ? (
-                <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800" dir="rtl">
-                  لم يتم ضبط Plan ID لهذه الخطة بعد. أضف المتغير البيئي المناسب ثم أعد المحاولة.
-                </div>
-              ) : (
-                <PayPalSubscriptionButton
-                  planId={plan.planId}
-                  onApprove={handlePayPalSuccess}
-                  onError={handlePayPalError}
-                />
-              )}
+              <PayPalSubscriptionButton
+                planId={plan.planId}
+                onApprove={handlePayPalSuccess}
+                onError={handlePayPalError}
+              />
               {savingPayPal && <p className="text-xs text-[#92400E] mt-2" dir="rtl">جاري تثبيت اشتراكك بعد الدفع...</p>}
             </div>
-          ) : paymentMethod === 'wallet' ? (
-            <button
-              onClick={handleWalletCheckout}
-              disabled={loadingWallet}
-              className="w-full h-12 rounded-2xl bg-gradient-to-r from-[#0EA5E9] to-[#0284C7] text-white font-extrabold flex items-center justify-center gap-2 disabled:opacity-70"
-            >
-              <Wallet className="w-5 h-5" />
-              {loadingWallet ? 'جاري الخصم من المحفظة...' : 'الدفع عبر المحفظة وتفعيل العضوية'}
-            </button>
-          ) : (
-            <button
-              onClick={handleWhatsAppCheckout}
-              disabled={loadingWhatsApp}
-              className="w-full h-12 rounded-2xl bg-gradient-to-r from-[#25D366] to-[#16A34A] text-white font-extrabold flex items-center justify-center gap-2 disabled:opacity-70"
-            >
-              <MessageCircle className="w-5 h-5" />
-              {loadingWhatsApp ? 'جاري التجهيز...' : 'إكمال الطلب عبر واتساب'}
-            </button>
           )}
         </motion.section>
 

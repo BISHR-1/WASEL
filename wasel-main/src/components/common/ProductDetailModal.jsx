@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Clock, Package } from 'lucide-react';
 import AddToCartButton from '@/components/buttons/AddToCartButton';
@@ -8,7 +8,7 @@ import { useDarkMode } from '@/lib/DarkModeContext';
 
 /**
  * ProductDetailModal - نافذة موحدة لعرض تفاصيل المنتج
- * تعمل كـ bottom-sheet على الموبايل ومنتصف الشاشة على الديسكتوب
+ * تعمل في منتصف الشاشة على جميع الأحجام
  */
 export default function ProductDetailModal({
   item,
@@ -19,9 +19,19 @@ export default function ProductDetailModal({
   isLoading = false,
   extraContent = null,
 }) {
-  if (!isOpen || !item) return null;
-
   const { isDarkMode } = useDarkMode();
+
+  // Prevent background scrolling when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isOpen]);
+
+  if (!isOpen || !item) return null;
   const name = item.name_ar || item.name || item.title_ar || item.title || '';
   const description = item.details || item.description_ar || item.description || '';
   const price = item.customer_price || item.price || item.base_price || 0;
@@ -51,20 +61,20 @@ export default function ProductDetailModal({
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]"
           />
 
-          {/* Modal - bottom sheet on mobile, centered on desktop */}
+          {/* Modal - centered on all screen sizes */}
           <motion.div
-            initial={{ opacity: 0, y: 60 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 60 }}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
             transition={{ type: 'spring', damping: 28, stiffness: 350 }}
-            className="fixed inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center z-[101] pointer-events-none"
+            className="fixed inset-0 flex items-center justify-center z-[101] pointer-events-none p-4"
           >
             <div
-              className={`pointer-events-auto ${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md max-h-[88vh] overflow-hidden shadow-2xl flex flex-col`}
+              className={`pointer-events-auto ${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl w-full max-w-md max-h-[85vh] overflow-hidden shadow-2xl flex flex-col`}
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Drag Handle (mobile) */}
-              <div className="flex justify-center pt-3 pb-1 sm:hidden">
+              {/* Close handle */}
+              <div className="flex justify-center pt-2 pb-1 sm:hidden">
                 <div className="w-10 h-1 bg-gray-300 rounded-full" />
               </div>
 

@@ -156,7 +156,6 @@ export default function RestaurantDetail() {
     const customerPrice = item.customer_price || Math.round((item.base_price || 0) * 1.1);
     addToCart({ ...item, customer_price: customerPrice, restaurant_name: restaurant.name, restaurant_id: restaurantId });
     setAddedToCartItemId(item.id);
-    toast.success(language === 'en' ? 'Added to cart' : 'تمت الإضافة للسلة');
   };
 
   const handleCheckout = () => {
@@ -180,26 +179,26 @@ export default function RestaurantDetail() {
           </div>
         )}
         
-        <div className={`relative ${restaurant.cover_image_url ? '' : 'bg-gradient-to-br from-[#1B4332] to-[#2D6A4F]'} py-4`}>
+        <div className={`relative ${restaurant.cover_image_url ? '' : 'bg-gradient-to-br from-[#1B4332] to-[#2D6A4F]'} py-2`}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
-            <Link to={createPageUrl('Restaurants')} className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-3 transition-colors">
-              <ArrowRight className={`w-5 h-5 ${language === 'en' ? 'rotate-180' : ''}`} />
+            <Link to={createPageUrl('Restaurants')} className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-2 transition-colors">
+              <ArrowRight className={`w-4 h-4 ${language === 'en' ? 'rotate-180' : ''}`} />
               {language === 'en' ? 'Back to Restaurants' : 'العودة للمطاعم'}
             </Link>
 
-            <div className="flex flex-col md:flex-row gap-4 items-start">
+            <div className="flex flex-col md:flex-row gap-3 items-start">
               {restaurant.image_url && (
                 <img 
                   src={restaurant.image_url} 
                   alt={restaurant.name}
-                  className="w-20 h-20 md:w-24 md:h-24 object-cover rounded-2xl bg-white p-1.5 shadow-xl border border-white/60"
+                  className="w-14 h-14 md:w-18 md:h-18 object-cover rounded-xl bg-white p-1 shadow-xl border border-white/60"
                   onError={(e) => e.target.style.display = 'none'}
                 />
               )}
               <div className="flex-1">
-                <h1 className="text-2xl md:text-3xl font-bold text-white mb-1.5">{restaurant.name}</h1>
-                <p className="text-white/95 text-sm md:text-base mb-3 line-clamp-2">{restaurant.description}</p>
-                <div className="flex flex-wrap gap-3">
+                <h1 className="text-lg md:text-xl font-bold text-white mb-1">{restaurant.name}</h1>
+                <p className="text-white/95 text-xs md:text-sm mb-2 line-clamp-1">{restaurant.description}</p>
+                <div className="flex flex-wrap gap-2">
                   {restaurant.cuisine_type && (
                     <Badge className="bg-white/20 text-white border-0 backdrop-blur-sm">
                       {restaurant.cuisine_type}

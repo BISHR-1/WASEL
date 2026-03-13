@@ -1021,8 +1021,8 @@ function OrderSummary({ displayedSubtotalSYP, originalTotalSYP, membershipDiscou
   
   // ===== نظام الطلبات المجانية (أول 3 طلبات) =====
   // داخل سوريا: إلغاء رسوم التوصيل فقط (الخدمة بالفعل $0)
-  // خارج سوريا: إلغاء رسوم الخدمة والتوصيل
-  let SERVICE_FEE_USD = insideSyria ? 0 : 6;
+  // خارج سوريا: رسوم خدمة $3 (خصم 50% لفترة محدودة)
+  let SERVICE_FEE_USD = insideSyria ? 0 : 3; // خصم 50% - 3$ بدلاً من 6$
   let DELIVERY_FEE_USD = insideSyria ? 1 : 2;
   
   // رسوم خاصة للسلة المشتركة: $6 خدمة + $3 توصيل
@@ -1134,10 +1134,13 @@ function OrderSummary({ displayedSubtotalSYP, originalTotalSYP, membershipDiscou
           </div>
         )}
 
-        {/* Service Fee - ثابتة 6 دولار */}
+        {/* Service Fee - خصم 50% لفترة محدودة */}
         <div className="flex justify-between text-sm relative" dir="rtl">
           <span className="text-gray-600 flex items-center gap-1">
             رسوم الخدمة
+            {!insideSyria && SERVICE_FEE_USD > 0 && (
+              <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold animate-pulse">خصم 50% لمدة محدودة</span>
+            )}
             <button 
               onClick={() => setShowServiceFeeInfo(!showServiceFeeInfo)}
               className="text-xs text-blue-500 hover:text-blue-700 cursor-pointer transition-colors"
@@ -1146,6 +1149,7 @@ function OrderSummary({ displayedSubtotalSYP, originalTotalSYP, membershipDiscou
             </button>
           </span>
           <div className="text-left">
+            {!insideSyria && SERVICE_FEE_USD > 0 && <span className="text-gray-400 line-through text-xs ml-1">$6.00</span>}
             <span className="text-gray-900">{serviceFeeSYP.toLocaleString('en-US')} ل.س</span>
             <span className="text-gray-400 text-xs mx-2">|</span>
             <span className="text-gray-500 text-xs">${SERVICE_FEE_USD.toFixed(2)}</span>
@@ -1316,6 +1320,7 @@ const Cart = () => {
   const [isFreeOrderEligible, setIsFreeOrderEligible] = useState(false);
   const [showFreeOrderNotification, setShowFreeOrderNotification] = useState(false);
   const [freeOrderNotificationMessage, setFreeOrderNotificationMessage] = useState('');
+  const [userOrdersCount, setUserOrdersCount] = useState(999); // Start high to avoid false free delivery
   
   const exchangeRate = useUsdToSypRate() || EXCHANGE_RATE;
   const insideSyria = isInsideSyria(userRegion);
@@ -1634,6 +1639,19 @@ const Cart = () => {
           (data.status === 'trialing' && (!trialEnd || trialEnd > now));
 
         setIsWaselPlusMember(Boolean(activeMember && WASEL_PLUS_STATUSES.includes(data.status)));
+
+        // Load user orders count for free delivery on first 3 orders
+        if (user?.id) {
+          try {
+            const { count } = await supabase
+              .from('orders')
+              .select('*', { count: 'exact', head: true })
+              .or(`user_id.eq.${user.id},user_email.eq.${userEmail}`);
+            setUserOrdersCount(count || 0);
+          } catch (e) {
+            console.warn('Could not load orders count:', e);
+          }
+        }
       } catch (error) {
         console.error('Failed to load Wasel+ state in cart:', error);
         setCurrentUserEmail('');
@@ -1679,13 +1697,18 @@ const Cart = () => {
   const isFreeDelivery = originalTotalSYP >= FREE_DELIVERY_THRESHOLD_SYP;
   
   // رسوم التوصيل والخدمة - تطابق ما يراه المستخدم في OrderSummary
-  let SERVICE_FEE_USD = insideSyria ? 0 : 6;
+  let SERVICE_FEE_USD = insideSyria ? 0 : 3; // خصم 50% على رسوم الخدمة - 3$ بدلاً من 6$ لفترة محدودة
   let DELIVERY_FEE_USD = insideSyria ? 1 : 2;
 
   // رسوم خاصة للسلة المشتركة: $6 خدمة + $3 توصيل
   if (paymentMethod === 'shared_cart') {
     SERVICE_FEE_USD = 6;
     DELIVERY_FEE_USD = 3;
+  }
+
+  // أول 3 طلبات بتوصيل مجاني لجميع المستخدمين
+  if (userOrdersCount < 3) {
+    DELIVERY_FEE_USD = 0;
   }
 
   if (isFreeOrderEligible) {
@@ -1703,15 +1726,21 @@ const Cart = () => {
 
   // خصم الكوبون بالليرة (يُحسب فقط إذا كان الكوبون حقيقي)
   const couponDiscountSYP = useMemo(() => {
-    // الخصم يُطبق فقط على الكوبونات الحقيقية (مثل Daraa)
     if (!appliedCoupon || !appliedCoupon.isReal) return 0;
+    let discount = 0;
     if (appliedCoupon.type === 'percentage') {
-      // الخصم يكون على المجموع الكلي (السعر الأصلي + رسوم الخدمة + التوصيل)
-      return Math.round((subtotalBeforeCouponSYP * appliedCoupon.value) / 100);
+      discount = Math.round((subtotalBeforeCouponSYP * appliedCoupon.value) / 100);
+    } else {
+      // fixed amount in USD, convert to SYP
+      discount = Math.round(appliedCoupon.value * exchangeRate);
     }
-    // إذا كانت القيمة ثابتة نفترض أنها بالليرة
-    return appliedCoupon.value;
-  }, [appliedCoupon, subtotalBeforeCouponSYP]);
+    // Apply max discount cap if exists
+    if (appliedCoupon.max_discount_usd) {
+      const maxDiscountSYP = Math.round(appliedCoupon.max_discount_usd * exchangeRate);
+      discount = Math.min(discount, maxDiscountSYP);
+    }
+    return discount;
+  }, [appliedCoupon, subtotalBeforeCouponSYP, exchangeRate]);
 
   // المجموع النهائي بالليرة
   const finalTotalSYP = subtotalBeforeCouponSYP - couponDiscountSYP;
@@ -1750,7 +1779,6 @@ const Cart = () => {
       id: item.id,
       name: item.name_ar || item.name,
       name_ar: item.name_ar || item.name,
-      // السعر بالليرة من Base44
       price: item.customer_price || item.price || 0,
       customer_price: item.customer_price || item.price || 0,
       image_url: item.image_url || item.image,
@@ -1758,44 +1786,62 @@ const Cart = () => {
       images: item.images,
       quantity: 1
     });
-    toast.success(`تمت إضافة ${item.name_ar || item.name} إلى السلة`);
   }, [addToCart]);
 
-  // Handle coupon - كود Daraa يعطي 20% خصم حقيقي
+  // Handle coupon - DB-backed validation
   const handleApplyCoupon = useCallback(async (code) => {
     if (!code) return;
     setCouponLoading(true);
     
-    // تحويل الكود لأحرف كبيرة للمقارنة
-    const upperCode = code.toUpperCase();
+    const upperCode = code.toUpperCase().trim();
     
-    setTimeout(() => {
-      // الكوبونات الصالحة - Daraa هو الكود الحقيقي الوحيد
+    try {
+      // Get user session for per-user usage check
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id || null;
+      const userRegion = insideSyria ? 'inside_syria' : 'outside_syria';
+      
+      const { data, error } = await supabase.rpc('validate_coupon', {
+        p_code: upperCode,
+        p_user_id: userId,
+        p_region: userRegion,
+      });
+
+      if (error) throw error;
+      
+      if (data?.valid) {
+        setAppliedCoupon({
+          code: data.code,
+          type: data.discount_type,
+          value: Number(data.discount_value),
+          isReal: true,
+          couponId: data.id,
+          description: data.description || '',
+          applicable_categories: data.applicable_categories || [],
+          max_discount_usd: data.max_discount_usd ? Number(data.max_discount_usd) : null,
+        });
+        setShowCouponAnimation(true);
+        toast.success(data.description || `🎉 تم تطبيق كود الخصم ${data.code} بنجاح!`, { duration: 4000 });
+      } else {
+        toast.error(data?.error || 'كود الخصم غير صالح');
+      }
+    } catch (err) {
+      // Fallback to hardcoded coupons if DB is unavailable
       const validCoupons = {
         'DARAA': { type: 'percentage', value: 20, isReal: true, message: '🎉 مبروك! حصلت على خصم 20% من درعا' },
-        'WASEL20': { type: 'percentage', value: 20, isReal: false },
-        'WELCOME10': { type: 'percentage', value: 10, isReal: false },
-        'MISSYOU': { type: 'percentage', value: 20, isReal: false },
-        'AB20': { type: 'percentage', value: 20, isReal: false },
       };
       
       if (validCoupons[upperCode]) {
         const coupon = validCoupons[upperCode];
         setAppliedCoupon({ code: upperCode, ...coupon });
         setShowCouponAnimation(true);
-        
-        if (coupon.isReal) {
-          // خصم حقيقي - عرض رسالة خاصة
-          toast.success(coupon.message, { duration: 4000 });
-        } else {
-          toast.success('تم تطبيق الكوبون بنجاح!');
-        }
+        toast.success(coupon.message || 'تم تطبيق الكوبون بنجاح!');
       } else {
         toast.error('كود الخصم غير صالح');
       }
-      setCouponLoading(false);
-    }, 800);
-  }, []);
+    }
+    setCouponLoading(false);
+  }, [insideSyria]);
 
   const handleSaveDeliveryAddress = useCallback(() => {
     const result = saveAddressFromRecipient({

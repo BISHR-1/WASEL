@@ -7,7 +7,7 @@ import {
   Search, Settings2, ShieldCheck, Truck, Users, MessageCircle,
   Package, Phone, MapPin, User, ChevronDown, ChevronUp,
   Image as ImageIcon, Crown, Link as LinkIcon, RefreshCcw, Trash2, BookOpen,
-  Wallet, Plus, Minus, BarChart3, TrendingUp, Calendar, Download, Star, Send,
+  Wallet, Plus, Minus, BarChart3, TrendingUp, Calendar, Download, Star, Send, Tag,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -63,6 +63,7 @@ const PANEL_SECTIONS = [
   { key: 'reviews', label: 'التقييمات', icon: Star },
   { key: 'messages', label: 'الرسائل', icon: MessageCircle },
   { key: 'memberships', label: 'Wasel+', icon: Crown },
+  { key: 'coupons', label: 'الكوبونات', icon: Tag },
   { key: 'user-control', label: 'إدارة المستخدمين', icon: Wallet },
   { key: 'controls', label: 'التحكم', icon: Settings2 },
 ];
@@ -210,6 +211,25 @@ export default function SupervisorPanel() {
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
   const [sendingChat, setSendingChat] = useState(false);
+
+  // Coupons Section States
+  const [coupons, setCoupons] = useState([]);
+  const [couponsLoading, setCouponsLoading] = useState(false);
+  const [showCreateCoupon, setShowCreateCoupon] = useState(false);
+  const [newCoupon, setNewCoupon] = useState({
+    code: '', description: '', discount_type: 'percentage', discount_value: '',
+    region: 'all', applicable_categories: [], expires_at: '', usage_limit: '',
+  });
+  const [savingCoupon, setSavingCoupon] = useState(false);
+
+  const COUPON_CATEGORIES = [
+    { key: 'supermarket', label: 'سوبر ماركت' },
+    { key: 'restaurants', label: 'مطاعم' },
+    { key: 'sweets', label: 'حلويات' },
+    { key: 'electronics', label: 'إلكترونيات' },
+    { key: 'gifts', label: 'هدايا' },
+    { key: 'packages', label: 'باقات' },
+  ];
 
   const toggleOrderDetails = (orderId) => {
     setExpandedOrderIds((prev) => {
@@ -431,6 +451,17 @@ export default function SupervisorPanel() {
       }
     } catch (e) {
       console.warn('Memberships load warning:', e);
+    }
+
+    // Load coupons
+    try {
+      const { data: couponsData } = await supabase
+        .from('coupons')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (Array.isArray(couponsData)) setCoupons(couponsData);
+    } catch (e) {
+      console.warn('Coupons load warning:', e);
     }
 
     // Load latest USD/SYP exchange rate
@@ -2611,6 +2642,170 @@ export default function SupervisorPanel() {
                   ))}
               </div>
             )}
+          </section>
+        )}
+
+        {/* Coupons Section */}
+        {activeSection === 'coupons' && (
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-black text-[#1B4332]">إدارة أكواد الخصم</h2>
+              <Button onClick={() => setShowCreateCoupon(!showCreateCoupon)} className="rounded-xl bg-[#1B4332] hover:bg-[#2D6A4F] text-white">
+                <Plus className="w-4 h-4 ml-1" /> إنشاء كود جديد
+              </Button>
+            </div>
+
+            {showCreateCoupon && (
+              <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+                className="rounded-3xl border border-[#E7ECEA] bg-white p-5 shadow-sm space-y-4" dir="rtl">
+                <h3 className="font-bold text-[#1B4332]">إنشاء كود خصم جديد</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-[#64748B] mb-1 block">الكود *</label>
+                    <input value={newCoupon.code} onChange={(e) => setNewCoupon(p => ({...p, code: e.target.value.toUpperCase()}))}
+                      placeholder="مثال: SUMMER50" className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm" dir="ltr" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-[#64748B] mb-1 block">نوع الخصم</label>
+                    <select value={newCoupon.discount_type} onChange={(e) => setNewCoupon(p => ({...p, discount_type: e.target.value}))}
+                      className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm">
+                      <option value="percentage">نسبة مئوية %</option>
+                      <option value="fixed">مبلغ ثابت $</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-[#64748B] mb-1 block">قيمة الخصم *</label>
+                    <input type="number" value={newCoupon.discount_value} onChange={(e) => setNewCoupon(p => ({...p, discount_value: e.target.value}))}
+                      placeholder={newCoupon.discount_type === 'percentage' ? '50' : '5'} className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm" dir="ltr" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-[#64748B] mb-1 block">المنطقة المستهدفة</label>
+                    <select value={newCoupon.region} onChange={(e) => setNewCoupon(p => ({...p, region: e.target.value}))}
+                      className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm">
+                      <option value="all">الجميع</option>
+                      <option value="inside_syria">داخل سوريا فقط</option>
+                      <option value="outside_syria">خارج سوريا فقط</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-[#64748B] mb-1 block">تاريخ الانتهاء</label>
+                    <input type="datetime-local" value={newCoupon.expires_at} onChange={(e) => setNewCoupon(p => ({...p, expires_at: e.target.value}))}
+                      className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm" dir="ltr" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-[#64748B] mb-1 block">الحد الأقصى للاستخدام</label>
+                    <input type="number" value={newCoupon.usage_limit} onChange={(e) => setNewCoupon(p => ({...p, usage_limit: e.target.value}))}
+                      placeholder="بلا حدود" className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm" dir="ltr" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-[#64748B] mb-1 block">الوصف</label>
+                  <input value={newCoupon.description} onChange={(e) => setNewCoupon(p => ({...p, description: e.target.value}))}
+                    placeholder="مثال: خصم 50% على طلبات السوبر ماركت" className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs text-[#64748B] mb-2 block">الأقسام المشمولة (اتركها فارغة لتشمل الكل)</label>
+                  <div className="flex flex-wrap gap-2">
+                    {COUPON_CATEGORIES.map(cat => (
+                      <button key={cat.key} type="button"
+                        onClick={() => setNewCoupon(p => ({...p, applicable_categories: p.applicable_categories.includes(cat.key) ? p.applicable_categories.filter(c => c !== cat.key) : [...p.applicable_categories, cat.key]}))}
+                        className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${newCoupon.applicable_categories.includes(cat.key) ? 'bg-[#1B4332] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                        {cat.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <Button disabled={savingCoupon || !newCoupon.code || !newCoupon.discount_value}
+                  onClick={async () => {
+                    setSavingCoupon(true);
+                    try {
+                      const { error } = await supabase.from('coupons').insert({
+                        code: newCoupon.code.trim().toUpperCase(),
+                        description: newCoupon.description || null,
+                        discount_type: newCoupon.discount_type,
+                        discount_value: Number(newCoupon.discount_value),
+                        region: newCoupon.region,
+                        applicable_categories: newCoupon.applicable_categories.length > 0 ? newCoupon.applicable_categories : null,
+                        expires_at: newCoupon.expires_at || null,
+                        usage_limit: newCoupon.usage_limit ? Number(newCoupon.usage_limit) : null,
+                        is_active: true,
+                      });
+                      if (error) throw error;
+                      toast.success('تم إنشاء كود الخصم بنجاح');
+                      setNewCoupon({ code: '', description: '', discount_type: 'percentage', discount_value: '', region: 'all', applicable_categories: [], expires_at: '', usage_limit: '' });
+                      setShowCreateCoupon(false);
+                      const { data } = await supabase.from('coupons').select('*').order('created_at', { ascending: false });
+                      if (data) setCoupons(data);
+                    } catch (err) {
+                      toast.error(err.message || 'فشل إنشاء الكود');
+                    } finally { setSavingCoupon(false); }
+                  }}
+                  className="w-full rounded-xl bg-[#1B4332] hover:bg-[#2D6A4F] text-white font-bold">
+                  {savingCoupon ? 'جاري الحفظ...' : 'إنشاء الكود'}
+                </Button>
+              </motion.div>
+            )}
+
+            {/* Existing Coupons List */}
+            <div className="space-y-3">
+              {coupons.length === 0 && !couponsLoading && (
+                <div className="text-center py-8 text-[#64748B]">لا توجد أكواد خصم حالياً</div>
+              )}
+              {coupons.map(coupon => (
+                <motion.div key={coupon.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                  className={`rounded-2xl border p-4 shadow-sm ${coupon.is_active ? 'bg-white border-[#E7ECEA]' : 'bg-gray-50 border-gray-200 opacity-60'}`} dir="rtl">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-black text-lg text-[#1B4332] bg-[#ECFDF5] px-3 py-1 rounded-lg">{coupon.code}</span>
+                      <Badge className={coupon.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                        {coupon.is_active ? 'مفعل' : 'معطل'}
+                      </Badge>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline"
+                        onClick={async () => {
+                          const { error } = await supabase.from('coupons').update({ is_active: !coupon.is_active }).eq('id', coupon.id);
+                          if (!error) {
+                            setCoupons(prev => prev.map(c => c.id === coupon.id ? {...c, is_active: !c.is_active} : c));
+                            toast.success(coupon.is_active ? 'تم تعطيل الكود' : 'تم تفعيل الكود');
+                          }
+                        }}
+                        className="rounded-lg text-xs">
+                        {coupon.is_active ? 'تعطيل' : 'تفعيل'}
+                      </Button>
+                      <Button size="sm" variant="outline"
+                        onClick={async () => {
+                          if (!confirm('هل أنت متأكد من حذف هذا الكود؟')) return;
+                          const { error } = await supabase.from('coupons').delete().eq('id', coupon.id);
+                          if (!error) {
+                            setCoupons(prev => prev.filter(c => c.id !== coupon.id));
+                            toast.success('تم حذف الكود');
+                          }
+                        }}
+                        className="rounded-lg text-xs text-red-600 border-red-200 hover:bg-red-50">
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-[#64748B]">
+                    <p>الخصم: <span className="font-bold text-[#1B4332]">{coupon.discount_value}{coupon.discount_type === 'percentage' ? '%' : '$'}</span></p>
+                    <p>المنطقة: <span className="font-bold text-[#1B4332]">{coupon.region === 'all' ? 'الجميع' : coupon.region === 'inside_syria' ? 'داخل سوريا' : 'خارج سوريا'}</span></p>
+                    <p>الاستخدام: <span className="font-bold text-[#1B4332]">{coupon.used_count || 0}{coupon.usage_limit ? `/${coupon.usage_limit}` : ''}</span></p>
+                    <p>الانتهاء: <span className="font-bold text-[#1B4332]">{coupon.expires_at ? new Date(coupon.expires_at).toLocaleDateString('ar-EG') : 'بلا حدود'}</span></p>
+                  </div>
+                  {coupon.description && <p className="text-xs text-[#047857] mt-1">{coupon.description}</p>}
+                  {coupon.applicable_categories?.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {coupon.applicable_categories.map(cat => (
+                        <span key={cat} className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-bold">
+                          {COUPON_CATEGORIES.find(c => c.key === cat)?.label || cat}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </motion.div>
+              ))}
+            </div>
           </section>
         )}
 

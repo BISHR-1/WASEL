@@ -19,6 +19,7 @@ import { interleaveByCategory, scoreItemsByBehavior } from '@/lib/recommendation
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
 import AddToCartButton from '@/components/buttons/AddToCartButton';
+import ProductDetailModal from '@/components/common/ProductDetailModal';
 import { useDarkMode } from '@/lib/DarkModeContext';
 import { attachRatingsFromReviews, normalizeItemRating } from '@/lib/itemRatings';
 
@@ -32,6 +33,8 @@ const Home = () => {
   const [favoriteProductIds, setFavoriteProductIds] = useState([]);
   const [likedProductId, setLikedProductId] = useState(null);
   const [addedToCartProductId, setAddedToCartProductId] = useState(null);
+  const [detailItem, setDetailItem] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   // تهيئة الإشعارات عند فتح الصفحة الرئيسية
   useEffect(() => {
@@ -260,7 +263,6 @@ const Home = () => {
   const handleAddToCart = (product) => {
     addToCart(product);
     setAddedToCartProductId(product.id);
-    toast.success(`${product.name} أضيف إلى السلة`);
   };
 
   const normalizeShowcaseItem = (item, itemType) => ({
@@ -362,6 +364,22 @@ const Home = () => {
           </div>
         </motion.div>
 
+        {/* Promo Banners - عروض مغرية */}
+        <div className="grid grid-cols-2 gap-3 mb-4" dir="rtl">
+          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}
+            onClick={() => navigate(createPageUrl('Cart'))}
+            className="rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 p-4 cursor-pointer shadow-md hover:shadow-lg transition-shadow">
+            <p className="text-white font-extrabold text-sm mb-1">🚚 توصيل مجاني</p>
+            <p className="text-white/80 text-[11px]">أول 3 طلبات بتوصيل مجاني لجميع المستخدمين</p>
+          </motion.div>
+          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }}
+            onClick={() => navigate(createPageUrl('Cart'))}
+            className="rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 p-4 cursor-pointer shadow-md hover:shadow-lg transition-shadow">
+            <p className="text-white font-extrabold text-sm mb-1">🔥 رسوم خدمة 50%</p>
+            <p className="text-white/80 text-[11px]">رسوم الخدمة $3 بدلاً من $6 لفترة محدودة</p>
+          </motion.div>
+        </div>
+
         {/* Category Chips */}
         <div className="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-hide">
           {categories.map(cat => (
@@ -418,8 +436,9 @@ const Home = () => {
                     <img
                       src={product.image_url || 'https://placehold.co/400x400/F9FAF8/1F2933?text=Wasel'}
                       alt={product.name}
-                      className="w-full h-28 md:h-24 lg:h-28 object-contain bg-[#F8FAFC] p-2"
+                      className="w-full h-28 md:h-24 lg:h-28 object-contain bg-[#F8FAFC] p-2 cursor-pointer"
                       loading="lazy"
+                      onClick={() => { setDetailItem(product); setShowDetailModal(true); }}
                     />
 
                     <Button
@@ -486,8 +505,9 @@ const Home = () => {
                   <img
                     src={item.image_url}
                     alt={item.name}
-                    className="w-full h-28 md:h-24 lg:h-28 object-contain bg-[#F8FAFC] p-2"
+                    className="w-full h-28 md:h-24 lg:h-28 object-contain bg-[#F8FAFC] p-2 cursor-pointer"
                     loading="lazy"
+                    onClick={() => { setDetailItem(item); setShowDetailModal(true); }}
                   />
                   <div className="p-3">
                     <div className="flex items-center justify-between gap-2 mb-1">
@@ -502,7 +522,7 @@ const Home = () => {
                       <AddToCartButton
                         onClick={() => openMixedItem(item)}
                         isLoading={addedToCartProductId === item.id && !isGiftOrPackage}
-                        label={isGiftOrPackage ? 'تخصيص' : 'أضف للسلة'}
+                        label={'أضف للسلة'}
                         className="w-auto px-4"
                       />
                     </div>
@@ -524,8 +544,9 @@ const Home = () => {
                 <img
                   src={item.image_url}
                   alt={item.name}
-                  className="w-full h-28 md:h-24 lg:h-28 object-contain bg-[#F8FAFC] p-2"
+                  className="w-full h-28 md:h-24 lg:h-28 object-contain bg-[#F8FAFC] p-2 cursor-pointer"
                   loading="lazy"
+                  onClick={() => { setDetailItem(item); setShowDetailModal(true); }}
                 />
                 <div className="p-3">
                   <h4 className="font-bold text-sm mb-1 text-[#1F2933] line-clamp-1">{item.name}</h4>
@@ -545,6 +566,13 @@ const Home = () => {
           </div>
         </div>
         </div>
+
+        <ProductDetailModal
+          item={detailItem}
+          isOpen={showDetailModal}
+          onClose={() => setShowDetailModal(false)}
+          onAddToCart={handleAddToCart}
+        />
       </main>
     </div>
   );
