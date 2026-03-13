@@ -138,7 +138,7 @@ export default function SharedCartPay() {
 
         const sessionData = {
           token: token.trim(),
-          creator_id: data.creator_id,
+          creator_id: data.created_by,
           payload: data.payload,
           recipient: data.payload?.recipient,
           sender: data.payload?.sender
