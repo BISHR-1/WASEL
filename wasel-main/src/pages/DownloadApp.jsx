@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Download, Shield, Truck, Gift, CreditCard, Star, MapPin, Headphones, ChevronDown, Store, Utensils, Smartphone, Globe } from 'lucide-react';
 
-const APK_URL = 'https://github.com/BISHR-1/WASEL/releases/download/v1.0.0/Wasel.Store.App.apk';
+const APK_URL = 'https://github.com/BISHR-1/WASEL/releases/download/v1.0.0/Wasel-Store.apk';
 
 const features = [
   { icon: Store, title: 'سوبرماركت متكامل', desc: 'تصفّح آلاف المنتجات من المتاجر المحلية مع أسعار واضحة وتوصيل سريع', color: 'from-emerald-500 to-green-600' },
