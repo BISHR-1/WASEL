@@ -2123,7 +2123,21 @@ const Cart = () => {
         }
       }
 
-      // ===== STEP 3: Clear cart + show success =====
+      // ===== STEP 3: Notify admin/supervisor about new shared cart =====
+      try {
+        console.log('📢 SharedCart: sending admin notification for shared cart link', linkShortCode);
+        await notifyAdminUsers('new_order_created', {
+          id: createdLink?.id || linkToken,
+          order_number: linkShortCode || linkToken,
+          total_usd: finalTotalUSD,
+          total_amount: finalTotalUSD,
+        }, { paymentMethod: 'shared_cart' });
+        console.log('✅ SharedCart: admin notification sent');
+      } catch (notifyErr) {
+        console.warn('⚠️ SharedCart admin notification warning:', notifyErr);
+      }
+
+      // ===== STEP 4: Clear cart + show success =====
       // لا يتم إنشاء طلب هنا — الطلب يُنشأ فقط عندما يدفع الطرف الخارجي
       clearCart?.();
       localStorage.removeItem('wasel_shared_cart_session');
