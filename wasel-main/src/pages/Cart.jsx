@@ -2106,17 +2106,11 @@ const Cart = () => {
         'واصل - نوصّل لأحبابك 💙',
       ].filter(Boolean).join('\n');
 
-      let sharedViaSystemDialog = false;
-      try {
-        if (navigator.share) {
-          await navigator.share({ title: 'تطبيق واصل - مشاركة سلة', text: shareText, url: shareUrl });
-          sharedViaSystemDialog = true;
-        }
-      } catch (shareError) {
-        console.warn('Share cart native share warning:', shareError);
-      }
-
-      if (!sharedViaSystemDialog) {
+      // فتح واتساب مباشرة مع رابط السلة (navigator.share لا يعمل بعد await)
+      const encodedShareText = encodeURIComponent(shareText);
+      const whatsappShareUrl = `https://wa.me/?text=${encodedShareText}`;
+      const opened = window.open(whatsappShareUrl, '_blank');
+      if (!opened) {
         try {
           await navigator.clipboard.writeText(shareText);
           toast.info('تم نسخ رسالة السلة مع الرابط. يمكنك لصقها مباشرة في أي تطبيق مراسلة 📋');
@@ -2945,33 +2939,19 @@ const Cart = () => {
           }
         }
         
-        // فتح نافذة النظام للمشاركة عبر واتساب
-        let sharedViaSystem = false;
-        try {
-          if (navigator.share) {
-            await navigator.share({ title: 'واصل - طلب جديد', text: message });
-            sharedViaSystem = true;
-          }
-        } catch (shareErr) {
-          console.warn('navigator.share fallback:', shareErr);
-        }
-
-        if (!sharedViaSystem) {
-          const opened = openWhatsAppSafely(whatsappUrl);
-          if (!opened) {
-            try {
-              await navigator.clipboard.writeText(message);
-            } catch {}
-            toast('لإكمال الطلب، يرجى إرسال الرسالة عبر واتساب', {
-              action: {
-                label: 'فتح واتساب',
-                onClick: () => window.location.href = whatsappUrl
-              },
-              duration: 10000
-            });
-          } else {
-            toast.success('تم حفظ الطلب وارساله ✅');
-          }
+        // فتح واتساب مباشرة (navigator.share لا يعمل بعد await)
+        const opened = openWhatsAppSafely(whatsappUrl);
+        if (!opened) {
+          try {
+            await navigator.clipboard.writeText(message);
+          } catch {}
+          toast('لإكمال الطلب، يرجى إرسال الرسالة عبر واتساب', {
+            action: {
+              label: 'فتح واتساب',
+              onClick: () => window.location.href = whatsappUrl
+            },
+            duration: 10000
+          });
         } else {
           toast.success('تم حفظ الطلب وارساله ✅');
         }
