@@ -2549,11 +2549,13 @@ const Cart = () => {
       // Notify supervisors/admins for every newly created order,
       // regardless of whether it came from PayPal, WhatsApp, or COD.
       try {
-        await notifyAdminUsers('new_order_created', order, {
+        console.log('📢 saveOrderToSupabase: sending admin notification for', orderData.paymentMethod, 'order', order?.id);
+        const notifyResult = await notifyAdminUsers('new_order_created', order, {
           paymentMethod: orderData.paymentMethod,
         });
+        console.log('📢 saveOrderToSupabase: admin notification result', JSON.stringify(notifyResult));
       } catch (notifyError) {
-        console.warn('notifyAdminUsers warning:', notifyError);
+        console.warn('⚠️ notifyAdminUsers inside saveOrderToSupabase warning:', notifyError);
       }
 
       return order;
@@ -2875,7 +2877,14 @@ const Cart = () => {
               }
             }
 
-            // Notify admin/supervisor is already handled by saveOrderToSupabase
+            // Explicit admin notification for wallet payment (redundant safety net)
+            try {
+              console.log('📢 Wallet: sending explicit admin notification for order', savedOrder?.id);
+              await notifyAdminUsers('new_order_created', savedOrder, { paymentMethod: 'wallet' });
+              console.log('✅ Wallet: admin notification sent');
+            } catch (walletNotifyErr) {
+              console.warn('⚠️ Wallet admin notification fallback warning:', walletNotifyErr);
+            }
           } else {
             const errMsg = payResult?.error === 'insufficient_balance'
               ? `رصيد غير كافٍ. رصيدك: ${payResult.balance}$ والمطلوب: ${payResult.required}$`
@@ -3086,6 +3095,17 @@ const Cart = () => {
           });
         } catch (notifySharedError) {
           console.warn('Shared payment notify warning:', notifySharedError);
+        }
+      }
+
+      // Explicit admin notification for PayPal payment (redundant safety net)
+      if (persisted?.savedOrder) {
+        try {
+          console.log('📢 PayPal: sending explicit admin notification for order', persisted.savedOrder?.id);
+          await notifyAdminUsers('new_order_created', persisted.savedOrder, { paymentMethod: 'paypal' });
+          console.log('✅ PayPal: admin notification sent');
+        } catch (paypalNotifyErr) {
+          console.warn('⚠️ PayPal admin notification fallback warning:', paypalNotifyErr);
         }
       }
 
