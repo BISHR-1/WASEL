@@ -328,19 +328,8 @@ const syncCachedTokenIfPossible = async () => {
 };
 
 const deactivateTokenForOtherUsers = async (token, activeUserId) => {
-  if (!token || !activeUserId) return;
-  try {
-    await supabase
-      .from('user_devices')
-      .update({
-        is_active: false,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('fcm_token', token)
-      .neq('user_id', activeUserId);
-  } catch (error) {
-    console.warn('deactivateTokenForOtherUsers warning:', error);
-  }
+  // Skipped: RLS prevents updating other users' rows from client.
+  // The edge function uses service_role key and handles stale tokens.
 };
 
 /**
@@ -353,7 +342,7 @@ const saveTokenToDatabase = async (token) => {
     const detectedPlatform = Capacitor.isNativePlatform() ? 'android' : 'web';
     
     if (user) {
-      // تحديث أو إضافة الـ token
+      // تحديث أو إضافة الـ token (unique index on user_id only)
       const { error } = await supabase
         .from('user_devices')
         .upsert({
@@ -363,74 +352,64 @@ const saveTokenToDatabase = async (token) => {
           is_active: true,
           updated_at: new Date().toISOString()
         }, {
-          onConflict: 'user_id,platform'
+          onConflict: 'user_id'
         });
 
       if (!error) {
-        await deactivateTokenForOtherUsers(token, user.id);
-        console.log('✅ تم حفظ Token في قاعدة البيانات');
+        console.log('✅ تم حفظ Token في قاعدة البيانات (platform:', detectedPlatform, ')');
         localStorage.removeItem('fcm_token');
         return;
       }
+      console.warn('⚠️ Upsert token error:', error.code, error.message);
 
-      // Fallback for environments where user_id doesn't have a unique index yet.
-      const conflictMissing = String(error?.message || '').toLowerCase().includes('on conflict')
-        || String(error?.code || '') === '42P10';
+      // Fallback: SELECT → UPDATE or INSERT
+      const { data: existing, error: selectError } = await supabase
+        .from('user_devices')
+        .select('id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
 
-      if (conflictMissing) {
-        const { data: existing, error: selectError } = await supabase
+      if (selectError) {
+        console.error('❌ خطأ في قراءة user_devices:', selectError);
+        return;
+      }
+
+      if (existing?.id) {
+        const { error: updateError } = await supabase
           .from('user_devices')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('platform', detectedPlatform)
-          .limit(1)
-          .maybeSingle();
-
-        if (selectError) {
-          console.error('❌ خطأ في قراءة user_devices:', selectError);
-          return;
-        }
-
-        if (existing?.id) {
-          const { error: updateError } = await supabase
-            .from('user_devices')
-            .update({
-              fcm_token: token,
-              platform: detectedPlatform,
-              is_active: true,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', existing.id);
-          if (updateError) {
-            console.error('❌ خطأ في تحديث Token:', updateError);
-            return;
-          }
-          await deactivateTokenForOtherUsers(token, user.id);
-          console.log('✅ تم تحديث Token في قاعدة البيانات (fallback)');
-          localStorage.removeItem('fcm_token');
-          return;
-        }
-
-        const { error: insertError } = await supabase
-          .from('user_devices')
-          .insert({
-            user_id: user.id,
+          .update({
             fcm_token: token,
             platform: detectedPlatform,
             is_active: true,
             updated_at: new Date().toISOString(),
-          });
-        if (insertError) {
-          console.error('❌ خطأ في إدراج Token:', insertError);
+          })
+          .eq('id', existing.id);
+        if (updateError) {
+          console.error('❌ خطأ في تحديث Token:', updateError);
           return;
         }
-        await deactivateTokenForOtherUsers(token, user.id);
-        console.log('✅ تم إدراج Token في قاعدة البيانات (fallback)');
+        console.log('✅ تم تحديث Token في قاعدة البيانات (fallback update)');
         localStorage.removeItem('fcm_token');
         return;
       }
 
-      console.error('❌ خطأ في حفظ Token:', error);
+      const { error: insertError } = await supabase
+        .from('user_devices')
+        .insert({
+          user_id: user.id,
+          fcm_token: token,
+          platform: detectedPlatform,
+          is_active: true,
+          updated_at: new Date().toISOString(),
+        });
+      if (insertError) {
+        console.error('❌ خطأ في إدراج Token:', insertError);
+        return;
+      }
+      console.log('✅ تم إدراج Token في قاعدة البيانات (fallback insert)');
+      localStorage.removeItem('fcm_token');
+      return;
     } else {
       // حفظ في localStorage للاستخدام لاحقاً
       localStorage.setItem('fcm_token', token);
