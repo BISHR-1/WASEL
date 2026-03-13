@@ -513,6 +513,20 @@ export default function DriverPanel() {
       if (!courierProfile?.first_delivery_completed_at) {
         supabase.from('courier_profiles').update({ first_delivery_completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('user_id', currentUser.id).then(() => {});
       }
+      // Increment completed orders count and add delivery fee to balance
+      supabase.rpc('increment_courier_stats', { p_user_id: currentUser.id, p_delivery_fee_usd: Number(order.delivery_fee || 1) }).then(({ error: incErr }) => {
+        if (incErr) {
+          // Fallback: direct increment if RPC doesn't exist
+          supabase.from('courier_profiles')
+            .update({
+              completed_orders_count: (courierProfile?.completed_orders_count || 0) + 1,
+              balance_usd: (courierProfile?.balance_usd || 0) + Number(order.delivery_fee || 1),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('user_id', currentUser.id)
+            .then(() => {});
+        }
+      });
       supabase.from('order_assignments')
         .select('*', { count: 'exact', head: true })
         .eq('delivery_person_id', currentUser.assignment_id || currentUser.id)

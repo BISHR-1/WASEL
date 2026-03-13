@@ -1,7 +1,7 @@
 {
-  "name": "واصل",
-  "short_name": "واصل",
-  "description": "تطبيق واصل",
+  "name": "واصل ستور - سوبر ماركت اونلاين درعا",
+  "short_name": "واصل ستور",
+  "description": "سوبر ماركت اونلاين في درعا سوريا - توصيل سريع لباب بيتك. اطلب مواد غذائية وكل احتياجاتك اليومية.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
