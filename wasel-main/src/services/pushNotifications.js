@@ -246,7 +246,22 @@ const setupListeners = () => {
 
   // عند وصول إشعار والتطبيق مفتوح (Foreground)
   PushNotifications.addListener('pushNotificationReceived', (notification) => {
-    console.log('📬 إشعار جديد:', notification);
+    console.log('📬 إشعار جديد (foreground):', notification);
+    // عرض إشعار داخلي عندما يكون التطبيق مفتوح
+    const title = notification.title || 'إشعار جديد';
+    const body = notification.body || '';
+    const data = notification.data || {};
+    try {
+      toast.info(`${title}${body ? `\n${body}` : ''}`, {
+        duration: 6000,
+        action: data?.order_id ? {
+          label: 'عرض',
+          onClick: () => handleNotificationTap({ data }),
+        } : undefined,
+      });
+    } catch (e) {
+      console.warn('Foreground toast warning:', e);
+    }
   });
 
   // عند الضغط على الإشعار
@@ -335,6 +350,7 @@ const saveTokenToDatabase = async (token) => {
   try {
     // الحصول على معرف المستخدم الحالي (إذا كان مسجل دخول)
     const { data: { user } } = await supabase.auth.getUser();
+    const detectedPlatform = Capacitor.isNativePlatform() ? 'android' : 'web';
     
     if (user) {
       // تحديث أو إضافة الـ token
@@ -343,11 +359,11 @@ const saveTokenToDatabase = async (token) => {
         .upsert({
           user_id: user.id,
           fcm_token: token,
-          platform: 'android',
+          platform: detectedPlatform,
           is_active: true,
           updated_at: new Date().toISOString()
         }, {
-          onConflict: 'user_id'
+          onConflict: 'user_id,platform'
         });
 
       if (!error) {
@@ -366,6 +382,7 @@ const saveTokenToDatabase = async (token) => {
           .from('user_devices')
           .select('id')
           .eq('user_id', user.id)
+          .eq('platform', detectedPlatform)
           .limit(1)
           .maybeSingle();
 
@@ -379,7 +396,7 @@ const saveTokenToDatabase = async (token) => {
             .from('user_devices')
             .update({
               fcm_token: token,
-              platform: 'android',
+              platform: detectedPlatform,
               is_active: true,
               updated_at: new Date().toISOString(),
             })
@@ -399,7 +416,7 @@ const saveTokenToDatabase = async (token) => {
           .insert({
             user_id: user.id,
             fcm_token: token,
-            platform: 'android',
+            platform: detectedPlatform,
             is_active: true,
             updated_at: new Date().toISOString(),
           });

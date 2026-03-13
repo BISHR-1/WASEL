@@ -25,6 +25,10 @@ const config: CapacitorConfig = {
     // ✅ Browser plugin للـ Redirect PayPal
     Browser: {
       enabled: true
+    },
+    // ✅ Push Notifications - عرض الإشعارات أثناء فتح التطبيق
+    PushNotifications: {
+      presentationOptions: ['badge', 'sound', 'alert']
     }
   }
 };
