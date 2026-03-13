@@ -2125,163 +2125,14 @@ const Cart = () => {
         }
       }
 
-      // ===== STEP 3: Create shared order =====
-      const linkInsertUserId = linkCreatedBy;
-      const sharedOrderNumber = await generateOrderNumber();
-      let sharedOrder = null;
-      let sharedOrderError = null;
-
-      try {
-        const rpc = await supabase.rpc('create_compatible_order_v2', {
-          p_order: {
-            sender: sharePayload.sender,
-            recipient: sharePayload.recipient,
-            items: sharePayload.items,
-            totalSYP: sharePayload.totalSYP,
-            totalUSD: sharePayload.totalUSD,
-            membershipDiscountSYP: sharePayload.membershipDiscountSYP,
-            paymentMethod: 'whatsapp',
-            notes: `طلب سلة مشتركة بانتظار دفع الطرف الخارجي.${additionalNotes ? ` ${additionalNotes}` : ''}`,
-            deliveryTime: sharePayload.deliveryTime,
-            tip: sharePayload.tip,
-            coupon: sharePayload.coupon,
-            orderNumber: sharedOrderNumber,
-            collaborationMode: 'shared',
-            recipientUserId: linkInsertUserId,
-            metadata: {
-              created_via: 'shared_cart_link',
-              shared_cart_token: linkToken,
-              shared_cart_url: shareUrl,
-              shared_cart_link_id: createdLink?.id || null,
-              shared_cart_client_id: shareId,
-              source_region: sharePayload.sourceRegion,
-            },
-          },
-        });
-
-        if (!rpc.error && rpc.data) {
-          sharedOrder = rpc.data;
-        } else {
-          sharedOrderError = rpc.error;
-        }
-      } catch (rpcError) {
-        sharedOrderError = rpcError;
-      }
-
-      if (!sharedOrder) {
-        const directPayload = {
-          order_number: sharedOrderNumber,
-          status: 'pending',
-          payment_status: 'pending',
-          payment_method: 'whatsapp',
-          total_amount: Number(sharePayload.totalUSD || 0),
-          total_usd: Number(sharePayload.totalUSD || 0),
-          total_syp: Number(sharePayload.totalSYP || 0),
-          currency: 'USD',
-          items: sharePayload.items,
-          collaboration_mode: 'shared',
-          recipient_user_id: linkInsertUserId,
-          sender_details: {
-            ...sharePayload.sender,
-            meta: {
-              created_via: 'shared_cart_link',
-              shared_cart_token: linkToken,
-              shared_cart_url: shareUrl,
-              shared_cart_link_id: createdLink?.id || null,
-              shared_cart_client_id: shareId,
-              sourceRegion: sharePayload.sourceRegion,
-            },
-          },
-          recipient_details: sharePayload.recipient,
-          notes: `طلب سلة مشتركة بانتظار دفع الطرف الخارجي.${additionalNotes ? ` ${additionalNotes}` : ''}`,
-        };
-
-        if (linkInsertUserId) {
-          directPayload.user_id = linkInsertUserId;
-        }
-
-        const { data: insertedOrder, error: directInsertError } = await supabase
-          .from('orders')
-          .insert([directPayload])
-          .select('*')
-          .single();
-
-        if (directInsertError) {
-          throw sharedOrderError || directInsertError;
-        }
-        sharedOrder = insertedOrder;
-      }
-
-      // ===== STEP 5: Ensure collaboration_mode is saved in DB =====
-      // create_compatible_order_v2 لا يحفظ collaboration_mode، لذا نضمنه بـ UPDATE
-      if (sharedOrder?.id) {
-        const collaborationPatch = {
-          collaboration_mode: 'shared',
-          recipient_user_id: linkInsertUserId,
-        };
-        // أضف sender_details.meta إذا لم يكن محفوظاً من الـ RPC
-        if (!sharedOrder.sender_details?.meta?.created_via) {
-          collaborationPatch.sender_details = {
-            ...(sharedOrder.sender_details || {}),
-            meta: {
-              created_via: 'shared_cart_link',
-              shared_cart_token: linkToken,
-              shared_cart_url: shareUrl,
-              shared_cart_link_id: createdLink?.id || null,
-              shared_cart_client_id: shareId,
-              sourceRegion: sharePayload.sourceRegion,
-            },
-          };
-        }
-        const { error: patchError } = await supabase
-          .from('orders')
-          .update(collaborationPatch)
-          .eq('id', sharedOrder.id);
-        if (patchError) {
-          console.warn('⚠️ تعذر تثبيت collaboration_mode على الطلب المشترك:', patchError);
-        } else {
-          sharedOrder = { ...sharedOrder, ...collaborationPatch };
-        }
-
-        await supabase
-          .from('cart_share_links')
-          .update({ created_order_id: sharedOrder.id })
-          .eq('id', createdLink.id);
-      }
-
-      // ===== STEP 6: Insert order_items =====
-      try {
-        if (sharedOrder?.id && Array.isArray(sharePayload.items) && sharePayload.items.length > 0) {
-          const { error: itemsError } = await insertOrderItemsCompat(sharedOrder.id, sharePayload.items);
-          if (itemsError) {
-            console.warn('Share cart order_items warning:', itemsError);
-          }
-        }
-      } catch (itemsError) {
-        console.warn('Share cart order_items warning:', itemsError);
-      }
-
-      // ===== STEP 7: Notify admins =====
-      try {
-        const notifyResult = await notifyAdminUsers('new_order_created', sharedOrder, {
-          paymentMethod: 'shared_cart',
-          source: 'cart_share_link_created',
-        });
-
-        if (notifyResult && Number(notifyResult.total || 0) > 0 && Number(notifyResult.sent || 0) === 0) {
-          toast.warning('تم إنشاء الطلب، لكن لم يصل إشعار Push للمشرف. تحقق من ربط جهاز المشرف.');
-        }
-      } catch (notifyError) {
-        console.warn('Share cart admin notify warning:', notifyError);
-      }
-
-      // ===== STEP 8: Clear cart + show success animation → redirect to shared tab =====
+      // ===== STEP 3: Clear cart + show success =====
+      // لا يتم إنشاء طلب هنا — الطلب يُنشأ فقط عندما يدفع الطرف الخارجي
       clearCart?.();
       localStorage.removeItem('wasel_shared_cart_session');
-      setPaymentSuccessMessage('تم إنشاء رابط السلة المشتركة وإرسال الطلب بنجاح ✨');
+      setPaymentSuccessMessage('تم إنشاء رابط السلة المشتركة بنجاح ✨ بانتظار دفع الطرف الخارجي.');
       setPaymentSuccessRedirectState({
-        showInvoicePrompt: true,
-        invoiceOrderId: sharedOrder?.id || null,
+        showInvoicePrompt: false,
+        invoiceOrderId: null,
         activeOrdersTab: 'shared',
       });
       setShowPaymentSuccessAnimation(true);
@@ -2292,15 +2143,13 @@ const Cart = () => {
         toast.error('تعذر تجهيز حسابك للمشاركة الآن. أعد تسجيل الدخول ثم جرّب مرة أخرى.');
       } else if (isMissingRpcFunctionError(error, 'create_cart_share_link')) {
         toast.error('مشاركة السلة تحتاج تحديث قاعدة البيانات: شغّل migration 010_cart_share_links_checkout.sql');
-      } else if (isMissingRpcFunctionError(error, 'create_compatible_order_v2')) {
-        toast.error('إنشاء طلب السلة المشتركة يحتاج تحديث قاعدة البيانات: شغّل migration 013_create_compatible_order_rpc_v2.sql');
       } else {
         toast.error('تعذر مشاركة السلة');
       }
     } finally {
       setCreatingCartShareLink(false);
     }
-  }, [insideSyria, recipientName, recipientPhone, recipientAddress, senderName, senderPhone, senderCountry, currentUserEmail, cartItems, exchangeRate, finalTotalSYP, finalTotalUSD, membershipDiscountSYP, selectedTipSYP, appliedCoupon, additionalNotes, deliveryTime, clearCart, currentAppUserId, resolveCurrentAppUserId, buildSharedCartIdentifiers, generateOrderNumber]);
+  }, [insideSyria, recipientName, recipientPhone, recipientAddress, senderName, senderPhone, senderCountry, currentUserEmail, cartItems, exchangeRate, finalTotalSYP, finalTotalUSD, membershipDiscountSYP, selectedTipSYP, appliedCoupon, additionalNotes, deliveryTime, clearCart, currentAppUserId, resolveCurrentAppUserId, buildSharedCartIdentifiers]);
 
   const handleDownloadInvoicePdf = useCallback(async () => {
     try {
@@ -2652,12 +2501,9 @@ const Cart = () => {
           if (payerUid) {
             const payerFields = {
               payer_user_id: payerUid,
+              paid_by_user_id: payerUid,
               collaboration_mode: 'shared',
             };
-            // paid_by_user_id قد يكون موجوداً فقط عند اكتمال الدفع (ليس عند الإنشاء)
-            if (orderData.paymentMethod === 'paypal' || orderData.paymentMethod === 'wallet') {
-              payerFields.paid_by_user_id = payerUid;
-            }
             const { error: payerUpdateError } = await supabase
               .from('orders')
               .update(payerFields)
@@ -2665,8 +2511,19 @@ const Cart = () => {
             if (payerUpdateError) {
               console.warn('⚠️ تعذر تعيين payer_user_id على الطلب المشترك:', payerUpdateError);
             } else {
-              // تحديث الكائن المحلي أيضاً لكي تعمل الإشعارات الفورية بعد الإنشاء
               order = { ...order, ...payerFields };
+            }
+          }
+
+          // ربط الطلب بسجل cart_share_links حتى يظهر لكلا المستخدمين
+          if (orderData.sharedCart?.token) {
+            try {
+              await supabase
+                .from('cart_share_links')
+                .update({ created_order_id: order.id, status: 'paid' })
+                .eq('token', orderData.sharedCart.token);
+            } catch (linkErr) {
+              console.warn('⚠️ تعذر ربط الطلب بسجل السلة المشتركة:', linkErr);
             }
           }
         } catch (payerUpdateErr) {
@@ -3088,20 +2945,33 @@ const Cart = () => {
           }
         }
         
-        // Attempt to open WhatsApp popup synchronously to keep user activation
-        const opened = openWhatsAppSafely(whatsappUrl);
-        
-        if (!opened) {
-          try {
-            navigator.clipboard.writeText(message);
-          } catch {}
-          toast('لإكمال الطلب، يرجى إرسال الرسالة عبر واتساب', {
-            action: {
-              label: 'فتح واتساب',
-              onClick: () => window.location.href = whatsappUrl
-            },
-            duration: 10000
-          });
+        // فتح نافذة النظام للمشاركة عبر واتساب
+        let sharedViaSystem = false;
+        try {
+          if (navigator.share) {
+            await navigator.share({ title: 'واصل - طلب جديد', text: message });
+            sharedViaSystem = true;
+          }
+        } catch (shareErr) {
+          console.warn('navigator.share fallback:', shareErr);
+        }
+
+        if (!sharedViaSystem) {
+          const opened = openWhatsAppSafely(whatsappUrl);
+          if (!opened) {
+            try {
+              await navigator.clipboard.writeText(message);
+            } catch {}
+            toast('لإكمال الطلب، يرجى إرسال الرسالة عبر واتساب', {
+              action: {
+                label: 'فتح واتساب',
+                onClick: () => window.location.href = whatsappUrl
+              },
+              duration: 10000
+            });
+          } else {
+            toast.success('تم حفظ الطلب وارساله ✅');
+          }
         } else {
           toast.success('تم حفظ الطلب وارساله ✅');
         }
@@ -3481,8 +3351,9 @@ const Cart = () => {
                     value={recipientName}
                     onChange={(e) => setRecipientName(e.target.value)}
                     placeholder="أدخل اسم المستقبل"
-                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366] transition-all"
+                    className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none transition-all ${sharedCartMode ? 'bg-gray-200 border-gray-300 text-gray-500 cursor-not-allowed' : 'bg-gray-50 border-gray-200 focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366]'}`}
                     dir="rtl"
+                    disabled={sharedCartMode}
                   />
                 </div>
 
@@ -3493,8 +3364,9 @@ const Cart = () => {
                     value={recipientPhone}
                     onChange={(e) => setRecipientPhone(e.target.value)}
                     placeholder="أرقام الهاتف"
-                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366] transition-all"
+                    className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none transition-all ${sharedCartMode ? 'bg-gray-200 border-gray-300 text-gray-500 cursor-not-allowed' : 'bg-gray-50 border-gray-200 focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366]'}`}
                     dir="ltr"
+                    disabled={sharedCartMode}
                   />
                 </div>
 
@@ -3505,11 +3377,13 @@ const Cart = () => {
                     value={recipientAddress}
                     onChange={(e) => setRecipientAddress(e.target.value)}
                     placeholder="المدينة، الحي، الشارع، البناية"
-                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366] transition-all resize-none"
+                    className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none resize-none transition-all ${sharedCartMode ? 'bg-gray-200 border-gray-300 text-gray-500 cursor-not-allowed' : 'bg-gray-50 border-gray-200 focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366]'}`}
                     dir="rtl"
+                    disabled={sharedCartMode}
                   />
                 </div>
 
+                {!sharedCartMode && (
                 <div className="flex items-center gap-2 pt-1">
                   <button
                     type="button"
@@ -3550,6 +3424,7 @@ const Cart = () => {
                     <span className="text-xs text-green-700" dir="rtl">تم الحفظ بنجاح</span>
                   )}
                 </div>
+                )}
               </div>
             </div>
 
