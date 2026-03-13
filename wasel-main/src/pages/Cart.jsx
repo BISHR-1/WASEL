@@ -2497,12 +2497,13 @@ const Cart = () => {
       // Firebase بشكل صحيح لكلا الطرفين (المُنشئ والدافع)
       if (orderData?.sharedCart?.creator_id && order?.id) {
         try {
-          const { data: { session: payerSession } } = await supabase.auth.getSession();
-          const payerUid = payerSession?.user?.id || null;
-          if (payerUid) {
+          // order.user_id is already the payer's public.users.id (from RPC ensure_current_app_user_id)
+          // Do NOT use auth session id — payer_user_id and paid_by_user_id FK → public.users(id)
+          const payerPublicId = order.user_id || null;
+          if (payerPublicId) {
             const payerFields = {
-              payer_user_id: payerUid,
-              paid_by_user_id: payerUid,
+              payer_user_id: payerPublicId,
+              paid_by_user_id: payerPublicId,
               collaboration_mode: 'shared',
               recipient_user_id: orderData.sharedCart.creator_id,
             };
