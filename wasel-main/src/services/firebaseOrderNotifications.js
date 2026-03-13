@@ -582,21 +582,8 @@ export async function notifyAdminUsers(eventType, order, context = {}) {
 
     console.log('📢 notifyAdminUsers edge function response:', JSON.stringify(data));
 
-    // Also try client-side in-app notifications as fallback (may fail due to RLS)
-    try {
-      const { data: adminRows } = await supabase
-        .from('admin_users')
-        .select('id')
-        .in('role', ['admin', 'supervisor']);
-      const adminIds = (adminRows || []).map(r => r.id);
-      if (adminIds.length) {
-        await createInAppNotifications(adminIds, content, order);
-        console.log('📢 notifyAdminUsers client-side fallback: created in-app notifications for', adminIds.length, 'admins');
-      }
-    } catch (inAppErr) {
-      // Expected to fail for non-admin callers due to RLS - edge function handles it
-      console.log('📢 notifyAdminUsers client-side fallback skipped (RLS):', inAppErr?.message);
-    }
+    // In-app notifications are handled by DB trigger (trg_notify_admins_new_order)
+    // which fires on every orders INSERT — no client-side fallback needed.
 
     const dispatchSummary = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,

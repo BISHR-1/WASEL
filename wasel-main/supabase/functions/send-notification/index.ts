@@ -441,34 +441,9 @@ Deno.serve(async (req) => {
       debugInfo.staffAuthIds = staffAuthIds.length;
       debugInfo.staffCandidateIds = staffCandidateIds.length;
 
-      // --- In-app notifications (notifications.user_id FK → public.users.id) ---
-      // ONLY use public.users.id values here; auth.users.id values would cause FK violations
-      // and fail the entire batch insert.
-      const adminPublicIds = toUniqueStrings([
-        ...((usersAdmins || []).map((row: any) => row?.id)),
-        ...((mappedAdminUsers || []).map((row: any) => row?.id)),
-      ]);
-      debugInfo.adminPublicIds = adminPublicIds.length;
-
-      if (adminPublicIds.length > 0) {
-        const now = new Date().toISOString();
-        const orderId = data?.order_id || '';
-        const orderLink = orderId ? `/TrackOrder?order=${orderId}` : '/MyOrders';
-        const notifRows = adminPublicIds.map((uid: string) => ({
-          user_id: uid,
-          title: finalTitle,
-          message: finalBody,
-          type: event === 'new_order_created' ? 'new_order' : 'order_update',
-          is_read: false,
-          link: orderLink,
-          created_at: now,
-        }));
-        await supabase.from('notifications').insert(notifRows).then(({ error: inAppErr }) => {
-          if (inAppErr) console.warn('Server in-app notification insert warning:', inAppErr.message);
-        });
-      } else {
-        console.warn('send-notification: no public.users rows found for admins — in-app notifications skipped');
-      }
+      // --- In-app notifications are handled by DB trigger trg_notify_admins_new_order ---
+      // No manual INSERT needed here; the trigger fires on orders INSERT and creates
+      // notifications for all admin/supervisor users automatically.
 
       // --- Device query (user_devices.user_id FK → auth.users.id) ---
       // Use auth IDs to find FCM tokens
