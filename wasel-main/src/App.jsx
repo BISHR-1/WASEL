@@ -20,6 +20,7 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 import { initializePushNotifications, deactivateCurrentDeviceToken } from '@/services/pushNotifications';
 import SharedPay from './pages/SharedPay';
 import SharedCartPay from './pages/SharedCartPay';
+import DownloadApp from './pages/DownloadApp';
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
 import { authError, authTrace, authWarn } from '@/lib/authDebug';
@@ -442,6 +443,11 @@ const AuthenticatedApp = () => {
         <p className="text-gray-500 text-sm">جاري التحميل...</p>
       </div>
     );
+  }
+
+  // صفحة تحميل التطبيق عامة - لا تحتاج تسجيل دخول
+  if (location.pathname === '/DownloadApp') {
+    return <DownloadApp />;
   }
 
   // عرض صفحة تسجيل الدخول إذا لم يكن هناك جلسة

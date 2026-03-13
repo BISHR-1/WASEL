@@ -52,6 +52,9 @@ const Profile = () => {
       <Link to="/CustomerSupport" className="block w-full text-center py-3 px-4 bg-blue-50 text-blue-700 font-bold rounded-xl hover:bg-blue-100 transition-colors mt-3">
         🎧 مركز المساعدة والدعم
       </Link>
+      <Link to="/DownloadApp" className="block w-full text-center py-3 px-4 bg-emerald-50 text-emerald-700 font-bold rounded-xl hover:bg-emerald-100 transition-colors mt-3">
+        📱 تحميل التطبيق (Android)
+      </Link>
       <button onClick={handleLogout}>تسجيل الخروج</button>
     </div>
   );
