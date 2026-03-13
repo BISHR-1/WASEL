@@ -10,12 +10,11 @@ import {
   Minus, Plus, Trash2, ShoppingBag, ArrowRight, Tag,
   Truck, Gift, CreditCard, ChevronLeft,
   Heart, Sparkles, CheckCircle, X, Loader2, Edit3,
-  Phone, Shield, MessageCircle, Eye, FileDown, Share2, Copy, Wallet, Bell
+  Phone, Shield, MessageCircle, Eye, FileDown, Share2, Copy, Wallet, Bell, Lock
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { base44 } from '@/api/base44Client';
-import PayPalPayment from '@/components/payment/PayPalPayment';
 import PayPalModal from '@/components/payment/PayPalModal';
 import EnvelopeGift from '@/components/cart/EnvelopeGift';
 import { getCountriesArabicNames, getCountryByArabicName, getCallingCode, getCountryByCode, COUNTRIES } from '@/utils/countryData';
@@ -3532,160 +3531,63 @@ const Cart = () => {
         </motion.div>
       </div>
 
-      {/* PayPal Payment Button Section */}
-      {paymentMethod === 'paypal' && !insideSyria && (
-        <div className="max-w-6xl mx-auto px-4 pb-8 mt-4">
-          {(!senderName || !senderPhone || !recipientName || !recipientPhone || !recipientAddress) ? (
-            <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm mb-4" dir="rtl">
-              يرجى إكمال بيانات التوصيل أعلاه (اسم المرسل، رقم الواتساب، اسم المستلم، العنوان) قبل الدفع عبر PayPal.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <PayPalPayment
-                amount={finalTotalUSD}
-                onSuccess={handlePayPalSuccess}
-                onError={handlePayPalError}
+      {/* Unified Secure Checkout Button */}
+      <div className="max-w-6xl mx-auto px-4 pb-8 mt-4">
+        <AnimatePresence mode="wait">
+          {isCheckingOut ? (
+            <motion.div
+              key="processing"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className="flex flex-col items-center justify-center gap-4 py-8 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border border-emerald-200 mb-4"
+            >
+              <SmartLottie
+                animationPath={ANIMATION_PRESETS.paymentProcessing.path}
+                width={100}
+                height={100}
+                trigger="immediate"
+                loop={true}
               />
-            </div>
-          )}
-        </div>
-      )}
-
-      {paymentMethod === 'whatsapp' && (
-        <div className="max-w-6xl mx-auto px-4 pb-8">
-          <AnimatePresence>
-            {isCheckingOut ? (
+              <p className="text-emerald-900 font-bold text-lg">جاري معالجة طلبك...</p>
+              <p className="text-emerald-600 text-sm">يرجى الانتظار</p>
+            </motion.div>
+          ) : (
+            <motion.button
+              key="checkout-btn"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={handleCheckout}
+              className="relative w-full h-14 rounded-2xl font-bold text-lg text-white flex items-center justify-center gap-3 shadow-xl overflow-hidden transition-all"
+              style={{
+                background: 'linear-gradient(135deg, #059669 0%, #047857 50%, #065F46 100%)',
+              }}
+            >
+              {/* Animated shimmer effect */}
               <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                className="flex flex-col items-center justify-center gap-4 py-8 bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl border border-green-200 mb-4"
-              >
-                <SmartLottie
-                  animationPath={ANIMATION_PRESETS.paymentProcessing.path}
-                  width={100}
-                  height={100}
-                  trigger="immediate"
-                  loop={true}
-                />
-                <p className="text-green-700 font-bold text-lg">معالجة الطلب...</p>
-                <p className="text-green-600 text-sm">يرجى الانتظار حتى نكمل إرسال طلبك</p>
-              </motion.div>
-            ) : (
-              <motion.button
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.99 }}
-                onClick={handleCheckout}
-                className="w-full h-12 bg-[#25D366] text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#1da851] transition-all shadow-lg"
-              >
-                <MessageCircle className="w-5 h-5" />
-                إكمال الطلب عبر واتساب
-              </motion.button>
-            )}
-          </AnimatePresence>
-          {insideSyria && !isCheckingOut && (
-            <p className="text-xs text-slate-500 mt-2 text-center">للدفع عند الاستلام</p>
+                className="absolute inset-0 opacity-20"
+                style={{
+                  background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)',
+                }}
+                animate={{ x: ['-100%', '100%'] }}
+                transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }}
+              />
+              <Lock className="w-5 h-5 relative z-10" />
+              <span className="relative z-10" dir="rtl">إتمام الطلب بأمان</span>
+            </motion.button>
           )}
-        </div>
-      )}
-
-      {paymentMethod === 'wallet' && (
-        <div className="max-w-6xl mx-auto px-4 pb-8 mt-4">
-          {(insideSyria 
-            ? (!recipientName || !recipientPhone || !recipientAddress)
-            : (!senderName || !senderPhone || !recipientName || !recipientPhone || !recipientAddress)
-          ) ? (
-            <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm mb-4" dir="rtl">
-              {insideSyria 
-                ? 'يرجى إكمال بيانات المستقبل أعلاه (الاسم، الرقم، العنوان) قبل الدفع عبر المحفظة.'
-                : 'يرجى إكمال بيانات التوصيل أعلاه (اسم المرسل، رقم الواتساب، اسم المستلم، العنوان) قبل الدفع عبر المحفظة.'
-              }
-            </div>
-          ) : (
-            <AnimatePresence>
-              {isCheckingOut ? (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  className="flex flex-col items-center justify-center gap-4 py-8 bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl border border-slate-300 mb-4"
-                >
-                  <SmartLottie
-                    animationPath={ANIMATION_PRESETS.paymentProcessing.path}
-                    width={100}
-                    height={100}
-                    trigger="immediate"
-                    loop={true}
-                  />
-                  <p className="text-slate-900 font-bold text-lg">معالجة الدفع...</p>
-                  <p className="text-slate-600 text-sm">يرجى الانتظار حتى يتم خصم المبلغ من محفظتك</p>
-                </motion.div>
-              ) : (
-                <motion.button
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
-                  onClick={handleCheckout}
-                  className="w-full h-12 bg-black text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-800 transition-all shadow-md"
-                >
-                  <Wallet className="w-5 h-5" />
-                  دفع بواسطة المحفظة
-                </motion.button>
-              )}
-            </AnimatePresence>
-          )}
-        </div>
-      )}
-
-      {/* Shared Cart Checkout Button */}
-      {paymentMethod === 'shared_cart' && (
-        <div className="max-w-6xl mx-auto px-4 pb-8 mt-4">
-          {(!recipientName || !recipientPhone || !recipientAddress) ? (
-            <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm mb-4" dir="rtl">
-              يرجى إكمال بيانات المستقبل أعلاه (الاسم، الرقم، العنوان) قبل مشاركة السلة.
-            </div>
-          ) : (
-            <AnimatePresence>
-              {isCheckingOut ? (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  className="flex flex-col items-center justify-center gap-4 py-8 bg-gradient-to-br from-purple-50 to-violet-50 rounded-2xl border border-purple-200 mb-4"
-                >
-                  <SmartLottie
-                    animationPath={ANIMATION_PRESETS.paymentProcessing.path}
-                    width={100}
-                    height={100}
-                    trigger="immediate"
-                    loop={true}
-                  />
-                  <p className="text-purple-900 font-bold text-lg">جاري إنشاء السلة المشتركة...</p>
-                  <p className="text-purple-600 text-sm">يرجى الانتظار حتى يتم إنشاء رابط المشاركة</p>
-                </motion.div>
-              ) : (
-                <motion.button
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
-                  onClick={handleCheckout}
-                  className="w-full h-12 bg-gradient-to-r from-[#8B5CF6] to-[#7C3AED] text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:from-[#7C3AED] hover:to-[#6D28D9] transition-all shadow-lg"
-                >
-                  <Share2 className="w-5 h-5" />
-                  مشاركة السلة وإرسال الطلب
-                </motion.button>
-              )}
-            </AnimatePresence>
-          )}
+        </AnimatePresence>
+        {paymentMethod === 'shared_cart' && !isCheckingOut && (
           <p className="text-xs text-slate-500 mt-2 text-center" dir="rtl">
             سيتم إنشاء رابط مشاركة وإرسال الطلب للمشرف
           </p>
-        </div>
-      )}
+        )}
+        {paymentMethod === 'whatsapp' && insideSyria && !isCheckingOut && (
+          <p className="text-xs text-slate-500 mt-2 text-center">للدفع عند الاستلام</p>
+        )}
+      </div>
 
       {/* Product Detail Modal */}
       <ProductDetailModal
