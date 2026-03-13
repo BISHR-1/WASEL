@@ -464,37 +464,10 @@ export async function notifyOrderUsers(eventType, order, context = {}) {
     if (!order?.id) return { success: false, reason: 'missing_order_id' };
 
     if (isSharedOrder(order) && ['shared_payment_success', 'order_status_changed', 'order_delivered', 'delivery_proof_uploaded'].includes(eventType)) {
-      // DB triggers (029 + 030) handle in-app notifications for shared orders.
-      // Only send FCM push here to avoid duplicate notification rows.
-      const { creatorIds, payerIds } = resolveSharedAudience(order);
-      const normalizedStatus = eventType === 'order_delivered'
-        ? 'completed'
-        : (context?.newStatus || (eventType === 'delivery_proof_uploaded' ? 'delivering' : 'processing'));
-
-      const creatorEvent = eventType === 'shared_payment_success' ? 'shared_cart_paid_creator' : 'shared_order_status_creator';
-      const payerEvent = eventType === 'shared_payment_success' ? 'shared_cart_paid_payer' : 'shared_order_status_payer';
-
-      const allIds = toUniqueStrings([...creatorIds, ...payerIds]);
-      const authUserIds = await resolveAuthUserIds(allIds);
-      const creatorContent = getEventContent(creatorEvent, order, { ...context, newStatus: normalizedStatus });
-      const pushResult = await sendFirebasePush(authUserIds, creatorContent);
-
-      const dispatchSummary = {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        created_at: new Date().toISOString(),
-        event_type: eventType,
-        order_id: order.id,
-        order_number: order.order_number || null,
-        public_targets: allIds.length,
-        auth_targets: authUserIds.length,
-        sent: Number(pushResult?.sent || 0),
-        failed: Number(pushResult?.failed || 0),
-        total: Number(pushResult?.total || authUserIds.length || 0),
-        push_success: Boolean(pushResult?.success),
-        note: 'shared order - in-app handled by DB trigger',
-      };
-      pushDispatchLog(dispatchSummary);
-      return dispatchSummary;
+      // DB triggers (028/029/030) handle BOTH in-app notifications AND FCM push for shared orders.
+      // Skip entirely here to avoid duplicate notifications.
+      console.log('📢 notifyOrderUsers: skipping shared order — DB triggers handle notifications', eventType, order.id);
+      return { success: true, skipped: true, reason: 'shared_order_handled_by_db_triggers' };
     }
 
     const publicUserIds = toUniqueStrings([

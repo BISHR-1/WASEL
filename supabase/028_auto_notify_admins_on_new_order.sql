@@ -3,19 +3,23 @@
 -- يعمل على مستوى قاعدة البيانات → مضمون 100% لكل أنواع الدفع
 -- يُنشئ إشعارات داخلية + يستدعي Edge Function للـ FCM push
 -- ==================================================================
---
--- ⚠️ مهم: قبل تشغيل هذا الملف، أضف المتغيرات التالية في
--- Supabase Dashboard → SQL Editor:
---
---   INSERT INTO vault.secrets (name, secret) VALUES
---     ('supabase_url', 'https://YOUR-PROJECT-REF.supabase.co'),
---     ('service_role_key', 'YOUR-SERVICE-ROLE-KEY')
---   ON CONFLICT (name) DO UPDATE SET secret = EXCLUDED.secret;
---
--- ==================================================================
 
 -- تأكد من تفعيل pg_net extension (مطلوب لـ HTTP calls)
 CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
+
+-- جدول بسيط لتخزين إعدادات التطبيق (بديل vault.secrets)
+CREATE TABLE IF NOT EXISTS public.app_config (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+ALTER TABLE public.app_config ENABLE ROW LEVEL SECURITY;
+-- لا نضيف أي policy → فقط SECURITY DEFINER functions تقدر تقرأ
+
+-- أدخل القيم (عدّل service_role_key لقيمتك الحقيقية)
+INSERT INTO public.app_config (key, value) VALUES
+  ('supabase_url', 'https://ofdqkracfqakbtjjmksa.supabase.co'),
+  ('service_role_key', '__SERVICE_ROLE_KEY__')
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
 
 -- الدالة: تنشئ إشعاراً لكل مشرف/أدمن عند INSERT في جدول orders
 -- وتستدعي Edge Function لإرسال FCM push notification
@@ -62,18 +66,10 @@ BEGIN
 
   -- 2) استدعاء Edge Function لإرسال FCM push notification
   BEGIN
-    v_supabase_url := COALESCE(
-      current_setting('app.settings.supabase_url', true),
-      (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'supabase_url' LIMIT 1),
-      ''
-    );
-    v_service_key := COALESCE(
-      current_setting('app.settings.service_role_key', true),
-      (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'service_role_key' LIMIT 1),
-      ''
-    );
+    v_supabase_url := (SELECT value FROM public.app_config WHERE key = 'supabase_url');
+    v_service_key  := (SELECT value FROM public.app_config WHERE key = 'service_role_key');
 
-    IF v_supabase_url <> '' AND v_service_key <> '' THEN
+    IF v_supabase_url IS NOT NULL AND v_service_key IS NOT NULL THEN
       PERFORM net.http_post(
         url     := v_supabase_url || '/functions/v1/send-notification',
         headers := jsonb_build_object(
@@ -151,18 +147,10 @@ BEGIN
 
   -- 2) استدعاء Edge Function لإرسال FCM push notification
   BEGIN
-    v_supabase_url := COALESCE(
-      current_setting('app.settings.supabase_url', true),
-      (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'supabase_url' LIMIT 1),
-      ''
-    );
-    v_service_key := COALESCE(
-      current_setting('app.settings.service_role_key', true),
-      (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'service_role_key' LIMIT 1),
-      ''
-    );
+    v_supabase_url := (SELECT value FROM public.app_config WHERE key = 'supabase_url');
+    v_service_key  := (SELECT value FROM public.app_config WHERE key = 'service_role_key');
 
-    IF v_supabase_url <> '' AND v_service_key <> '' THEN
+    IF v_supabase_url IS NOT NULL AND v_service_key IS NOT NULL THEN
       PERFORM net.http_post(
         url     := v_supabase_url || '/functions/v1/send-notification',
         headers := jsonb_build_object(

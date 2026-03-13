@@ -2123,19 +2123,7 @@ const Cart = () => {
         }
       }
 
-      // ===== STEP 3: Notify admin/supervisor about new shared cart =====
-      try {
-        console.log('📢 SharedCart: sending admin notification for shared cart link', linkShortCode);
-        await notifyAdminUsers('new_order_created', {
-          id: createdLink?.id || linkToken,
-          order_number: linkShortCode || linkToken,
-          total_usd: finalTotalUSD,
-          total_amount: finalTotalUSD,
-        }, { paymentMethod: 'shared_cart' });
-        console.log('✅ SharedCart: admin notification sent');
-      } catch (notifyErr) {
-        console.warn('⚠️ SharedCart admin notification warning:', notifyErr);
-      }
+      // Admin notifications handled by DB trigger 028 (trg_notify_admins_shared_cart)
 
       // ===== STEP 4: Clear cart + show success =====
       // لا يتم إنشاء طلب هنا — الطلب يُنشأ فقط عندما يدفع الطرف الخارجي
@@ -2564,17 +2552,7 @@ const Cart = () => {
         }
       }
 
-      // Notify supervisors/admins for every newly created order,
-      // regardless of whether it came from PayPal, WhatsApp, or COD.
-      try {
-        console.log('📢 saveOrderToSupabase: sending admin notification for', orderData.paymentMethod, 'order', order?.id);
-        const notifyResult = await notifyAdminUsers('new_order_created', order, {
-          paymentMethod: orderData.paymentMethod,
-        });
-        console.log('📢 saveOrderToSupabase: admin notification result', JSON.stringify(notifyResult));
-      } catch (notifyError) {
-        console.warn('⚠️ notifyAdminUsers inside saveOrderToSupabase warning:', notifyError);
-      }
+      // Admin notifications handled by DB trigger 028 (trg_notify_admins_new_order)
 
       return order;
     } catch (error) {
@@ -2883,26 +2861,7 @@ const Cart = () => {
             });
             toast.success(isSharedPayment ? 'تم دفع السلة المشتركة بنجاح! 💜' : 'تم الدفع بنجاح ✅', { duration: 5000 });
 
-            if (isSharedPayment && savedOrder?.id) {
-              try {
-                await notifyOrderUsers('shared_payment_success', savedOrder, {
-                  payerName: senderName || currentUserEmail || 'المُرسِل',
-                  recipientName: recipientName || savedOrder?.recipient_details?.name || 'المستلم',
-                  newStatus: 'processing',
-                });
-              } catch (notifySharedError) {
-                console.warn('Shared payment notify warning:', notifySharedError);
-              }
-            }
-
-            // Explicit admin notification for wallet payment (redundant safety net)
-            try {
-              console.log('📢 Wallet: sending explicit admin notification for order', savedOrder?.id);
-              await notifyAdminUsers('new_order_created', savedOrder, { paymentMethod: 'wallet' });
-              console.log('✅ Wallet: admin notification sent');
-            } catch (walletNotifyErr) {
-              console.warn('⚠️ Wallet admin notification fallback warning:', walletNotifyErr);
-            }
+            // Shared order + admin notifications handled by DB triggers 028/029
           } else {
             const errMsg = payResult?.error === 'insufficient_balance'
               ? `رصيد غير كافٍ. رصيدك: ${payResult.balance}$ والمطلوب: ${payResult.required}$`
@@ -2966,18 +2925,7 @@ const Cart = () => {
           activeOrdersTab: isSharedWhatsApp ? 'shared' : 'current',
         });
 
-        // Notify creator if shared cart payment via WhatsApp
-        if (isSharedWhatsApp && savedOrder?.id) {
-          try {
-            await notifyOrderUsers('shared_payment_success', savedOrder, {
-              payerName: senderName || currentUserEmail || 'المُرسِل',
-              recipientName: recipientName || savedOrder?.recipient_details?.name || 'المستلم',
-              newStatus: 'processing',
-            });
-          } catch (notifySharedError) {
-            console.warn('Shared payment (whatsapp) notify warning:', notifySharedError);
-          }
-        }
+        // Shared order notifications handled by DB triggers 028/029
         
         // فتح واتساب مباشرة (navigator.share لا يعمل بعد await)
         const opened = openWhatsAppSafely(whatsappUrl);
@@ -3104,28 +3052,7 @@ const Cart = () => {
       });
       toast.success(sharedCartMode ? 'تم دفع السلة المشتركة بنجاح! 💜' : 'تم الدفع بنجاح وحفظ الطلب! شكراً لك 🎉');
 
-      if (sharedCartMode && persisted?.savedOrder?.id) {
-        try {
-          await notifyOrderUsers('shared_payment_success', persisted.savedOrder, {
-            payerName: senderName || currentUserEmail || 'المُرسِل',
-            recipientName: recipientName || persisted.savedOrder?.recipient_details?.name || 'المستلم',
-            newStatus: 'processing',
-          });
-        } catch (notifySharedError) {
-          console.warn('Shared payment notify warning:', notifySharedError);
-        }
-      }
-
-      // Explicit admin notification for PayPal payment (redundant safety net)
-      if (persisted?.savedOrder) {
-        try {
-          console.log('📢 PayPal: sending explicit admin notification for order', persisted.savedOrder?.id);
-          await notifyAdminUsers('new_order_created', persisted.savedOrder, { paymentMethod: 'paypal' });
-          console.log('✅ PayPal: admin notification sent');
-        } catch (paypalNotifyErr) {
-          console.warn('⚠️ PayPal admin notification fallback warning:', paypalNotifyErr);
-        }
-      }
+      // Shared order + admin notifications handled by DB triggers 028/029
 
       clearCart?.();
       localStorage.removeItem('wasel_shared_cart_session');
