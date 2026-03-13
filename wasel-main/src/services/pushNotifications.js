@@ -436,7 +436,18 @@ const showInAppNotification = (notification) => {
 const handleNotificationTap = (notification) => {
   const data = notification.data || {};
   
-  // التنقل حسب نوع الإشعار
+  // Admin/supervisor: navigate to SupervisorPanel for order-related events
+  if (data.order_id && ['new_order_created', 'order_assigned'].includes(data.event)) {
+    window.location.href = '/SupervisorPanel';
+    return;
+  }
+
+  // Regular user: navigate to the specific order
+  if (data.order_id) {
+    window.location.href = `/TrackOrder?order=${data.order_id}`;
+    return;
+  }
+
   switch (data.type) {
     case 'order_update':
       window.location.href = '/MyOrders';

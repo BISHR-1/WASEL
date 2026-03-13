@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
+import OrderTimeline from '@/components/order/OrderTimeline';
 
 const STEPS = [
 	{ id: 'pending', label: 'تم الاستلام', icon: Package, description: 'طلبك وصل وسيتم مراجعته' },
@@ -156,47 +157,7 @@ export default function TrackOrder() {
 								</div>
 							) : (
 								<div>
-									<div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-										{STEPS.map((step, index) => {
-											const active = index <= currentStep;
-											return (
-												<div key={step.id} className={`rounded-xl border p-3 text-center ${active ? 'border-[#1B4332] bg-[#ECFDF5]' : 'border-gray-200 bg-white'}`}>
-													<step.icon className={`w-5 h-5 mx-auto mb-2 ${active ? 'text-[#1B4332]' : 'text-gray-400'}`} />
-													<p className={`text-xs font-bold ${active ? 'text-[#1B4332]' : 'text-gray-500'}`}>{step.label}</p>
-												</div>
-											);
-										})}
-									</div>
-
-{/* Status Box with Animation */}
-											<div className="mt-6 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-6 text-center border-2 border-blue-200 relative overflow-hidden">
-												{currentStep < 3 ? (
-													<>
-														<h4 className="font-bold text-[#1B4332] text-lg mb-2">{STEPS[currentStep]?.label}</h4>
-														<p className="text-gray-500">{STEPS[currentStep]?.description}</p>
-													</>
-												) : (
-													<div className="space-y-3">
-														<motion.div
-															initial={{ scale: 0 }}
-															animate={{ scale: 1 }}
-															transition={{ type: 'spring', delay: 0.2 }}
-														>
-															<CheckCircle className="w-16 h-16 text-[#059669] mx-auto" />
-														</motion.div>
-														<h4 className="font-bold text-[#059669] text-xl">تم استلام طلبك بنجاح ✨</h4>
-														<p className="text-gray-600 text-sm">شكراً لاختيارك خدماتنا، نتمنى أن تستمتع بالطلب</p>
-														<motion.div
-															initial={{ opacity: 0 }}
-															animate={{ opacity: 1 }}
-															transition={{ delay: 0.5 }}
-															className="text-xs text-gray-500 mt-2"
-														>
-															❤️ في خدمتكم دائماً
-														</motion.div>
-													</div>
-												)}
-									</div>
+									<OrderTimeline status={normalizedStatus} language="ar" />
 
 									{order.delivery_proof?.public_url && (
 										<div className="mt-6 bg-white border border-[#E5E7EB] rounded-2xl p-6">
