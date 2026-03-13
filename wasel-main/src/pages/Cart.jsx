@@ -1679,14 +1679,25 @@ const Cart = () => {
   // هل التوصيل مجاني؟ (إذا اكتمل الشريط)
   const isFreeDelivery = originalTotalSYP >= FREE_DELIVERY_THRESHOLD_SYP;
   
-  // رسوم التوصيل - $3 للسلة المشتركة، وإلا 300 ل.س إذا لم يكتمل الشريط
-  const deliveryFeeSYP = paymentMethod === 'shared_cart'
-    ? 3 * exchangeRate
-    : (isFreeDelivery ? 0 : FAKE_DELIVERY_FEE_SYP);
+  // رسوم التوصيل والخدمة - تطابق ما يراه المستخدم في OrderSummary
+  let SERVICE_FEE_USD = insideSyria ? 0 : 6;
+  let DELIVERY_FEE_USD = insideSyria ? 1 : 2;
 
-  // رسوم الخدمة ثابتة = 6 دولار = 900 ليرة
-  const SERVICE_FEE_USD = 6;
+  // رسوم خاصة للسلة المشتركة: $6 خدمة + $3 توصيل
+  if (paymentMethod === 'shared_cart') {
+    SERVICE_FEE_USD = 6;
+    DELIVERY_FEE_USD = 3;
+  }
+
+  if (isFreeOrderEligible) {
+    DELIVERY_FEE_USD = 0;
+    if (!insideSyria) {
+      SERVICE_FEE_USD = 0;
+    }
+  }
+
   const serviceFeeSYP = SERVICE_FEE_USD * exchangeRate;
+  const deliveryFeeSYP = DELIVERY_FEE_USD * exchangeRate;
 
   // المجموع قبل خصم الكوبون (لحساب الخصم منه)
   const subtotalBeforeCouponSYP = discountedItemsTotalSYP + serviceFeeSYP + deliveryFeeSYP + selectedTipSYP;
