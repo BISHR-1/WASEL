@@ -391,6 +391,15 @@ BEGIN
     'totals', jsonb_build_object('total_syp', v_total_syp, 'total_usd', v_total_usd)
   );
 
+  -- إضافة بيانات السلة المشتركة إلى meta حتى يتعرف عليها detectOrderFlowType
+  IF NULLIF(p_order->>'collaborationMode', '') IS NOT NULL THEN
+    v_meta := v_meta || jsonb_build_object(
+      'created_via', 'shared_cart_link',
+      'shared_cart_token', p_order->'metadata'->>'shared_cart_token',
+      'shared_cart_creator_id', p_order->'metadata'->>'shared_cart_creator_id'
+    );
+  END IF;
+
   v_snapshot := jsonb_build_object(
     'sender', v_sender,
     'recipient', v_recipient,
@@ -571,6 +580,17 @@ BEGIN
   IF 'customer_notes' = ANY(v_schema_cols) THEN
     v_cols := array_append(v_cols, 'customer_notes');
     v_vals := array_append(v_vals, quote_literal(COALESCE(p_order->>'notes', '')));
+  END IF;
+
+  -- ===== collaboration_mode + recipient_user_id for shared cart =====
+  IF 'collaboration_mode' = ANY(v_schema_cols) AND NULLIF(p_order->>'collaborationMode', '') IS NOT NULL THEN
+    v_cols := array_append(v_cols, 'collaboration_mode');
+    v_vals := array_append(v_vals, quote_literal(p_order->>'collaborationMode'));
+  END IF;
+
+  IF 'recipient_user_id' = ANY(v_schema_cols) AND NULLIF(p_order->>'recipientUserId', '') IS NOT NULL THEN
+    v_cols := array_append(v_cols, 'recipient_user_id');
+    v_vals := array_append(v_vals, quote_literal(p_order->>'recipientUserId') || '::uuid');
   END IF;
 
   IF 'metadata' = ANY(v_schema_cols) THEN

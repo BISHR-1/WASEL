@@ -1495,6 +1495,10 @@ const Cart = () => {
           setRecipientPhone(session.recipient.phone || '');
           setRecipientAddress(session.recipient.address || '');
         }
+        // مسح بيانات المرسل — المغترب يملأها بنفسه
+        setSenderName('');
+        setSenderPhone('');
+        setSenderCountry('الإمارات');
       }
     } catch(e) {}
   }, []);
@@ -2339,6 +2343,9 @@ const Cart = () => {
             } catch (resolveErr) {
               console.warn('resolveCurrentAppUserId in order fallback:', resolveErr);
             }
+            const senderWithMeta = orderData?.sharedCart
+              ? { ...(orderData.sender || {}), meta: { created_via: 'shared_cart_link', shared_cart_token: orderData.sharedCart.token, shared_cart_creator_id: orderData.sharedCart.creator_id } }
+              : (orderData.sender || {});
             const directPayload = {
               order_number: generatedOrderNumber,
               status: paymentStatus,
@@ -2349,7 +2356,7 @@ const Cart = () => {
               total_syp: Number(orderData.totalSYP || 0),
               currency: 'USD',
               items: orderData.items,
-              sender_details: orderData.sender || {},
+              sender_details: senderWithMeta,
               recipient_details: orderData.recipient || {},
               notes: orderData.notes || '',
               collaboration_mode: orderData?.sharedCart ? 'shared' : null,
@@ -2497,7 +2504,20 @@ const Cart = () => {
               payer_user_id: payerUid,
               paid_by_user_id: payerUid,
               collaboration_mode: 'shared',
+              recipient_user_id: orderData.sharedCart.creator_id,
             };
+            // تأكد من وجود sender_details.meta.created_via حتى يظهر في خانة المشتركة
+            if (!order.sender_details?.meta?.created_via) {
+              payerFields.sender_details = {
+                ...(order.sender_details || {}),
+                meta: {
+                  ...(order.sender_details?.meta || {}),
+                  created_via: 'shared_cart_link',
+                  shared_cart_token: orderData.sharedCart.token || null,
+                  shared_cart_creator_id: orderData.sharedCart.creator_id || null,
+                },
+              };
+            }
             const { error: payerUpdateError } = await supabase
               .from('orders')
               .update(payerFields)
