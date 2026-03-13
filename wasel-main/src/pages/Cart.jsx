@@ -3572,38 +3572,13 @@ const Cart = () => {
               يرجى إكمال بيانات التوصيل أعلاه (اسم المرسل، رقم الواتساب، اسم المستلم، العنوان) قبل الدفع عبر PayPal.
             </div>
           ) : (
-            <AnimatePresence>
-              {isCheckingOut ? (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  className="flex flex-col items-center justify-center gap-4 py-8 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl border border-blue-200 mb-4"
-                >
-                  <SmartLottie
-                    animationPath={ANIMATION_PRESETS.paymentProcessing.path}
-                    width={100}
-                    height={100}
-                    trigger="immediate"
-                    loop={true}
-                  />
-                  <p className="text-blue-900 font-bold text-lg">معالجة الدفع...</p>
-                  <p className="text-blue-700 text-sm">يرجى الانتظار حتى يتم الاتصال بخادم PayPal</p>
-                </motion.div>
-              ) : (
-                <motion.button
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
-                  onClick={handleShareCart}
-                  className="w-full h-12 bg-[#003087] text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#002566] transition-all shadow-lg"
-                >
-                  <CreditCard className="w-5 h-5" />
-                  الدفع الآن عبر PayPal
-                </motion.button>
-              )}
-            </AnimatePresence>
+            <div className="space-y-3">
+              <PayPalPayment
+                amount={finalTotalUSD}
+                onSuccess={handlePayPalSuccess}
+                onError={handlePayPalError}
+              />
+            </div>
           )}
         </div>
       )}

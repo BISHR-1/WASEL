@@ -1307,6 +1307,78 @@ export default function SupervisorPanel() {
     const totalRevenueSYP = completedOrders.reduce((sum, o) => sum + getOrderTotalSYP(o), 0);
     const avgOrderValueUSD = completedOrders.length > 0 ? totalRevenueUSD / completedOrders.length : 0;
 
+    // ===== حساب الأرباح =====
+    // الربح = هامش 10% على كل منتج + رسوم الخدمة + رسوم التوصيل
+    let totalProductMarkupUSD = 0;
+    let totalServiceFeesUSD = 0;
+    let totalDeliveryFeesUSD = 0;
+    const profitByDay = {};
+    const profitByMethod = {};
+
+    completedOrders.forEach(o => {
+      const items = extractOrderItems(o);
+      const exchangeRate = getExchangeRate(o);
+      const flowType = detectOrderFlowType(o);
+      const paymentMethod = String(o.payment_method || o.paymentMethod || '').toLowerCase();
+
+      // حساب هامش الربح على المنتجات (10% من السعر الأصلي = السعر المعروض / 1.1)
+      let orderItemsTotal = 0;
+      items.forEach(item => {
+        const qty = Number(item.quantity || 1);
+        // Try USD price first, then convert SYP
+        let priceUSD = Number(item.priceUSD || item.unit_price || item.price || 0);
+        if (priceUSD <= 0) {
+          const priceSYP = Number(item.priceSYP || item.customer_price || 0);
+          if (priceSYP > 0) priceUSD = priceSYP / exchangeRate;
+        }
+        orderItemsTotal += priceUSD * qty;
+      });
+
+      // الربح من هامش المنتجات: السعر المعروض - السعر الأصلي = السعر المعروض * (1 - 1/1.1) = السعر * 10/110
+      const productMarkup = orderItemsTotal * (10 / 110);
+      totalProductMarkupUSD += productMarkup;
+
+      // رسوم الخدمة والتوصيل حسب نوع الطلب
+      let serviceFee = 0;
+      let deliveryFee = 0;
+
+      if (flowType === 'shared') {
+        serviceFee = 6;
+        deliveryFee = 3;
+      } else if (flowType === 'inside') {
+        serviceFee = 0;
+        deliveryFee = 1;
+      } else {
+        // outside Syria
+        serviceFee = 6;
+        deliveryFee = 2;
+      }
+
+      // Try to use stored delivery_fee if available
+      const storedDeliveryFee = Number(o.delivery_fee);
+      if (Number.isFinite(storedDeliveryFee) && storedDeliveryFee >= 0) {
+        deliveryFee = storedDeliveryFee;
+      }
+
+      totalServiceFeesUSD += serviceFee;
+      totalDeliveryFeesUSD += deliveryFee;
+
+      const orderProfit = productMarkup + serviceFee + deliveryFee;
+
+      // Profit by day
+      const day = new Date(o.created_at).toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' });
+      profitByDay[day] = (profitByDay[day] || 0) + orderProfit;
+
+      // Profit by payment method
+      const methodLabel = paymentMethod || 'غير محدد';
+      if (!profitByMethod[methodLabel]) profitByMethod[methodLabel] = { markup: 0, service: 0, delivery: 0 };
+      profitByMethod[methodLabel].markup += productMarkup;
+      profitByMethod[methodLabel].service += serviceFee;
+      profitByMethod[methodLabel].delivery += deliveryFee;
+    });
+
+    const totalProfitUSD = totalProductMarkupUSD + totalServiceFeesUSD + totalDeliveryFeesUSD;
+
     // Orders by day (last 30 days)
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -1334,7 +1406,10 @@ export default function SupervisorPanel() {
     // Conversion rate
     const conversionRate = orders.length > 0 ? ((completedOrders.length / orders.length) * 100).toFixed(1) : '0';
 
-    return { totalRevenueUSD, totalRevenueSYP, avgOrderValueUSD, ordersByDay, revenueByMethod, courierPerf, conversionRate, completedOrders };
+    return {
+      totalRevenueUSD, totalRevenueSYP, avgOrderValueUSD, ordersByDay, revenueByMethod, courierPerf, conversionRate, completedOrders,
+      totalProfitUSD, totalProductMarkupUSD, totalServiceFeesUSD, totalDeliveryFeesUSD, profitByDay, profitByMethod,
+    };
   }, [orders, couriers]);
 
   if (loading) {
@@ -1436,6 +1511,7 @@ export default function SupervisorPanel() {
             { title: 'جاري التوصيل', value: deliveringOrdersCount, icon: ShieldCheck, gradient: 'from-[#7C3AED] to-[#A78BFA]' },
             { title: 'مكتملة', value: completedOrdersCount, icon: TrendingUp, gradient: 'from-[#10B981] to-[#6EE7B7]' },
             { title: 'الإيرادات ($)', value: `$${analyticsData.totalRevenueUSD.toFixed(0)}`, icon: BarChart3, gradient: 'from-[#3B82F6] to-[#93C5FD]' },
+            { title: 'الأرباح ($)', value: `$${analyticsData.totalProfitUSD.toFixed(0)}`, icon: TrendingUp, gradient: 'from-[#047857] to-[#10B981]' },
             { title: 'اشتراكات Wasel+', value: `${pendingMembershipsCount}/${memberships.length}`, icon: Crown, gradient: 'from-[#F59E0B] to-[#F97316]' },
           ].map((card, i) => (
             <motion.div key={card.title} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
@@ -1547,6 +1623,93 @@ export default function SupervisorPanel() {
                 <p className="text-xs opacity-80">معدل التحويل</p>
                 <p className="text-2xl font-black mt-1">{analyticsData.conversionRate}%</p>
               </motion.div>
+            </div>
+
+            {/* Profit Cards - بطاقات الأرباح */}
+            <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+                className="rounded-2xl bg-gradient-to-br from-[#047857] to-[#10B981] text-white p-4">
+                <p className="text-xs opacity-80">إجمالي الأرباح (USD)</p>
+                <p className="text-2xl font-black mt-1">${analyticsData.totalProfitUSD.toFixed(2)}</p>
+              </motion.div>
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
+                className="rounded-2xl bg-gradient-to-br from-[#7C3AED] to-[#A78BFA] text-white p-4">
+                <p className="text-xs opacity-80">أرباح هامش المنتجات (10%)</p>
+                <p className="text-2xl font-black mt-1">${analyticsData.totalProductMarkupUSD.toFixed(2)}</p>
+              </motion.div>
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+                className="rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#60A5FA] text-white p-4">
+                <p className="text-xs opacity-80">أرباح رسوم الخدمة</p>
+                <p className="text-2xl font-black mt-1">${analyticsData.totalServiceFeesUSD.toFixed(2)}</p>
+              </motion.div>
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
+                className="rounded-2xl bg-gradient-to-br from-[#D97706] to-[#FBBF24] text-white p-4">
+                <p className="text-xs opacity-80">أرباح رسوم التوصيل</p>
+                <p className="text-2xl font-black mt-1">${analyticsData.totalDeliveryFeesUSD.toFixed(2)}</p>
+              </motion.div>
+            </div>
+
+            {/* Profit Breakdown - تفصيل الأرباح */}
+            <div className="rounded-2xl border border-[#E7ECEA] bg-white p-5">
+              <h3 className="text-lg font-black text-[#1B4332] mb-4 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5" />
+                تفصيل الأرباح حسب طريقة الدفع
+              </h3>
+              <div className="space-y-2">
+                {Object.entries(analyticsData.profitByMethod).sort(([,a],[,b]) => (b.markup + b.service + b.delivery) - (a.markup + a.service + a.delivery)).map(([method, breakdown]) => {
+                  const total = breakdown.markup + breakdown.service + breakdown.delivery;
+                  return (
+                    <div key={method} className="p-3 rounded-xl bg-[#FAFCFB] border border-[#E7ECEA]">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-bold text-[#1B4332]">
+                          {method === 'paypal' ? '💳 PayPal' : method === 'wallet' ? '👛 المحفظة' : method === 'whatsapp' ? '📱 واتساب' : method === 'shared_cart' ? '🛒 سلة مشتركة' : method}
+                        </span>
+                        <span className="font-black text-[#047857]">${total.toFixed(2)}</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-[11px]">
+                        <div className="text-center p-1.5 rounded-lg bg-purple-50">
+                          <p className="text-purple-600">هامش المنتجات</p>
+                          <p className="font-bold text-purple-800">${breakdown.markup.toFixed(2)}</p>
+                        </div>
+                        <div className="text-center p-1.5 rounded-lg bg-blue-50">
+                          <p className="text-blue-600">رسوم الخدمة</p>
+                          <p className="font-bold text-blue-800">${breakdown.service.toFixed(2)}</p>
+                        </div>
+                        <div className="text-center p-1.5 rounded-lg bg-amber-50">
+                          <p className="text-amber-600">رسوم التوصيل</p>
+                          <p className="font-bold text-amber-800">${breakdown.delivery.toFixed(2)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {Object.keys(analyticsData.profitByMethod).length === 0 && (
+                  <p className="text-center text-gray-400 text-sm py-4">لا توجد بيانات أرباح بعد</p>
+                )}
+              </div>
+            </div>
+
+            {/* Profit by Day Chart */}
+            <div className="rounded-2xl border border-[#E7ECEA] bg-white p-5">
+              <h3 className="text-lg font-black text-[#1B4332] mb-4 flex items-center gap-2">
+                <BarChart3 className="w-5 h-5" />
+                الأرباح اليومية (الطلبات المكتملة)
+              </h3>
+              <div className="flex items-end gap-1 h-40 overflow-x-auto pb-8">
+                {Object.entries(analyticsData.profitByDay).slice(-15).map(([day, profit]) => {
+                  const maxProfit = Math.max(...Object.values(analyticsData.profitByDay), 1);
+                  return (
+                    <div key={day} className="flex flex-col items-center gap-1 min-w-[2.5rem] flex-1">
+                      <span className="text-xs font-bold text-[#047857]">${profit.toFixed(0)}</span>
+                      <div className="w-full bg-gradient-to-t from-[#047857] to-[#10B981] rounded-t-lg" style={{ height: `${(profit / maxProfit) * 100}%`, minHeight: '4px' }} />
+                      <span className="text-[9px] text-[#94A3B8] truncate w-full text-center">{day}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              {Object.keys(analyticsData.profitByDay).length === 0 && (
+                <p className="text-center text-gray-400 text-sm py-8">لا توجد أرباح مسجلة</p>
+              )}
             </div>
 
             {/* Status breakdown */}

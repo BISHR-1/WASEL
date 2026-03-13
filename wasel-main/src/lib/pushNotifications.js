@@ -135,18 +135,20 @@ function setupPushListeners(PushNotifications) {
  */
 async function saveDeviceToken(token) {
   try {
-    const userId = localStorage.getItem('wasel_user_id');
+    // Get user ID from Supabase auth session (wasel_user_id is deprecated/never set)
+    const { supabase } = await import('@/lib/supabase');
+    if (!supabase) return;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const userId = user?.id;
     if (!userId) return;
-    
+
     // احفظ في localStorage مؤقتاً
     localStorage.setItem('wasel_device_token', token);
     
       // حفظ الـ token في جدول user_devices
       const platform = (window['Capacitor']?.isNativePlatform?.()) ? 'android' : 'web';
-      
-      const { supabase } = await import('@/lib/supabase');
 
-      if (supabase) {
         const { data: existingDevice } = await supabase.from('user_devices')
           .select('id')
           .eq('fcm_token', token)
@@ -177,7 +179,6 @@ async function saveDeviceToken(token) {
         }
 
         console.log('Device token saved to DB:', token);
-      }
   } catch (error) {
       console.error('Error in saveDeviceToken:', error);
   }

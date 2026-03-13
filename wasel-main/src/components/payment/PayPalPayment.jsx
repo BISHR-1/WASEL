@@ -12,7 +12,6 @@ export default function PayPalPayment({ amount, onSuccess, onError }) {
     const paypalRef = useRef(null);
     const cardRef = useRef(null);
     const [sdkReady, setSdkReady] = useState(Boolean(window.paypal));
-    const [showCardModal, setShowCardModal] = useState(false);
     const isMountedRef = useRef(true);
 
     // Track component mount/unmount to prevent "Detected container element removed from DOM" error
@@ -120,7 +119,6 @@ export default function PayPalPayment({ amount, onSuccess, onError }) {
                 if (details.status === 'COMPLETED') {
                     toast.success('تم الدفع بنجاح! ✅');
                     onSuccess?.(details);
-                    setShowCardModal(false);
                 } else {
                     toast.error('لم يتم اكتمال الدفع');
                     onError?.(details);
@@ -164,8 +162,9 @@ export default function PayPalPayment({ amount, onSuccess, onError }) {
         }
     }, [amount, onError, onSuccess, sdkReady]);
 
+    // Render card button inline (below PayPal button)
     useEffect(() => {
-        if (!sdkReady || !window.paypal || !showCardModal || !cardRef.current || !isMountedRef.current) return;
+        if (!sdkReady || !window.paypal || !cardRef.current || !isMountedRef.current) return;
 
         // Check if container is still in the DOM
         if (!document.body.contains(cardRef.current)) return;
@@ -282,60 +281,19 @@ export default function PayPalPayment({ amount, onSuccess, onError }) {
         if (cardButtons?.isEligible?.()) {
             cardButtons.render(cardRef.current);
         }
-    }, [amount, onError, onSuccess, sdkReady, showCardModal]);
-
-    useEffect(() => {
-        if (!showCardModal) return undefined;
-
-        const originalOverflow = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
-
-        return () => {
-            document.body.style.overflow = originalOverflow;
-        };
-    }, [showCardModal]);
+    }, [amount, onError, onSuccess, sdkReady]);
 
     return (
-        <>
-            <div className="w-full space-y-3 flex flex-col items-center">
-                {/* زر PayPal */}
-                <div ref={paypalRef} className="w-full max-w-[360px] min-h-[50px]"
-                  style={isMobile() ? { minHeight: '55px', touchAction: 'manipulation' } : {}}
-                ></div>
+        <div className="w-full space-y-3 flex flex-col items-center">
+            {/* زر PayPal - أصفر */}
+            <div ref={paypalRef} className="w-full max-w-[360px] min-h-[50px]"
+              style={isMobile() ? { minHeight: '55px', touchAction: 'manipulation' } : {}}
+            ></div>
 
-                {/* زر فتح الدفع بالبطاقة في نافذة مخصصة */}
-                <button
-                    type="button"
-                    onClick={() => setShowCardModal(true)}
-                    className="w-full max-w-[360px] h-[45px] rounded-lg border border-[#CBD5E1] bg-[#F8FAFC] text-[#1F2937] font-bold hover:bg-[#EEF2F7] transition-colors"
-                >
-                    Debit or Credit Card
-                </button>
-            </div>
-
-            {showCardModal && (
-                <div className="fixed inset-0 z-[120] bg-black/55 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
-                  onClick={(e) => { if (e.target === e.currentTarget) setShowCardModal(false); }}
-                >
-                    <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl border border-[#D1D5DB] bg-white p-4 shadow-2xl"
-                      style={{ touchAction: 'manipulation' }}
-                    >
-                        <div className="flex items-center justify-between mb-3">
-                            <h4 className="text-sm font-bold text-[#1F2937]" dir="rtl">الدفع بالبطاقة البنكية</h4>
-                            <button
-                                type="button"
-                                onClick={() => setShowCardModal(false)}
-                                className="w-8 h-8 rounded-full border border-[#D1D5DB] text-[#374151] hover:bg-[#F3F4F6]"
-                            >
-                                x
-                            </button>
-                        </div>
-                        <div className="rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] p-3">
-                            <div ref={cardRef} className="w-full min-h-[50px]"></div>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </>
+            {/* زر البطاقة البنكية - أسود */}
+            <div ref={cardRef} className="w-full max-w-[360px] min-h-[50px]"
+              style={isMobile() ? { minHeight: '55px', touchAction: 'manipulation' } : {}}
+            ></div>
+        </div>
     );
 }

@@ -353,38 +353,57 @@ Deno.serve(async (req) => {
     }
 
     let tokens: string[] = [];
+    let resolutionBranch = 'unknown';
+    const debugInfo: Record<string, unknown> = {
+      event,
+      topic: topic || null,
+      hasUserId: Boolean(userId),
+      inputUserIds: Array.isArray(userIds) ? userIds.length : 0,
+    };
 
     if (userId) {
+      resolutionBranch = 'single_user';
       const candidateUserIds = await resolveDeviceUserIds(supabase, [userId]);
+      debugInfo.candidateUserIds = candidateUserIds.length;
       const { data: devices } = await supabase
         .from('user_devices')
         .select('fcm_token, is_active')
         .in('user_id', candidateUserIds);
+
+      debugInfo.matchedDeviceRows = (devices || []).length;
 
       tokens = (devices || [])
         .filter((d: any) => d?.is_active !== false && d?.fcm_token)
         .map((d: any) => d.fcm_token);
     } else if (userIds && userIds.length > 0) {
+      resolutionBranch = 'multi_users';
       const candidateUserIds = await resolveDeviceUserIds(supabase, userIds);
+      debugInfo.candidateUserIds = candidateUserIds.length;
       const { data: devices } = await supabase
         .from('user_devices')
         .select('fcm_token, is_active')
         .in('user_id', candidateUserIds);
+
+      debugInfo.matchedDeviceRows = (devices || []).length;
 
       tokens = devices
         ?.filter((d) => d?.is_active !== false)
         .map((d) => d.fcm_token)
         .filter(Boolean) || [];
     } else if (topic === 'all') {
+      resolutionBranch = 'topic_all';
       const { data: devices } = await supabase
         .from('user_devices')
         .select('fcm_token, is_active');
+
+      debugInfo.matchedDeviceRows = (devices || []).length;
 
       tokens = devices
         ?.filter((d) => d?.is_active !== false)
         .map((d) => d.fcm_token)
         .filter(Boolean) || [];
     } else if (topic === 'admins' || topic === 'staff') {
+      resolutionBranch = 'topic_admins_or_staff';
       // Resolve admin/staff auth IDs server-side to avoid client RLS limitations.
       const [{ data: adminUsers }, { data: usersAdmins }] = await Promise.all([
         supabase
@@ -417,12 +436,20 @@ Deno.serve(async (req) => {
         ...staffAuthIds,
         ...((mappedAdminUsers || []).map((row: any) => row?.id)),
       ]);
+      debugInfo.adminAuthIds = adminAuthIds.length;
+      debugInfo.mappedAdminUsers = (mappedAdminUsers || []).length;
+      debugInfo.staffAuthIds = staffAuthIds.length;
+      debugInfo.staffCandidateIds = staffCandidateIds.length;
 
-      // Also create server-side in-app notifications for admins
+      // --- In-app notifications (notifications.user_id FK → public.users.id) ---
+      // ONLY use public.users.id values here; auth.users.id values would cause FK violations
+      // and fail the entire batch insert.
       const adminPublicIds = toUniqueStrings([
         ...((usersAdmins || []).map((row: any) => row?.id)),
         ...((mappedAdminUsers || []).map((row: any) => row?.id)),
       ]);
+      debugInfo.adminPublicIds = adminPublicIds.length;
+
       if (adminPublicIds.length > 0) {
         const now = new Date().toISOString();
         const orderId = data?.order_id || '';
@@ -439,13 +466,21 @@ Deno.serve(async (req) => {
         await supabase.from('notifications').insert(notifRows).then(({ error: inAppErr }) => {
           if (inAppErr) console.warn('Server in-app notification insert warning:', inAppErr.message);
         });
+      } else {
+        console.warn('send-notification: no public.users rows found for admins — in-app notifications skipped');
       }
 
-      if (staffAuthIds.length > 0) {
+      // --- Device query (user_devices.user_id FK → auth.users.id) ---
+      // Use auth IDs to find FCM tokens
+      const allDeviceQueryIds = toUniqueStrings([...staffCandidateIds, ...adminAuthIds]);
+      debugInfo.allDeviceQueryIds = allDeviceQueryIds.length;
+      if (allDeviceQueryIds.length > 0) {
         const { data: devices } = await supabase
           .from('user_devices')
           .select('fcm_token, is_active')
-          .in('user_id', staffCandidateIds);
+          .in('user_id', allDeviceQueryIds);
+
+        debugInfo.matchedDeviceRows = (devices || []).length;
 
         tokens = devices
           ?.filter((d) => d?.is_active !== false)
@@ -454,11 +489,15 @@ Deno.serve(async (req) => {
       }
     }
 
+    debugInfo.resolutionBranch = resolutionBranch;
+    debugInfo.tokensBeforeDedupe = tokens.length;
     tokens = Array.from(new Set(tokens));
+    debugInfo.tokensAfterDedupe = tokens.length;
 
     if (tokens.length === 0) {
+      console.warn('send-notification: no devices found', debugInfo);
       return new Response(
-        JSON.stringify({ success: false, message: 'No devices found' }),
+        JSON.stringify({ success: false, message: 'No devices found', debug: debugInfo }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -501,6 +540,7 @@ Deno.serve(async (req) => {
         total: tokens.length,
         errors: failedResults.slice(0, 5).map((r) => r.error || 'Unknown error'),
         invalid_tokens_deactivated: invalidTokens.length,
+        debug: debugInfo,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

@@ -560,21 +560,8 @@ export async function notifyAdminUsers(eventType, order, context = {}) {
   try {
     const content = getEventContent(eventType, order, context);
 
-    // Also create in-app notifications for admin/supervisor users
-    try {
-      const { data: adminRows } = await supabase
-        .from('admin_users')
-        .select('id')
-        .in('role', ['admin', 'supervisor']);
-      const adminIds = (adminRows || []).map(r => r.id);
-      if (adminIds.length) {
-        await createInAppNotifications(adminIds, content, order);
-      }
-    } catch (inAppErr) {
-      console.warn('notifyAdminUsers in-app fallback error:', inAppErr);
-    }
-
     // Use server-side staff resolution in Edge Function to avoid any client-side RLS blockers.
+    // The edge function handles BOTH in-app notification creation AND push notifications.
     const { data, error } = await supabase.functions.invoke('send-notification', {
       body: {
         topic: 'admins',
@@ -588,6 +575,20 @@ export async function notifyAdminUsers(eventType, order, context = {}) {
 
     if (error) {
       throw error;
+    }
+
+    // Also try client-side in-app notifications as fallback (may fail due to RLS)
+    try {
+      const { data: adminRows } = await supabase
+        .from('admin_users')
+        .select('id')
+        .in('role', ['admin', 'supervisor']);
+      const adminIds = (adminRows || []).map(r => r.id);
+      if (adminIds.length) {
+        await createInAppNotifications(adminIds, content, order);
+      }
+    } catch (inAppErr) {
+      // Expected to fail for non-admin callers due to RLS - edge function handles it
     }
 
     const dispatchSummary = {
