@@ -1,0 +1,98 @@
+-- ==================================================================
+-- 029: إشعار منشئ السلة المشتركة عند دفع طلبه من قبل المغترب
+-- يعمل على مستوى قاعدة البيانات → مضمون 100%
+-- يُنشئ إشعار ويب (Realtime) + FCM push عبر Edge Function
+-- ==================================================================
+
+-- الدالة: عند INSERT في orders بـ collaboration_mode = 'shared'
+-- نُرسل إشعاراً لمنشئ السلة (recipient_user_id)
+CREATE OR REPLACE FUNCTION public.notify_creator_on_shared_payment()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_creator_id   UUID;
+  v_payer_name   TEXT;
+  v_total        NUMERIC;
+  v_creator_auth TEXT;
+  notif_title    TEXT;
+  notif_body     TEXT;
+  order_link     TEXT;
+  v_supabase_url TEXT;
+  v_service_key  TEXT;
+BEGIN
+  -- فقط الطلبات المشتركة
+  IF COALESCE(NEW.collaboration_mode, '') <> 'shared' THEN
+    RETURN NEW;
+  END IF;
+
+  -- منشئ السلة = recipient_user_id (الشخص داخل سوريا)
+  v_creator_id := NEW.recipient_user_id;
+  IF v_creator_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  -- اسم الدافع (المغترب)
+  v_payer_name := COALESCE(
+    NEW.sender_details->>'name',
+    'المُرسِل'
+  );
+
+  v_total := ROUND(COALESCE(NEW.total_usd, NEW.total_amount, 0)::numeric, 2);
+
+  notif_title := '💜 خبر جميل وصل!';
+  notif_body  := 'قام ' || v_payer_name || ' بدفع سلتك المشتركة بمبلغ $' || v_total || ' 🎉 طلبك الآن قيد التجهيز وسيصلك قريباً ❤️';
+  order_link  := '/TrackOrder?order=' || COALESCE(NEW.order_number, NEW.id::text);
+
+  -- 1) إشعار ويب داخلي (Realtime يلتقطه مباشرة)
+  INSERT INTO public.notifications (user_id, title, message, type, is_read, link, created_at)
+  VALUES (v_creator_id, notif_title, notif_body, 'payment_success', false, order_link, NOW());
+
+  -- 2) FCM push عبر Edge Function
+  BEGIN
+    -- نحتاج auth_id لإرسال FCM (user_devices مربوط بـ auth.users.id)
+    SELECT u.auth_id INTO v_creator_auth
+    FROM public.users u
+    WHERE u.id = v_creator_id;
+
+    IF v_creator_auth IS NOT NULL THEN
+      v_supabase_url := (SELECT value FROM public.app_config WHERE key = 'supabase_url');
+      v_service_key  := (SELECT value FROM public.app_config WHERE key = 'service_role_key');
+
+      IF v_supabase_url IS NOT NULL AND v_service_key IS NOT NULL THEN
+        PERFORM net.http_post(
+          url     := v_supabase_url || '/functions/v1/send-notification',
+          headers := jsonb_build_object(
+            'Content-Type', 'application/json',
+            'Authorization', 'Bearer ' || v_service_key
+          ),
+          body    := jsonb_build_object(
+            'userIds', jsonb_build_array(v_creator_auth),
+            'title', notif_title,
+            'body',  notif_body,
+            'data',  jsonb_build_object(
+              'type', 'order_update',
+              'order_id', COALESCE(NEW.id::text, ''),
+              'event', 'shared_cart_paid_creator',
+              'payment_method', COALESCE(NEW.payment_method, '')
+            )
+          )
+        );
+      END IF;
+    END IF;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'notify_creator_on_shared_payment FCM: %', SQLERRM;
+  END;
+
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+  RAISE WARNING 'notify_creator_on_shared_payment: %', SQLERRM;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- التريغر: يعمل بعد إنشاء أي طلب مشترك
+DROP TRIGGER IF EXISTS trg_notify_creator_shared_payment ON public.orders;
+CREATE TRIGGER trg_notify_creator_shared_payment
+  AFTER INSERT ON public.orders
+  FOR EACH ROW
+  WHEN (NEW.collaboration_mode = 'shared')
+  EXECUTE FUNCTION public.notify_creator_on_shared_payment();
