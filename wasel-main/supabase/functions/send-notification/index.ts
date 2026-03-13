@@ -129,8 +129,17 @@ function getServerStyledContent(
   };
 }
 
+// كاش Access Token عبر الطلبات (Edge Functions تبقى warm)
+let cachedAccessToken: string | null = null;
+let cachedTokenExpiry = 0;
+
 // الحصول على Access Token من Service Account
 async function getAccessToken(): Promise<string> {
+  // إعادة استخدام التوكن إذا لم ينتهِ بعد (هامش 5 دقائق)
+  if (cachedAccessToken && Date.now() < cachedTokenExpiry) {
+    return cachedAccessToken;
+  }
+
   const serviceAccountJson = Deno.env.get('FIREBASE_SERVICE_ACCOUNT');
   if (!serviceAccountJson) {
     throw new Error('FIREBASE_SERVICE_ACCOUNT not configured');
@@ -193,6 +202,10 @@ async function getAccessToken(): Promise<string> {
     throw new Error('Failed to get access token: ' + JSON.stringify(tokenData));
   }
 
+  cachedAccessToken = tokenData.access_token;
+  // صلاحية التوكن 3600 ثانية، نعيد التجديد قبل 5 دقائق
+  cachedTokenExpiry = Date.now() + (55 * 60 * 1000);
+
   return tokenData.access_token;
 }
 
@@ -214,16 +227,12 @@ async function sendFCMNotification(
   token: string,
   title: string,
   body: string,
+  accessToken: string,
+  projectId: string,
   data?: Record<string, string>,
   imageUrl?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const serviceAccountJson = Deno.env.get('FIREBASE_SERVICE_ACCOUNT');
-    const serviceAccount = JSON.parse(serviceAccountJson || '{}');
-    const projectId = serviceAccount.project_id;
-
-    const accessToken = await getAccessToken();
-
     const message = {
       message: {
         token: token,
@@ -238,6 +247,14 @@ async function sendFCMNotification(
             sound: 'default',
             channel_id: 'wasel_notifications',
             click_action: 'OPEN_ORDER',
+          },
+        },
+        apns: {
+          payload: {
+            aps: {
+              sound: 'default',
+              badge: 1,
+            },
           },
         },
         webpush: {
@@ -315,15 +332,14 @@ Deno.serve(async (req) => {
     let tokens: string[] = [];
 
     if (userId) {
-      const { data: device } = await supabase
+      const { data: devices } = await supabase
         .from('user_devices')
         .select('fcm_token, is_active')
-        .eq('user_id', userId)
-        .single();
+        .eq('user_id', userId);
 
-      if (device?.fcm_token && device?.is_active !== false) {
-        tokens.push(device.fcm_token);
-      }
+      tokens = (devices || [])
+        .filter((d: any) => d?.is_active !== false && d?.fcm_token)
+        .map((d: any) => d.fcm_token);
     } else if (userIds && userIds.length > 0) {
       const { data: devices } = await supabase
         .from('user_devices')
@@ -406,9 +422,14 @@ Deno.serve(async (req) => {
       );
     }
 
+    // جلب Access Token مرة واحدة لكل الطلبات بدلاً من مرة لكل توكن
+    const accessToken = await getAccessToken();
+    const serviceAccountJson = Deno.env.get('FIREBASE_SERVICE_ACCOUNT');
+    const projectId = JSON.parse(serviceAccountJson || '{}').project_id;
+
     const results = await Promise.all(
       tokens.map(async (token) => {
-        const result = await sendFCMNotification(token, finalTitle, finalBody, data, imageUrl);
+        const result = await sendFCMNotification(token, finalTitle, finalBody, accessToken, projectId, data, imageUrl);
         return { token, ...result };
       })
     );
