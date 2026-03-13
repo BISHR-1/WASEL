@@ -398,14 +398,30 @@ Deno.serve(async (req) => {
           .in('role', ['admin', 'super_admin', 'supervisor', 'operator', 'support']),
       ]);
 
+      // Also map admin_users IDs back to public.users rows when they exist.
+      const adminAuthIds = toUniqueStrings((adminUsers || []).map((row: any) => row?.id));
+      const { data: mappedAdminUsers } = adminAuthIds.length > 0
+        ? await supabase
+            .from('users')
+            .select('id, auth_id')
+            .in('auth_id', adminAuthIds)
+        : { data: [] as any[] };
+
       const staffAuthIds = toUniqueStrings([
-        ...((adminUsers || []).map((row: any) => row?.id)),
+        ...adminAuthIds,
         ...((usersAdmins || []).map((row: any) => row?.auth_id || row?.id)),
+        ...((mappedAdminUsers || []).map((row: any) => row?.auth_id || row?.id)),
+      ]);
+
+      const staffCandidateIds = await resolveDeviceUserIds(supabase, [
+        ...staffAuthIds,
+        ...((mappedAdminUsers || []).map((row: any) => row?.id)),
       ]);
 
       // Also create server-side in-app notifications for admins
       const adminPublicIds = toUniqueStrings([
         ...((usersAdmins || []).map((row: any) => row?.id)),
+        ...((mappedAdminUsers || []).map((row: any) => row?.id)),
       ]);
       if (adminPublicIds.length > 0) {
         const now = new Date().toISOString();
@@ -429,7 +445,7 @@ Deno.serve(async (req) => {
         const { data: devices } = await supabase
           .from('user_devices')
           .select('fcm_token, is_active')
-          .in('user_id', staffAuthIds);
+          .in('user_id', staffCandidateIds);
 
         tokens = devices
           ?.filter((d) => d?.is_active !== false)
