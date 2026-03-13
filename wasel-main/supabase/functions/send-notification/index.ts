@@ -332,6 +332,16 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Validate that the request includes the project's anon key (lightweight auth check)
+    const apiKey = req.headers.get('apikey') || '';
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
+    if (!apiKey || apiKey !== supabaseAnonKey) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
