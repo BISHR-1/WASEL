@@ -2917,7 +2917,13 @@ const Cart = () => {
             });
             toast.success(isSharedPayment ? 'تم دفع السلة المشتركة بنجاح! 💜' : 'تم الدفع بنجاح ✅', { duration: 5000 });
 
-            // Shared order + admin notifications handled by DB triggers 028/029
+            // Send push notifications to admins & order users
+            try {
+              await notifyAdminUsers('new_order_created', savedOrder, { paymentMethod: 'wallet' });
+              await notifyOrderUsers('new_order_created', savedOrder, { paymentMethod: 'wallet' });
+            } catch (notifErr) {
+              console.warn('⚠️ Push notification failed (wallet):', notifErr);
+            }
           } else {
             const errMsg = payResult?.error === 'insufficient_balance'
               ? `رصيد غير كافٍ. رصيدك: ${payResult.balance}$ والمطلوب: ${payResult.required}$`
@@ -2981,7 +2987,13 @@ const Cart = () => {
           activeOrdersTab: isSharedWhatsApp ? 'shared' : 'current',
         });
 
-        // Shared order notifications handled by DB triggers 028/029
+        // Send push notifications to admins & order users
+        try {
+          await notifyAdminUsers('new_order_created', savedOrder, { paymentMethod: 'whatsapp' });
+          await notifyOrderUsers('new_order_created', savedOrder, { paymentMethod: 'whatsapp' });
+        } catch (notifErr) {
+          console.warn('⚠️ Push notification failed (whatsapp):', notifErr);
+        }
         
         // فتح واتساب مباشرة (navigator.share لا يعمل بعد await)
         const opened = openWhatsAppSafely(whatsappUrl);
@@ -3108,7 +3120,14 @@ const Cart = () => {
       });
       toast.success(sharedCartMode ? 'تم دفع السلة المشتركة بنجاح! 💜' : 'تم الدفع بنجاح وحفظ الطلب! شكراً لك 🎉');
 
-      // Shared order + admin notifications handled by DB triggers 028/029
+      // Send push notifications to admins & order users
+      try {
+        const paypalSavedOrder = persisted?.savedOrder || { id: savedOrderId };
+        await notifyAdminUsers('new_order_created', paypalSavedOrder, { paymentMethod: 'paypal' });
+        await notifyOrderUsers('new_order_created', paypalSavedOrder, { paymentMethod: 'paypal' });
+      } catch (notifErr) {
+        console.warn('⚠️ Push notification failed (paypal):', notifErr);
+      }
 
       clearCart?.();
       localStorage.removeItem('wasel_shared_cart_session');
