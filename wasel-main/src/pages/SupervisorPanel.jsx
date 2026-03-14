@@ -759,7 +759,7 @@ export default function SupervisorPanel() {
         if (error) throw error;
         didAssign = true;
       } else {
-        const { error } = await supabase.from('order_assignments').insert({ order_id: order.id, delivery_person_id: courierId, assigned_by: currentUser.id, status: 'assigned' });
+        const { error } = await supabase.from('order_assignments').upsert({ order_id: order.id, delivery_person_id: courierId, assigned_by: currentUser.id, status: 'assigned' }, { onConflict: 'order_id' });
         if (error) throw error;
         didAssign = true;
       }
@@ -833,10 +833,10 @@ export default function SupervisorPanel() {
 
     try {
       setDeletingOrderId(order.id);
-      // Delete related records first
-      await supabase.from('order_assignments').delete().eq('order_id', order.id).catch(() => {});
-      await supabase.from('order_items').delete().eq('order_id', order.id).catch(() => {});
-      await supabase.from('delivery_proofs').delete().eq('order_id', order.id).catch(() => {});
+      // Delete related records first (ignore errors — rows may not exist)
+      try { await supabase.from('order_assignments').delete().eq('order_id', order.id); } catch {}
+      try { await supabase.from('order_items').delete().eq('order_id', order.id); } catch {}
+      try { await supabase.from('delivery_proofs').delete().eq('order_id', order.id); } catch {}
 
       const { error } = await supabase.from('orders').delete().eq('id', order.id);
       if (error) throw error;
