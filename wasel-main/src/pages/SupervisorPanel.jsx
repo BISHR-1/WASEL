@@ -706,10 +706,23 @@ export default function SupervisorPanel() {
     });
   }, [orders, search, statusFilter]);
 
+  const resolveAdminUserIdByEmail = async (email) => {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    if (!normalizedEmail) return null;
+    const { data, error } = await supabase
+      .from('admin_users')
+      .select('id')
+      .eq('email', normalizedEmail)
+      .maybeSingle();
+    if (error) return null;
+    return data?.id || null;
+  };
+
   const handleAssignOrder = async (order) => {
     const courierId = selectedCourierByOrder[order.id] || '';
     if (!couriers || couriers.length === 0) { toast.error('لا يوجد موصلون متاحون حاليًا'); return; }
     if (!courierId) { toast.error('اختر موصلًا أولاً'); return; }
+    const selectedCourier = (couriers || []).find((c) => String(c?.id) === String(courierId));
 
     const resolveCourierNotificationTargets = async (selectedCourierId) => {
       const targets = new Set([String(selectedCourierId)]);
@@ -749,17 +762,46 @@ export default function SupervisorPanel() {
       let didAssign = false;
       const existingAssignmentsArr = Array.isArray(order.order_assignments) ? order.order_assignments : (order.order_assignments ? [order.order_assignments] : []);
       const existingAssignment = existingAssignmentsArr.length > 0 ? existingAssignmentsArr[0] : null;
+      const currentUserAdminId = await resolveAdminUserIdByEmail(currentUser?.email);
+      const courierAdminId = await resolveAdminUserIdByEmail(selectedCourier?.email);
+      const assignmentCourierId = courierAdminId || courierId;
+      const assignmentById = currentUserAdminId || currentUser?.id || null;
 
-      if (existingAssignment?.delivery_person_id === courierId && String(existingAssignment.status || '').toLowerCase() === 'assigned') {
+      if (existingAssignment?.delivery_person_id === assignmentCourierId && String(existingAssignment.status || '').toLowerCase() === 'assigned') {
         toast.info('الطلب مفرز مسبقًا لنفس الموصل'); return;
       }
 
-      if (existingAssignment?.id) {
-        const { error } = await supabase.from('order_assignments').update({ delivery_person_id: courierId, status: 'assigned' }).eq('id', existingAssignment.id);
+      let assignmentInDb = existingAssignment;
+      if (!assignmentInDb?.id) {
+        const { data: foundAssignment, error: lookupError } = await supabase
+          .from('order_assignments')
+          .select('id, order_id, delivery_person_id, status, assigned_at')
+          .eq('order_id', order.id)
+          .order('assigned_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (lookupError && lookupError.code !== 'PGRST116') throw lookupError;
+        assignmentInDb = foundAssignment || null;
+      }
+
+      if (assignmentInDb?.id) {
+        const updatePayload = {
+          delivery_person_id: assignmentCourierId,
+          status: 'assigned',
+          updated_at: new Date().toISOString(),
+        };
+        if (assignmentById) updatePayload.assigned_by = assignmentById;
+        const { error } = await supabase.from('order_assignments').update(updatePayload).eq('id', assignmentInDb.id);
         if (error) throw error;
         didAssign = true;
       } else {
-        const { error } = await supabase.from('order_assignments').upsert({ order_id: order.id, delivery_person_id: courierId, assigned_by: currentUser.id, status: 'assigned' }, { onConflict: 'order_id' });
+        const insertPayload = {
+          order_id: order.id,
+          delivery_person_id: assignmentCourierId,
+          status: 'assigned',
+        };
+        if (assignmentById) insertPayload.assigned_by = assignmentById;
+        const { error } = await supabase.from('order_assignments').insert(insertPayload);
         if (error) throw error;
         didAssign = true;
       }
@@ -790,9 +832,10 @@ export default function SupervisorPanel() {
         setOrders(prev => prev.map(o => {
           if (o.id !== order.id) return o;
           const existingArr = Array.isArray(o.order_assignments) ? o.order_assignments : [];
-          const newAssignment = { id: existingAssignment?.id || `temp-${Date.now()}`, delivery_person_id: courierId, status: 'assigned', assigned_at: new Date().toISOString() };
-          const updatedAssignments = existingAssignment?.id
-            ? existingArr.map(a => a.id === existingAssignment.id ? newAssignment : a)
+          const assignmentId = assignmentInDb?.id || existingAssignment?.id || `temp-${Date.now()}`;
+          const newAssignment = { id: assignmentId, delivery_person_id: assignmentCourierId, status: 'assigned', assigned_at: new Date().toISOString() };
+          const updatedAssignments = assignmentInDb?.id
+            ? existingArr.map(a => a.id === assignmentInDb.id ? newAssignment : a)
             : [...existingArr, newAssignment];
           return { ...o, status: 'processing', order_assignments: updatedAssignments };
         }));
@@ -833,6 +876,21 @@ export default function SupervisorPanel() {
 
     try {
       setDeletingOrderId(order.id);
+      const { data: assignmentRows } = await supabase
+        .from('order_assignments')
+        .select('delivery_person_id')
+        .eq('order_id', order.id);
+
+      // Notify order owner/recipient/payer and assigned courier before hard delete.
+      const deleteEventOrder = { ...order, status: 'cancelled' };
+      try { await notifyOrderUsers('order_status_changed', deleteEventOrder, { newStatus: 'cancelled' }); } catch (e) { console.warn('Delete notify users warning:', e); }
+      try {
+        const courierTargets = Array.from(new Set((assignmentRows || []).map((row) => String(row?.delivery_person_id || '')).filter(Boolean)));
+        if (courierTargets.length > 0) {
+          await notifySpecificUsers('order_status_changed', deleteEventOrder, courierTargets, { newStatus: 'cancelled' });
+        }
+      } catch (e) { console.warn('Delete notify courier warning:', e); }
+
       // Delete related records first (ignore errors — rows may not exist)
       try { await supabase.from('order_assignments').delete().eq('order_id', order.id); } catch {}
       try { await supabase.from('order_items').delete().eq('order_id', order.id); } catch {}
