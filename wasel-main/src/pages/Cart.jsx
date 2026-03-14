@@ -1829,6 +1829,7 @@ const Cart = () => {
       // Fallback to hardcoded coupons if DB is unavailable
       const validCoupons = {
         'DARAA': { type: 'percentage', value: 20, isReal: true, message: '🎉 مبروك! حصلت على خصم 20% من درعا' },
+        'SHARED50': { type: 'percentage', value: 50, isReal: true, max_discount_usd: 10, message: '🎉 خصم 50% على أول طلب عبر السلة المشتركة!' },
       };
       
       if (validCoupons[upperCode]) {
@@ -3236,6 +3237,24 @@ const Cart = () => {
             ))}
           </AnimatePresence>
         </motion.div>
+
+        {/* Shared Cart CTA - داخل سوريا فقط */}
+        {insideSyria && !sharedCartMode && cartItems.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-2xl p-4 mt-3"
+            dir="rtl"
+          >
+            <div className="flex items-start gap-3">
+              <span className="text-2xl mt-0.5">💸</span>
+              <div className="flex-1">
+                <p className="text-sm font-bold text-purple-900 mb-1">لا تملك وسيلة دفع؟</p>
+                <p className="text-xs text-purple-700 leading-relaxed">شارك السلة مع قريبك في الخارج ليقوم بالدفع. اختر <span className="font-bold">"سلة مشتركة"</span> من طرق الدفع بالأسفل.</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Upsell - من Base44 */}
         <UpsellCarousel onAddItem={handleAddUpsellItem} />

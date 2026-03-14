@@ -97,6 +97,13 @@ export default function ProductDetailModal({
                 </div>
               )}
 
+              {/* Image disclaimer */}
+              {imageUrl && (
+                <div className="px-4 py-2 bg-amber-50 border-b border-amber-100" dir="rtl">
+                  <p className="text-[11px] text-amber-700 text-center leading-relaxed">📷 الصورة للتوضيح فقط وقد يختلف شكل المنتج قليلاً عند التسليم</p>
+                </div>
+              )}
+
               {/* Close button when no image */}
               {!imageUrl && (
                 <div className="flex justify-end px-4 pt-3">

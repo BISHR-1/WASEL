@@ -188,10 +188,15 @@ export default function SharedCartPay() {
             </p>
           ) : null}
           {recipientInfo.itemCount > 0 ? (
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-gray-500 mb-3">
               يحتوي على {recipientInfo.itemCount} {recipientInfo.itemCount === 1 ? 'منتج' : 'منتجات'}
             </p>
           ) : null}
+          {/* 50% discount banner for first shared cart order */}
+          <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl p-3 mb-4 shadow-md">
+            <p className="text-lg font-extrabold mb-1">🎉 خصم 50% على أول طلب!</p>
+            <p className="text-xs opacity-90">استخدم كود <span className="font-bold bg-white/20 px-2 py-0.5 rounded">SHARED50</span> عند الدفع</p>
+          </div>
           <div className="flex items-center justify-center gap-2 text-green-600 font-medium">
             <Loader2 className="w-4 h-4 animate-spin" />
             <span>جاري الانتقال إلى السلة...</span>

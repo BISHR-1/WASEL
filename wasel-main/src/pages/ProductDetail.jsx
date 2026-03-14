@@ -54,6 +54,13 @@ function ImageGallery({ images, productName }) {
           )}
         </motion.div>
 
+        {/* Image disclaimer */}
+        {imageList[activeIndex] && (
+          <div className="absolute bottom-0 left-0 right-0 bg-black/50 backdrop-blur-sm px-3 py-1.5" dir="rtl">
+            <p className="text-[10px] text-white/90 text-center">📷 الصورة للتوضيح فقط وقد يختلف شكل المنتج قليلاً عند التسليم</p>
+          </div>
+        )}
+
         {/* Image Navigation */}
         {imageList.length > 1 && (
           <>
