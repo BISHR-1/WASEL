@@ -15,7 +15,8 @@ import {
   ChevronDown,
   Crown,
   Sparkles,
-  ClipboardList
+  ClipboardList,
+  LogIn
 } from 'lucide-react';
 import SupportChat from './components/common/SupportChat';
 import AppFooter from '@/components/common/AppFooter';
@@ -27,6 +28,7 @@ import CameraPermissionPrompt from './components/common/CameraPermissionPrompt';
 import { CartProvider, useCart } from './components/cart/CartContext.jsx';
 import { LanguageProvider, useLanguage } from './components/common/LanguageContext';
 import { motion } from 'framer-motion';
+import { toast } from 'sonner';
 import { getUnreadCount } from './lib/inAppNotifications';
 import { getSelectedAddress } from './utils/senderReceiverStorage';
 import { useDarkMode } from './lib/DarkModeContext';
@@ -42,6 +44,12 @@ function LayoutContent({ children, currentPageName }) {
   const [isWaselPlusMember, setIsWaselPlusMember] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [deliveryLabel, setDeliveryLabel] = useState('Daraa, Syria');
+  const [isGuest, setIsGuest] = useState(() => {
+    try {
+      const id = localStorage.getItem('wasel_active_identity');
+      return !id || id === 'guest';
+    } catch { return true; }
+  });
   const navigate = useNavigate();
   
   const handleLanguageToggle = () => {
@@ -58,6 +66,32 @@ function LayoutContent({ children, currentPageName }) {
   // Scroll visibility logic
   const [showTopBar, setShowTopBar] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
+
+  // Sync guest state with identity changes
+  useEffect(() => {
+    const checkGuest = () => {
+      const id = localStorage.getItem('wasel_active_identity');
+      setIsGuest(!id || id === 'guest');
+    };
+    checkGuest();
+    window.addEventListener('wasel_identity_changed', checkGuest);
+    return () => window.removeEventListener('wasel_identity_changed', checkGuest);
+  }, []);
+
+  // Listen for auth-required events (e.g. from add-to-cart)
+  useEffect(() => {
+    const handleAuthRequired = (e) => {
+      toast.error(e.detail?.message || 'سجل دخولك أولاً لإكمال الطلب', {
+        action: {
+          label: language === 'ar' ? 'تسجيل الدخول' : 'Sign In',
+          onClick: () => navigate('/Login'),
+        },
+        duration: 5000,
+      });
+    };
+    window.addEventListener('wasel_auth_required', handleAuthRequired);
+    return () => window.removeEventListener('wasel_auth_required', handleAuthRequired);
+  }, [navigate, language]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -219,30 +253,40 @@ function LayoutContent({ children, currentPageName }) {
                  <div className={`flex items-center gap-2 ${dir === 'rtl' ? 'flex-row-reverse' : ''}`}>
                      <SupportChat inline className="shrink-0" />
 
-                     {/* Notifications Bell with Animation */}
-                     <button 
-                       onClick={() => navigate('/Notifications')}
-                       className="relative p-2 hover:bg-[#E5E7EB] rounded-lg transition-colors"
-                     >
-                       {unreadNotifications > 0 ? (
-                         <div className="relative" style={{ width: '24px', height: '24px' }}>
-                           <SmartLottie
-                             animationPath={ANIMATION_PRESETS.notificationBell.path}
-                             width={24}
-                             height={24}
-                             trigger="immediate"
-                             loop={true}
-                           />
-                         </div>
-                       ) : (
-                         <Bell className="w-5 h-5 text-[#1F2933]" />
-                       )}
-                       {unreadNotifications > 0 && (
-                         <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-[#2FA36B] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                           {unreadNotifications > 9 ? '9+' : unreadNotifications}
-                         </span>
-                       )}
-                     </button>
+                     {isGuest ? (
+                       <button
+                         onClick={() => navigate('/Login')}
+                         className="bg-[#1F7A63] text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-[#166b56] transition-colors flex items-center gap-1"
+                       >
+                         <LogIn className="w-3.5 h-3.5" />
+                         {language === 'ar' ? 'تسجيل الدخول' : 'Sign In'}
+                       </button>
+                     ) : (
+                       /* Notifications Bell with Animation */
+                       <button 
+                         onClick={() => navigate('/Notifications')}
+                         className="relative p-2 hover:bg-[#E5E7EB] rounded-lg transition-colors"
+                       >
+                         {unreadNotifications > 0 ? (
+                           <div className="relative" style={{ width: '24px', height: '24px' }}>
+                             <SmartLottie
+                               animationPath={ANIMATION_PRESETS.notificationBell.path}
+                               width={24}
+                               height={24}
+                               trigger="immediate"
+                               loop={true}
+                             />
+                           </div>
+                         ) : (
+                           <Bell className="w-5 h-5 text-[#1F2933]" />
+                         )}
+                         {unreadNotifications > 0 && (
+                           <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-[#2FA36B] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                             {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                           </span>
+                         )}
+                       </button>
+                     )}
                      
                      <button onClick={handleLanguageToggle} className="font-bold text-[10px] uppercase border border-[#E5E7EB] px-2 py-1 rounded bg-[#F9FAF8] text-[#1F2933] hover:bg-[#E5E7EB]">
                          {language === 'ar' ? 'EN' : 'AR'}
@@ -251,31 +295,54 @@ function LayoutContent({ children, currentPageName }) {
             </div>
 
             {/* Search Bar */}
-            <Link
-              to={createPageUrl('WaselPlusMembership')}
-              className="block"
-            >
-              <motion.div
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.99 }}
-                className="rounded-xl p-3 bg-gradient-to-r from-[#1D4ED8] via-[#0EA5E9] to-[#F59E0B] text-white shadow-[0_8px_20px_rgba(14,165,233,0.35)]"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Crown className="w-5 h-5" />
-                    <span className="font-extrabold text-sm" dir="rtl">
-                      {isWaselPlusMember ? 'أنت مشترك في Wasel+' : 'اشترك بـ Wasel+ ووفر'}
-                    </span>
+            {isGuest ? (
+              <Link to="/Login" className="block">
+                <motion.div
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                  className="rounded-xl p-3 bg-gradient-to-r from-[#1F7A63] via-[#2FA36B] to-[#34D399] text-white shadow-[0_8px_20px_rgba(31,122,99,0.35)]"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">🎁</span>
+                      <span className="font-extrabold text-sm" dir="rtl">
+                        سجل الآن واحصل على 3 طلبات توصيل مجانية
+                      </span>
+                    </div>
+                    <LogIn className="w-5 h-5" />
                   </div>
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                {!isWaselPlusMember && (
                   <p className="text-[11px] text-white/90 mt-1" dir="rtl">
-                    خصومات حصرية وتوصيل مجاني أسرع
+                    {language === 'ar' ? 'أنشئ حسابك في ثوانٍ وابدأ الطلب' : 'Create your account in seconds and start ordering'}
                   </p>
-                )}
-              </motion.div>
-            </Link>
+                </motion.div>
+              </Link>
+            ) : (
+              <Link
+                to={createPageUrl('WaselPlusMembership')}
+                className="block"
+              >
+                <motion.div
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                  className="rounded-xl p-3 bg-gradient-to-r from-[#1D4ED8] via-[#0EA5E9] to-[#F59E0B] text-white shadow-[0_8px_20px_rgba(14,165,233,0.35)]"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Crown className="w-5 h-5" />
+                      <span className="font-extrabold text-sm" dir="rtl">
+                        {isWaselPlusMember ? 'أنت مشترك في Wasel+' : 'اشترك بـ Wasel+ ووفر'}
+                      </span>
+                    </div>
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  {!isWaselPlusMember && (
+                    <p className="text-[11px] text-white/90 mt-1" dir="rtl">
+                      خصومات حصرية وتوصيل مجاني أسرع
+                    </p>
+                  )}
+                </motion.div>
+              </Link>
+            )}
 
             <div className="relative z-[60]">
               <SearchBar
@@ -349,10 +416,14 @@ function LayoutContent({ children, currentPageName }) {
                 <span className="text-[9px] font-medium mt-0.5">{language === 'ar' ? 'المحفظة' : 'Wallet'}</span>
             </Link>
 
-            {/* Account - الحساب */}
-            <Link to={createPageUrl('Account')} className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${isActive('Account') || isActive('Orders') || isActive('Track') ? 'text-[#1F7A63]' : isDarkMode ? 'text-gray-400' : 'text-[#1F2933]/50'}`}>
-                <User className={`w-5 h-5 transition-all ${isActive('Account') || isActive('Orders') || isActive('Track') ? 'stroke-[2.5]' : 'stroke-2'}`} strokeLinecap="round" strokeLinejoin="round" />
-                <span className="text-[9px] font-medium mt-0.5">{language === 'ar' ? 'الحساب' : 'Account'}</span>
+            {/* Account / Login - الحساب / دخول */}
+            <Link to={isGuest ? '/Login' : createPageUrl('Account')} className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${isGuest ? (isDarkMode ? 'text-emerald-400' : 'text-[#1F7A63]') : (isActive('Account') || isActive('Orders') || isActive('Track') ? 'text-[#1F7A63]' : isDarkMode ? 'text-gray-400' : 'text-[#1F2933]/50')}`}>
+                {isGuest ? (
+                  <LogIn className="w-5 h-5 stroke-[2.5]" strokeLinecap="round" strokeLinejoin="round" />
+                ) : (
+                  <User className={`w-5 h-5 transition-all ${isActive('Account') || isActive('Orders') || isActive('Track') ? 'stroke-[2.5]' : 'stroke-2'}`} strokeLinecap="round" strokeLinejoin="round" />
+                )}
+                <span className="text-[9px] font-medium mt-0.5">{isGuest ? (language === 'ar' ? 'دخول' : 'Sign In') : (language === 'ar' ? 'الحساب' : 'Account')}</span>
             </Link>
         </div>
       </nav>

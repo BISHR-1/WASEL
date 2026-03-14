@@ -70,6 +70,15 @@ export function CartProvider({ children }) {
   const toggleCart = () => setIsCartOpen(prev => !prev);
 
   const addToCart = async (item) => {
+    // Check if user is logged in before adding to cart
+    const identity = localStorage.getItem('wasel_active_identity');
+    if (!identity || identity === 'guest') {
+      window.dispatchEvent(new CustomEvent('wasel_auth_required', {
+        detail: { message: 'سجل دخولك أولاً لإكمال الطلب' }
+      }));
+      return;
+    }
+
     if (!item || !item.id) {
       console.warn('Attempted to add invalid item to cart:', item);
       return;

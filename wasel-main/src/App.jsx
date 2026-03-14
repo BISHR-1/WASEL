@@ -33,6 +33,24 @@ const LayoutWrapper = ({ children, currentPageName }) => Layout ?
   <Layout currentPageName={currentPageName}>{children}</Layout>
   : <>{children}</>;
 
+// Pages accessible without login (guest browsing)
+const PUBLIC_PAGES = new Set([
+  'Home', 'Restaurants', 'RestaurantDetail', 'Gifts', 'Packages',
+  'Electronics', 'Supermarket', 'Sweets', 'HowItWorks', 'WhyWasel',
+  'Transparency', 'LoyaltyProgram', 'LocalSpotlight', 'Contact',
+  'TermsAndConditions', 'CustomerSupport', 'WaselPlusMembership',
+  'CourierTerms', 'CourierGuide', 'SupervisorGuide', 'AdminTerms',
+]);
+
+const GuestLoginRedirect = () => {
+  const loc = useLocation();
+  const path = loc.pathname + loc.search;
+  if (path && path !== '/Login' && path !== '/DownloadApp') {
+    try { localStorage.setItem('wasel_post_login_redirect', path); } catch {}
+  }
+  return <Navigate to="/Login" replace />;
+};
+
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
   const location = useLocation();
@@ -450,9 +468,9 @@ const AuthenticatedApp = () => {
     return <DownloadApp />;
   }
 
-  // عرض صفحة تسجيل الدخول إذا لم يكن هناك جلسة
+  // تصفح عام بدون تسجيل دخول - السماح بالوصول للصفحات العامة
   if (!session) {
-    return <EmailOtpLogin onSuccess={() => {
+    const handleLoginSuccess = () => {
       const otpSession = getOtpSession();
       if (otpSession?.email) {
         const resolved = { type: 'otp', email: otpSession.email };
@@ -460,7 +478,25 @@ const AuthenticatedApp = () => {
         setSession(resolved);
         resolveUserRole(resolved);
       }
-    }} />;
+    };
+
+    return (
+      <Routes>
+        <Route path="/DownloadApp" element={<DownloadApp />} />
+        <Route path="/Login" element={<EmailOtpLogin onSuccess={handleLoginSuccess} />} />
+        <Route path="/shared-pay/:token" element={<SharedPay />} />
+        <Route path="/shared-pay" element={<SharedPay />} />
+        <Route path="/shared-cart/:token" element={<LayoutWrapper currentPageName="SharedCart"><SharedCartPay /></LayoutWrapper>} />
+        <Route path="/shared-cart" element={<LayoutWrapper currentPageName="SharedCart"><SharedCartPay /></LayoutWrapper>} />
+        <Route path="/wasel-app/shared-cart/:token" element={<LayoutWrapper currentPageName="SharedCart"><SharedCartPay /></LayoutWrapper>} />
+        <Route path="/wasel-app/shared-cart" element={<LayoutWrapper currentPageName="SharedCart"><SharedCartPay /></LayoutWrapper>} />
+        <Route path="/" element={<LayoutWrapper currentPageName={mainPageKey}><MainPage /></LayoutWrapper>} />
+        {Object.entries(Pages).filter(([name]) => PUBLIC_PAGES.has(name)).map(([name, Page]) => (
+          <Route key={name} path={`/${name}`} element={<LayoutWrapper currentPageName={name}><Page /></LayoutWrapper>} />
+        ))}
+        <Route path="*" element={<GuestLoginRedirect />} />
+      </Routes>
+    );
   }
 
   const isCourier = userRole === 'courier' || userRole === 'delivery_person';

@@ -54,3 +54,5 @@ __pycache__/
 .gradle/
 local.properties
 .vercel
+build-err.txt
+build-out.txt
