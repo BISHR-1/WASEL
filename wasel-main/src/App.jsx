@@ -56,7 +56,7 @@ const GuestLoginRedirect = () => {
 const GlobalBackButton = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const hiddenPaths = new Set(['/', '/Home', '/Login', '/DownloadApp']);
+  const hiddenPaths = new Set(['/', '/Home', '/Login', '/login', '/DownloadApp']);
 
   if (hiddenPaths.has(location.pathname)) return null;
 
@@ -476,6 +476,55 @@ const AuthenticatedApp = () => {
     }
   }, [session, location.pathname, location.search, routerNavigate]);
 
+  React.useEffect(() => {
+    if (!session) return;
+    if (!/^\/login$/i.test(location.pathname)) return;
+
+    const params = new URLSearchParams(location.search || '');
+    const joinMode = String(params.get('join') || '').trim().toLowerCase();
+    const referralCode = String(params.get('ref') || '').trim().toUpperCase();
+
+    if (joinMode === 'courier') {
+      try {
+        localStorage.setItem('wasel_auth_preferred_mode', 'courier');
+        localStorage.setItem('wasel_auth_region_locked', '1');
+        localStorage.setItem('wasel_auth_preferred_region', 'outside_syria');
+        if (referralCode) {
+          localStorage.setItem('wasel_referral_code', referralCode);
+        }
+      } catch {
+        // noop
+      }
+
+      void (async () => {
+        await applyReferralCourierProvision(session);
+        await resolveUserRole(session);
+        routerNavigate('/DriverPanel', { replace: true });
+      })();
+      return;
+    }
+
+    if (userRole === 'courier' || userRole === 'delivery_person') {
+      routerNavigate('/DriverPanel', { replace: true });
+      return;
+    }
+
+    if (['admin', 'super_admin', 'support', 'operator', 'supervisor'].includes(userRole)) {
+      routerNavigate('/SupervisorPanel', { replace: true });
+      return;
+    }
+
+    routerNavigate('/', { replace: true });
+  }, [
+    session,
+    location.pathname,
+    location.search,
+    userRole,
+    routerNavigate,
+    applyReferralCourierProvision,
+    resolveUserRole,
+  ]);
+
   // عرض شاشة التحميل مع timeout
   if (checkingAuth) {
     return (
@@ -516,6 +565,7 @@ const AuthenticatedApp = () => {
       <Routes>
         <Route path="/DownloadApp" element={<DownloadApp />} />
         <Route path="/Login" element={<EmailOtpLogin onSuccess={handleLoginSuccess} />} />
+        <Route path="/login" element={<EmailOtpLogin onSuccess={handleLoginSuccess} />} />
         <Route path="/shared-pay/:token" element={<SharedPay />} />
         <Route path="/shared-pay" element={<SharedPay />} />
         <Route path="/shared-cart/:token" element={<LayoutWrapper currentPageName="SharedCart"><SharedCartPay /></LayoutWrapper>} />
@@ -579,6 +629,8 @@ const AuthenticatedApp = () => {
         <Route path="/wasel-app/shared-cart/:token" element={<LayoutWrapper currentPageName="SharedCart"><SharedCartPay /></LayoutWrapper>} />
         <Route path="/wasel-app/shared-cart" element={<LayoutWrapper currentPageName="SharedCart"><SharedCartPay /></LayoutWrapper>} />
         <Route path="/DriverPanel" element={<GuardedDriverPanel />} />
+        <Route path="/Login" element={<Navigate to="/DriverPanel" replace />} />
+        <Route path="/login" element={<Navigate to="/DriverPanel" replace />} />
         <Route path="/CourierTerms" element={<Pages.CourierTerms />} />
         <Route path="/CourierGuide" element={<Pages.CourierGuide />} />
         <Route path="/SupervisorGuide" element={<Pages.SupervisorGuide />} />
@@ -601,6 +653,8 @@ const AuthenticatedApp = () => {
         <Route path="/wasel-app/shared-cart/:token" element={<LayoutWrapper currentPageName="SharedCart"><SharedCartPay /></LayoutWrapper>} />
         <Route path="/wasel-app/shared-cart" element={<LayoutWrapper currentPageName="SharedCart"><SharedCartPay /></LayoutWrapper>} />
         <Route path="/SupervisorPanel" element={<GuardedSupervisorPanel />} />
+        <Route path="/Login" element={<Navigate to="/SupervisorPanel" replace />} />
+        <Route path="/login" element={<Navigate to="/SupervisorPanel" replace />} />
         <Route path="/CourierTerms" element={<Pages.CourierTerms />} />
         <Route path="/CourierGuide" element={<Pages.CourierGuide />} />
         <Route path="/SupervisorGuide" element={<Pages.SupervisorGuide />} />
@@ -619,6 +673,8 @@ const AuthenticatedApp = () => {
     <Routes>
       <Route path="/shared-pay/:token" element={<SharedPay />} />
       <Route path="/shared-pay" element={<SharedPay />} />
+      <Route path="/Login" element={<Navigate to="/" replace />} />
+      <Route path="/login" element={<Navigate to="/" replace />} />
       <Route path="/shared-cart/:token" element={<LayoutWrapper currentPageName="SharedCart"><SharedCartPay /></LayoutWrapper>} />
       <Route path="/shared-cart" element={<LayoutWrapper currentPageName="SharedCart"><SharedCartPay /></LayoutWrapper>} />
       <Route path="/wasel-app/shared-cart/:token" element={<LayoutWrapper currentPageName="SharedCart"><SharedCartPay /></LayoutWrapper>} />
