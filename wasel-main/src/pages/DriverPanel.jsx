@@ -49,18 +49,6 @@ const BONUS_EVERY_ORDERS = 40;
 const BONUS_USD = 30;
 const SUPERVISOR_WHATSAPP = '963944000000';
 const KYC_STORAGE_BUCKETS = ['courier-kyc-v2', 'courier-kyc'];
-const ID_KEYWORDS = [
-  'هوية',
-  'بطاقة',
-  'شخصية',
-  'الجمهورية',
-  'العربية',
-  'السورية',
-  'identity',
-  'id card',
-  'national',
-  'republic',
-];
 
 function parseKycStoredValue(value) {
   const raw = String(value || '').trim();
@@ -182,8 +170,6 @@ export default function DriverPanel() {
   const [kycBackFile, setKycBackFile] = useState(null);
   const [kycFrontPreview, setKycFrontPreview] = useState('');
   const [kycBackPreview, setKycBackPreview] = useState('');
-  const [kycFrontValidation, setKycFrontValidation] = useState({ status: 'idle', message: '' });
-  const [kycBackValidation, setKycBackValidation] = useState({ status: 'idle', message: '' });
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingOnboarding, setSavingOnboarding] = useState(false);
 
@@ -251,45 +237,15 @@ export default function DriverPanel() {
     }
   }, []);
 
-  const validateNationalIdImage = useCallback(async (file, side) => {
-    const setState = side === 'front' ? setKycFrontValidation : setKycBackValidation;
-    if (!file) {
-      setState({ status: 'idle', message: '' });
-      return;
-    }
-    if (!String(file.type || '').startsWith('image/')) {
-      setState({ status: 'invalid', message: 'الملف ليس صورة.' });
-      return;
-    }
-
-    setState({ status: 'checking', message: 'جاري التحقق الذكي من صورة الهوية...' });
-    try {
-      const { recognize } = await import('tesseract.js');
-      const result = await recognize(file, 'ara+eng');
-      const text = String(result?.data?.text || '').toLowerCase();
-      const isLikelyId = ID_KEYWORDS.some((keyword) => text.includes(keyword));
-      if (isLikelyId) {
-        setState({ status: 'valid', message: 'تم التحقق: تبدو الصورة كهوية شخصية.' });
-      } else {
-        setState({ status: 'invalid', message: 'لم يتم التعرف على مؤشرات الهوية. ارفع صورة أوضح.' });
-      }
-    } catch (error) {
-      console.warn('validateNationalIdImage warning:', error);
-      setState({ status: 'invalid', message: 'تعذر التحقق الذكي من الصورة. حاول بصورة أوضح.' });
-    }
-  }, []);
-
   const handleKycFileChange = useCallback((side, file) => {
     if (side === 'front') {
       setKycFrontFile(file || null);
       setKycFrontPreview(file ? URL.createObjectURL(file) : '');
-      validateNationalIdImage(file, 'front');
       return;
     }
     setKycBackFile(file || null);
     setKycBackPreview(file ? URL.createObjectURL(file) : '');
-    validateNationalIdImage(file, 'back');
-  }, [validateNationalIdImage]);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -553,14 +509,6 @@ export default function DriverPanel() {
     }
     if (!courierProfile?.id_back_url && !kycBackFile) {
       toast.error('يرجى رفع صورة الهوية الخلفية');
-      return;
-    }
-    if (kycFrontFile && kycFrontValidation.status !== 'valid') {
-      toast.error('صورة الهوية الأمامية لم تجتز التحقق الذكي');
-      return;
-    }
-    if (kycBackFile && kycBackValidation.status !== 'valid') {
-      toast.error('صورة الهوية الخلفية لم تجتز التحقق الذكي');
       return;
     }
     if (courierProfile?.onboarding_completed && courierProfile?.payout_cycle && courierProfile.payout_cycle !== payoutCycle) {
@@ -1149,11 +1097,7 @@ export default function DriverPanel() {
                   <img src={courierProfile.id_front_url} alt="ID Front" className="w-full h-32 object-contain rounded-xl border border-[#E5E7EB]" />
                 </div>
               )}
-              {kycFrontValidation.status !== 'idle' && (
-                <p className={`mt-2 text-xs font-bold ${kycFrontValidation.status === 'valid' ? 'text-emerald-700' : kycFrontValidation.status === 'checking' ? 'text-blue-700' : 'text-rose-700'}`}>
-                  {kycFrontValidation.message}
-                </p>
-              )}
+              <p className="mt-2 text-xs font-bold text-[#64748B]">يمكنك رفع أي صورة مناسبة للهوية.</p>
             </label>
 
             <label className="rounded-xl border border-dashed border-[#9CA3AF] p-3 bg-[#FAFCFB] text-sm">
@@ -1176,11 +1120,7 @@ export default function DriverPanel() {
                   <img src={courierProfile.id_back_url} alt="ID Back" className="w-full h-32 object-contain rounded-xl border border-[#E5E7EB]" />
                 </div>
               )}
-              {kycBackValidation.status !== 'idle' && (
-                <p className={`mt-2 text-xs font-bold ${kycBackValidation.status === 'valid' ? 'text-emerald-700' : kycBackValidation.status === 'checking' ? 'text-blue-700' : 'text-rose-700'}`}>
-                  {kycBackValidation.message}
-                </p>
-              )}
+              <p className="mt-2 text-xs font-bold text-[#64748B]">يمكنك رفع أي صورة مناسبة للهوية.</p>
             </label>
           </div>
 
