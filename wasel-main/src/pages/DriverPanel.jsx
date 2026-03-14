@@ -530,16 +530,18 @@ export default function DriverPanel() {
     if (assignmentTargetIds.length === 0) return undefined;
 
     const refresh = () => loadAssignedOrders(currentUser).catch(() => {});
-    const channel = supabase.channel(`driver-assignments-${assignmentTargetIds.join('-')}`);
-
-    assignmentTargetIds.forEach((assignmentTargetId) => {
-      channel.on('postgres_changes', {
+    const channel = supabase
+      .channel(`driver-assignments-${assignmentTargetIds.join('-')}`)
+      .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'order_assignments',
-        filter: `delivery_person_id=eq.${assignmentTargetId}`,
+      }, refresh)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'orders',
       }, refresh);
-    });
 
     channel.subscribe();
 
