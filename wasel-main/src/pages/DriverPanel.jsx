@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -48,6 +48,51 @@ const COMMISSION_PER_ORDER_USD = 1.5;
 const BONUS_EVERY_ORDERS = 40;
 const BONUS_USD = 30;
 const SUPERVISOR_WHATSAPP = '963944000000';
+const KYC_STORAGE_BUCKETS = ['courier-kyc-v2', 'courier-kyc'];
+const ID_KEYWORDS = [
+  'هوية',
+  'بطاقة',
+  'شخصية',
+  'الجمهورية',
+  'العربية',
+  'السورية',
+  'identity',
+  'id card',
+  'national',
+  'republic',
+];
+
+function parseKycStoredValue(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return { bucket: null, path: null, url: null };
+
+  if (/^https?:\/\//i.test(raw)) {
+    const objectMarker = '/object/';
+    const markerIndex = raw.indexOf(objectMarker);
+    if (markerIndex >= 0) {
+      const objectPart = raw.slice(markerIndex + objectMarker.length);
+      const parts = objectPart.split('/').filter(Boolean);
+      const idx = parts.findIndex((part) => part === 'public' || part === 'sign' || part === 'authenticated');
+      if (idx >= 0 && parts[idx + 1]) {
+        const bucket = parts[idx + 1];
+        const path = parts.slice(idx + 2).join('/');
+        if (path) return { bucket, path, url: raw };
+      }
+    }
+    return { bucket: null, path: null, url: raw };
+  }
+
+  const prefixedBucket = KYC_STORAGE_BUCKETS.find((bucket) => raw.startsWith(`${bucket}:`));
+  if (prefixedBucket) {
+    return { bucket: prefixedBucket, path: raw.slice(prefixedBucket.length + 1), url: null };
+  }
+
+  if (raw.includes('/')) {
+    return { bucket: null, path: raw, url: null };
+  }
+
+  return { bucket: null, path: null, url: raw };
+}
 
 function getItemImageUrl(item) {
   if (!item || typeof item !== 'object') return null;
@@ -135,6 +180,10 @@ export default function DriverPanel() {
 
   const [kycFrontFile, setKycFrontFile] = useState(null);
   const [kycBackFile, setKycBackFile] = useState(null);
+  const [kycFrontPreview, setKycFrontPreview] = useState('');
+  const [kycBackPreview, setKycBackPreview] = useState('');
+  const [kycFrontValidation, setKycFrontValidation] = useState({ status: 'idle', message: '' });
+  const [kycBackValidation, setKycBackValidation] = useState({ status: 'idle', message: '' });
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingOnboarding, setSavingOnboarding] = useState(false);
 
@@ -155,9 +204,99 @@ export default function DriverPanel() {
 
   const [courierProfile, setCourierProfile] = useState(null);
   const [referralStats, setReferralStats] = useState({ registered: 0, qualified: 0 });
+  const [privateNotices, setPrivateNotices] = useState([]);
+  const [loadingPrivateNotices, setLoadingPrivateNotices] = useState(false);
   const exchangeRate = useUsdToSypRate();
 
   const isOnboardingComplete = Boolean(courierProfile?.onboarding_completed);
+
+  const resolveKycPreviewUrl = useCallback(async (storedValue) => {
+    const parsed = parseKycStoredValue(storedValue);
+    if (!parsed.path) return parsed.url || null;
+
+    const buckets = parsed.bucket ? [parsed.bucket] : KYC_STORAGE_BUCKETS;
+    for (const bucket of buckets) {
+      try {
+        const { data, error } = await supabase.storage.from(bucket).createSignedUrl(parsed.path, 60 * 60 * 24 * 7);
+        if (!error && data?.signedUrl) return data.signedUrl;
+      } catch {
+        // Try the next bucket candidate.
+      }
+    }
+
+    return parsed.url || null;
+  }, []);
+
+  const loadPrivateSupervisorNotices = useCallback(async (publicUserId) => {
+    if (!publicUserId) {
+      setPrivateNotices([]);
+      return;
+    }
+    setLoadingPrivateNotices(true);
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('id, title, message, type, created_at, link')
+        .eq('user_id', publicUserId)
+        .eq('type', 'supervisor_private_message')
+        .order('created_at', { ascending: false })
+        .limit(8);
+      if (error) throw error;
+      setPrivateNotices(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.warn('loadPrivateSupervisorNotices warning:', error);
+      setPrivateNotices([]);
+    } finally {
+      setLoadingPrivateNotices(false);
+    }
+  }, []);
+
+  const validateNationalIdImage = useCallback(async (file, side) => {
+    const setState = side === 'front' ? setKycFrontValidation : setKycBackValidation;
+    if (!file) {
+      setState({ status: 'idle', message: '' });
+      return;
+    }
+    if (!String(file.type || '').startsWith('image/')) {
+      setState({ status: 'invalid', message: 'الملف ليس صورة.' });
+      return;
+    }
+
+    setState({ status: 'checking', message: 'جاري التحقق الذكي من صورة الهوية...' });
+    try {
+      const { recognize } = await import('tesseract.js');
+      const result = await recognize(file, 'ara+eng');
+      const text = String(result?.data?.text || '').toLowerCase();
+      const isLikelyId = ID_KEYWORDS.some((keyword) => text.includes(keyword));
+      if (isLikelyId) {
+        setState({ status: 'valid', message: 'تم التحقق: تبدو الصورة كهوية شخصية.' });
+      } else {
+        setState({ status: 'invalid', message: 'لم يتم التعرف على مؤشرات الهوية. ارفع صورة أوضح.' });
+      }
+    } catch (error) {
+      console.warn('validateNationalIdImage warning:', error);
+      setState({ status: 'invalid', message: 'تعذر التحقق الذكي من الصورة. حاول بصورة أوضح.' });
+    }
+  }, []);
+
+  const handleKycFileChange = useCallback((side, file) => {
+    if (side === 'front') {
+      setKycFrontFile(file || null);
+      setKycFrontPreview(file ? URL.createObjectURL(file) : '');
+      validateNationalIdImage(file, 'front');
+      return;
+    }
+    setKycBackFile(file || null);
+    setKycBackPreview(file ? URL.createObjectURL(file) : '');
+    validateNationalIdImage(file, 'back');
+  }, [validateNationalIdImage]);
+
+  useEffect(() => {
+    return () => {
+      if (kycFrontPreview) URL.revokeObjectURL(kycFrontPreview);
+      if (kycBackPreview) URL.revokeObjectURL(kycBackPreview);
+    };
+  }, [kycFrontPreview, kycBackPreview]);
 
   const loadAssignedOrders = async (user) => {
     const assignmentTargetId = user?.assignment_id || user?.id;
@@ -244,6 +383,12 @@ export default function DriverPanel() {
     const courierData = courierResult?.data || null;
     const deliveryData = deliveryResult?.data || null;
     const userData = userResult?.data || null;
+    const idFrontStored = courierData?.id_front_url || null;
+    const idBackStored = courierData?.id_back_url || null;
+    const [idFrontPreviewUrl, idBackPreviewUrl] = await Promise.all([
+      resolveKycPreviewUrl(idFrontStored),
+      resolveKycPreviewUrl(idBackStored),
+    ]);
 
     const nextVehicle = courierData?.vehicle_type || deliveryData?.vehicle_type || 'motorbike';
     const nextLocation = courierData?.current_location || deliveryData?.current_location || '';
@@ -261,12 +406,16 @@ export default function DriverPanel() {
       vehicle_type: nextVehicle,
       current_location: nextLocation,
       payout_cycle: courierData?.payout_cycle || 'weekly',
-      id_front_url: courierData?.id_front_url || null,
-      id_back_url: courierData?.id_back_url || null,
+      id_front_url: idFrontPreviewUrl,
+      id_back_url: idBackPreviewUrl,
+      id_front_value: idFrontStored,
+      id_back_value: idBackStored,
       onboarding_completed: Boolean(courierData?.onboarding_completed),
       first_delivery_completed_at: courierData?.first_delivery_completed_at || null,
       referral_code: courierData?.referral_code || normalizeReferralCode(userId),
     });
+
+    await loadPrivateSupervisorNotices(userId);
 
     const refs = referralResult?.data || [];
     setReferralStats({
@@ -375,14 +524,21 @@ export default function DriverPanel() {
   const uploadKycFile = async (side, file) => {
     const safeName = String(file.name || `${side}-id`).replace(/[^a-zA-Z0-9._-]/g, '_');
     const path = `${currentUser.id}/${side}-${Date.now()}-${safeName}`;
-    const { error } = await supabase.storage.from('courier-kyc').upload(path, file, {
-      cacheControl: '3600',
-      upsert: false,
-      contentType: file.type || undefined,
-    });
-    if (error) throw error;
-    const { data } = supabase.storage.from('courier-kyc').getPublicUrl(path);
-    return data?.publicUrl || null;
+    let lastError = null;
+
+    for (const bucket of KYC_STORAGE_BUCKETS) {
+      const { error } = await supabase.storage.from(bucket).upload(path, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type || undefined,
+      });
+      if (!error) {
+        return `${bucket}:${path}`;
+      }
+      lastError = error;
+    }
+
+    throw lastError || new Error('KYC upload failed');
   };
 
   const saveCourierOnboarding = async () => {
@@ -399,6 +555,14 @@ export default function DriverPanel() {
       toast.error('يرجى رفع صورة الهوية الخلفية');
       return;
     }
+    if (kycFrontFile && kycFrontValidation.status !== 'valid') {
+      toast.error('صورة الهوية الأمامية لم تجتز التحقق الذكي');
+      return;
+    }
+    if (kycBackFile && kycBackValidation.status !== 'valid') {
+      toast.error('صورة الهوية الخلفية لم تجتز التحقق الذكي');
+      return;
+    }
     if (courierProfile?.onboarding_completed && courierProfile?.payout_cycle && courierProfile.payout_cycle !== payoutCycle) {
       toast.error('لا يمكن تغيير دورة الراتب بعد الاعتماد');
       return;
@@ -406,8 +570,8 @@ export default function DriverPanel() {
 
     try {
       setSavingOnboarding(true);
-      let idFrontUrl = courierProfile?.id_front_url || null;
-      let idBackUrl = courierProfile?.id_back_url || null;
+      let idFrontUrl = courierProfile?.id_front_value || courierProfile?.id_front_url || null;
+      let idBackUrl = courierProfile?.id_back_value || courierProfile?.id_back_url || null;
       if (kycFrontFile) idFrontUrl = await uploadKycFile('front', kycFrontFile);
       if (kycBackFile) idBackUrl = await uploadKycFile('back', kycBackFile);
 
@@ -429,6 +593,7 @@ export default function DriverPanel() {
 
       toast.success('تم اعتماد بيانات الموصل');
       await loadCourierProfile(currentUser);
+      setActiveTab('active');
     } catch (error) {
       console.error(error);
       toast.error('تعذر حفظ بيانات الموصل. تأكد من تنفيذ ملف SQL.');
@@ -964,14 +1129,59 @@ export default function DriverPanel() {
           </div>
 
           <div className="grid md:grid-cols-2 gap-3 mt-4">
-            <label className="rounded-xl border border-dashed border-[#9CA3AF] p-3 bg-[#FAFCFB] text-sm"><span className="font-bold text-[#1F2933]">صورة الهوية (الأمام)</span><input type="file" accept="image/*" onChange={(e) => setKycFrontFile(e.target.files?.[0] || null)} className="block mt-2 w-full text-xs" />
-          {courierProfile?.id_front_url && (
-            <div className="mt-2"><span className="text-xs text-gray-500 block mb-1">صورة الهوية (الأمام) الحالية:</span><img src={courierProfile.id_front_url} alt="ID Front" className="w-full h-32 object-contain rounded-xl border border-[#E5E7EB]" /></div>
-          )}</label>
-            <label className="rounded-xl border border-dashed border-[#9CA3AF] p-3 bg-[#FAFCFB] text-sm"><span className="font-bold text-[#1F2933]">صورة الهوية (الخلف)</span><input type="file" accept="image/*" onChange={(e) => setKycBackFile(e.target.files?.[0] || null)} className="block mt-2 w-full text-xs" />
-          {courierProfile?.id_back_url && (
-            <div className="mt-2"><span className="text-xs text-gray-500 block mb-1">صورة الهوية (الخلف) الحالية:</span><img src={courierProfile.id_back_url} alt="ID Back" className="w-full h-32 object-contain rounded-xl border border-[#E5E7EB]" /></div>
-          )}</label>
+            <label className="rounded-xl border border-dashed border-[#9CA3AF] p-3 bg-[#FAFCFB] text-sm">
+              <span className="font-bold text-[#1F2933]">صورة الهوية (الأمام)</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleKycFileChange('front', e.target.files?.[0] || null)}
+                className="block mt-2 w-full text-xs"
+              />
+              {kycFrontPreview && (
+                <div className="mt-2">
+                  <span className="text-xs text-gray-500 block mb-1">معاينة قبل الحفظ:</span>
+                  <img src={kycFrontPreview} alt="ID Front Preview" className="w-full h-32 object-contain rounded-xl border border-[#E5E7EB] bg-white" />
+                </div>
+              )}
+              {courierProfile?.id_front_url && !kycFrontPreview && (
+                <div className="mt-2">
+                  <span className="text-xs text-gray-500 block mb-1">صورة الهوية (الأمام) الحالية:</span>
+                  <img src={courierProfile.id_front_url} alt="ID Front" className="w-full h-32 object-contain rounded-xl border border-[#E5E7EB]" />
+                </div>
+              )}
+              {kycFrontValidation.status !== 'idle' && (
+                <p className={`mt-2 text-xs font-bold ${kycFrontValidation.status === 'valid' ? 'text-emerald-700' : kycFrontValidation.status === 'checking' ? 'text-blue-700' : 'text-rose-700'}`}>
+                  {kycFrontValidation.message}
+                </p>
+              )}
+            </label>
+
+            <label className="rounded-xl border border-dashed border-[#9CA3AF] p-3 bg-[#FAFCFB] text-sm">
+              <span className="font-bold text-[#1F2933]">صورة الهوية (الخلف)</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleKycFileChange('back', e.target.files?.[0] || null)}
+                className="block mt-2 w-full text-xs"
+              />
+              {kycBackPreview && (
+                <div className="mt-2">
+                  <span className="text-xs text-gray-500 block mb-1">معاينة قبل الحفظ:</span>
+                  <img src={kycBackPreview} alt="ID Back Preview" className="w-full h-32 object-contain rounded-xl border border-[#E5E7EB] bg-white" />
+                </div>
+              )}
+              {courierProfile?.id_back_url && !kycBackPreview && (
+                <div className="mt-2">
+                  <span className="text-xs text-gray-500 block mb-1">صورة الهوية (الخلف) الحالية:</span>
+                  <img src={courierProfile.id_back_url} alt="ID Back" className="w-full h-32 object-contain rounded-xl border border-[#E5E7EB]" />
+                </div>
+              )}
+              {kycBackValidation.status !== 'idle' && (
+                <p className={`mt-2 text-xs font-bold ${kycBackValidation.status === 'valid' ? 'text-emerald-700' : kycBackValidation.status === 'checking' ? 'text-blue-700' : 'text-rose-700'}`}>
+                  {kycBackValidation.message}
+                </p>
+              )}
+            </label>
           </div>
 
           <div className="mt-3 text-xs text-[#64748B] flex items-center gap-2"><ShieldAlert className="w-4 h-4" /> يجب إكمال الهوية والهاتف واختيار دورة الراتب قبل ظهور الطلبات.</div>
@@ -979,6 +1189,26 @@ export default function DriverPanel() {
             <Button onClick={saveDeliveryProfile} disabled={savingProfile} className="bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl px-6">{savingProfile ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <Save className="w-4 h-4 ml-1" />}حفظ البيانات العامة</Button>
             <Button onClick={saveCourierOnboarding} disabled={savingOnboarding} className="bg-[#0EA5E9] hover:bg-[#0284C7] text-white rounded-xl px-6">{savingOnboarding ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <FileText className="w-4 h-4 ml-1" />}{isOnboardingComplete ? 'تحديث معلومات الإلزام' : 'اعتماد بيانات الموصل'}</Button>
           </div>
+
+          <div className="mt-4 rounded-2xl border border-[#DBEAFE] bg-[#EFF6FF] p-3">
+            <p className="text-sm font-black text-[#1E3A8A] mb-2">رسائل المشرف الخاصة</p>
+            {loadingPrivateNotices ? (
+              <p className="text-xs text-[#475569]">جاري تحميل الرسائل...</p>
+            ) : privateNotices.length === 0 ? (
+              <p className="text-xs text-[#64748B]">لا توجد رسائل خاصة حتى الآن.</p>
+            ) : (
+              <div className="space-y-2">
+                {privateNotices.map((notice) => (
+                  <div key={notice.id} className="rounded-xl border border-[#BFDBFE] bg-white p-2">
+                    <p className="text-xs font-bold text-[#1E40AF]">{notice.title || 'رسالة من المشرف'}</p>
+                    <p className="text-xs text-[#334155] mt-1 whitespace-pre-line">{notice.message || ''}</p>
+                    <p className="text-[10px] text-[#64748B] mt-1">{notice.created_at ? new Date(notice.created_at).toLocaleString('ar-SY') : ''}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="mt-3 flex gap-3 text-sm">
             <a href={createPageUrl('CourierTerms')} className="text-[#0F766E] underline">شروط وأحكام الموصل</a>
             <a href={createPageUrl('CourierGuide')} className="text-[#1B4332] underline font-bold">📖 دليل الموصل</a>

@@ -71,6 +71,7 @@ const PANEL_SECTIONS = [
 const USER_ROLE_OPTIONS = ['user', 'courier', 'supervisor'];
 
 const DEFAULT_EXCHANGE_RATE = 150;
+const KYC_STORAGE_BUCKETS = ['courier-kyc-v2', 'courier-kyc'];
 
 function normalizeDecimalInput(value) {
   const raw = String(value ?? '').replace(',', '.').replace(/[^0-9.]/g, '');
@@ -119,6 +120,35 @@ function toDateInputValue(value) {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '';
   return d.toISOString().slice(0, 10);
+}
+
+function parseKycStoredValue(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return { bucket: null, path: null, url: null };
+
+  if (/^https?:\/\//i.test(raw)) {
+    const marker = '/object/';
+    const idx = raw.indexOf(marker);
+    if (idx >= 0) {
+      const objectPart = raw.slice(idx + marker.length);
+      const parts = objectPart.split('/').filter(Boolean);
+      const modeIdx = parts.findIndex((part) => part === 'public' || part === 'sign' || part === 'authenticated');
+      if (modeIdx >= 0 && parts[modeIdx + 1]) {
+        const bucket = parts[modeIdx + 1];
+        const path = parts.slice(modeIdx + 2).join('/');
+        if (path) return { bucket, path, url: raw };
+      }
+    }
+    return { bucket: null, path: null, url: raw };
+  }
+
+  const prefixedBucket = KYC_STORAGE_BUCKETS.find((bucket) => raw.startsWith(`${bucket}:`));
+  if (prefixedBucket) {
+    return { bucket: prefixedBucket, path: raw.slice(prefixedBucket.length + 1), url: null };
+  }
+
+  if (raw.includes('/')) return { bucket: null, path: raw, url: null };
+  return { bucket: null, path: null, url: raw };
 }
 
 function detectOrderFlowType(order) {
@@ -187,6 +217,10 @@ export default function SupervisorPanel() {
   const [refreshingDashboard, setRefreshingDashboard] = useState(false);
   const [resettingCourierId, setResettingCourierId] = useState(null);
   const [deletingOrderId, setDeletingOrderId] = useState(null);
+  const [deletingCourierId, setDeletingCourierId] = useState(null);
+  const [sendingCourierMsgId, setSendingCourierMsgId] = useState(null);
+  const [courierMessageTextById, setCourierMessageTextById] = useState({});
+  const [identityPreview, setIdentityPreview] = useState({ open: false, courierName: '', frontUrl: '', backUrl: '' });
 
   // User Control States
   const [users, setUsers] = useState([]);
@@ -402,7 +436,7 @@ export default function SupervisorPanel() {
           .in('user_id', publicCourierIds),
         supabase
           .from('courier_profiles')
-          .select('user_id, phone, payout_cycle, onboarding_completed, first_delivery_completed_at, referral_code, balance_usd, balance_syp, completed_orders_count')
+          .select('user_id, phone, payout_cycle, onboarding_completed, first_delivery_completed_at, referral_code, balance_usd, balance_syp, completed_orders_count, id_front_url, id_back_url')
           .in('user_id', publicCourierIds),
       ]);
 
@@ -431,6 +465,8 @@ export default function SupervisorPanel() {
               balance_usd: Number(p.balance_usd || 0),
               balance_syp: Number(p.balance_syp || 0),
               completed_orders_count: Number(p.completed_orders_count || 0),
+              id_front_url: p.id_front_url || null,
+              id_back_url: p.id_back_url || null,
             };
           }
         });
@@ -705,6 +741,140 @@ export default function SupervisorPanel() {
       return name.includes(q) || phone.includes(q) || number.includes(q);
     });
   }, [orders, search, statusFilter]);
+
+  const resolveKycPreviewUrl = async (storedValue) => {
+    const parsed = parseKycStoredValue(storedValue);
+    if (!parsed.path) return parsed.url || '';
+
+    const buckets = parsed.bucket ? [parsed.bucket] : KYC_STORAGE_BUCKETS;
+    for (const bucket of buckets) {
+      try {
+        const { data, error } = await supabase.storage.from(bucket).createSignedUrl(parsed.path, 60 * 60 * 24 * 7);
+        if (!error && data?.signedUrl) return data.signedUrl;
+      } catch {
+        // Try next candidate bucket.
+      }
+    }
+
+    return parsed.url || '';
+  };
+
+  const resolveCourierPublicUserId = async (courier) => {
+    if (courier?.public_user_id) return String(courier.public_user_id);
+    const email = String(courier?.email || '').trim().toLowerCase();
+    if (!email) return null;
+
+    const { data, error } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (error) return null;
+    return data?.id ? String(data.id) : null;
+  };
+
+  const handlePreviewCourierIdentity = async (courier) => {
+    const [frontUrl, backUrl] = await Promise.all([
+      resolveKycPreviewUrl(courier?.id_front_url),
+      resolveKycPreviewUrl(courier?.id_back_url),
+    ]);
+    setIdentityPreview({
+      open: true,
+      courierName: courier?.full_name || courier?.email || 'موصل',
+      frontUrl,
+      backUrl,
+    });
+  };
+
+  const handleSendCourierPrivateMessage = async (courier) => {
+    const message = String(courierMessageTextById[courier.id] || '').trim();
+    if (!message) {
+      toast.error('اكتب الرسالة أولاً');
+      return;
+    }
+
+    try {
+      setSendingCourierMsgId(courier.id);
+      const publicUserId = await resolveCourierPublicUserId(courier);
+      if (!publicUserId) {
+        toast.error('لا يوجد حساب users مرتبط بهذا الموصل');
+        return;
+      }
+
+      const conversationId = `courier_supervisor:${publicUserId}`;
+      await supabase.from('conversations').upsert({
+        id: conversationId,
+        type: 'courier_supervisor',
+        participant_ids: [publicUserId],
+        status: 'active',
+        last_message: message,
+        last_message_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
+
+      await supabase.from('direct_messages').insert({
+        conversation_id: conversationId,
+        sender_id: currentUser?.id || null,
+        sender_name: currentUser?.name || currentUser?.email || 'المشرف',
+        sender_role: 'supervisor',
+        message,
+      });
+
+      await supabase.from('notifications').insert({
+        user_id: publicUserId,
+        title: 'رسالة خاصة من المشرف',
+        message,
+        type: 'supervisor_private_message',
+        is_read: false,
+        link: '/DriverPanel',
+        created_at: new Date().toISOString(),
+      });
+
+      await notifySpecificUsers('new_chat_message', { id: conversationId }, [publicUserId], {
+        senderName: currentUser?.name || 'المشرف',
+      });
+
+      setCourierMessageTextById((prev) => ({ ...prev, [courier.id]: '' }));
+      toast.success('تم إرسال الرسالة الخاصة للموصل');
+    } catch (error) {
+      console.error('handleSendCourierPrivateMessage error:', error);
+      toast.error('تعذر إرسال الرسالة الخاصة');
+    } finally {
+      setSendingCourierMsgId(null);
+    }
+  };
+
+  const handleDeleteCourier = async (courier) => {
+    const label = courier?.full_name || courier?.email || courier?.id;
+    if (!window.confirm(`هل تريد حذف الموصل ${label}؟ سيتم إلغاء صلاحية التوصيل وإخفاؤه من القائمة.`)) return;
+
+    try {
+      setDeletingCourierId(courier.id);
+      const publicUserId = await resolveCourierPublicUserId(courier);
+
+      if (publicUserId) {
+        await supabase.from('courier_profiles').delete().eq('user_id', publicUserId);
+        await supabase.from('delivery_profiles').delete().eq('user_id', publicUserId);
+        await supabase.from('users').update({ role: 'user', updated_at: new Date().toISOString() }).eq('id', publicUserId);
+      }
+
+      if (courier?.id) {
+        await supabase.from('admin_users').delete().eq('id', courier.id);
+      }
+      if (courier?.email) {
+        await supabase.from('admin_users').delete().eq('email', courier.email).eq('role', 'delivery_person');
+      }
+
+      setCouriers((prev) => prev.filter((c) => c.id !== courier.id));
+      toast.success('تم حذف الموصل من النظام');
+    } catch (error) {
+      console.error('handleDeleteCourier error:', error);
+      toast.error('تعذر حذف الموصل');
+    } finally {
+      setDeletingCourierId(null);
+    }
+  };
 
   const resolveAdminUserIdByEmail = async (email) => {
     const normalizedEmail = String(email || '').trim().toLowerCase();
@@ -2171,6 +2341,41 @@ export default function SupervisorPanel() {
                     </Badge></p>
                   </div>
 
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <Button
+                      onClick={() => handlePreviewCourierIdentity(courier)}
+                      variant="outline"
+                      className="rounded-xl border-blue-300 text-blue-700 hover:bg-blue-50 text-xs"
+                    >
+                      عرض الهوية
+                    </Button>
+                    <Button
+                      onClick={() => handleDeleteCourier(courier)}
+                      disabled={deletingCourierId === courier.id}
+                      variant="outline"
+                      className="rounded-xl border-rose-300 text-rose-700 hover:bg-rose-50 text-xs"
+                    >
+                      {deletingCourierId === courier.id ? 'جارٍ الحذف...' : 'حذف الموصل'}
+                    </Button>
+                  </div>
+
+                  <div className="mt-2">
+                    <textarea
+                      value={courierMessageTextById[courier.id] || ''}
+                      onChange={(e) => setCourierMessageTextById((prev) => ({ ...prev, [courier.id]: e.target.value }))}
+                      placeholder="رسالة خاصة للموصل (تظهر كإشعار وفي ملفه)"
+                      rows={2}
+                      className="w-full rounded-xl border border-[#E5E7EB] bg-white p-2 text-xs focus:outline-none focus:border-[#1B4332]"
+                    />
+                    <Button
+                      onClick={() => handleSendCourierPrivateMessage(courier)}
+                      disabled={sendingCourierMsgId === courier.id}
+                      className="w-full mt-2 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs"
+                    >
+                      {sendingCourierMsgId === courier.id ? 'جارٍ الإرسال...' : 'إرسال رسالة خاصة'}
+                    </Button>
+                  </div>
+
                   <Button
                     onClick={() => handleResetCourierBalance(courier)}
                     disabled={resettingCourierId === courier.id || !courier.onboarding_completed}
@@ -2913,6 +3118,37 @@ export default function SupervisorPanel() {
               </div>
             </motion.article>
           </section>
+        )}
+
+        {identityPreview.open && (
+          <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setIdentityPreview({ open: false, courierName: '', frontUrl: '', backUrl: '' })}>
+            <div className="w-full max-w-4xl rounded-3xl border border-[#E7ECEA] bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()} dir="rtl">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-black text-[#1B4332]">هوية الموصل: {identityPreview.courierName}</h3>
+                <Button variant="outline" className="rounded-xl" onClick={() => setIdentityPreview({ open: false, courierName: '', frontUrl: '', backUrl: '' })}>إغلاق</Button>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="rounded-2xl border border-[#E5E7EB] p-3 bg-[#FAFCFB]">
+                  <p className="text-sm font-bold text-[#1F2933] mb-2">الوجه الأمامي</p>
+                  {identityPreview.frontUrl ? (
+                    <a href={identityPreview.frontUrl} target="_blank" rel="noopener noreferrer">
+                      <img src={identityPreview.frontUrl} alt="ID Front" className="w-full h-72 object-contain rounded-xl border border-[#E5E7EB] bg-white" />
+                    </a>
+                  ) : <p className="text-xs text-[#94A3B8]">لا توجد صورة أمامية</p>}
+                </div>
+
+                <div className="rounded-2xl border border-[#E5E7EB] p-3 bg-[#FAFCFB]">
+                  <p className="text-sm font-bold text-[#1F2933] mb-2">الوجه الخلفي</p>
+                  {identityPreview.backUrl ? (
+                    <a href={identityPreview.backUrl} target="_blank" rel="noopener noreferrer">
+                      <img src={identityPreview.backUrl} alt="ID Back" className="w-full h-72 object-contain rounded-xl border border-[#E5E7EB] bg-white" />
+                    </a>
+                  ) : <p className="text-xs text-[#94A3B8]">لا توجد صورة خلفية</p>}
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </main>
     </div>
