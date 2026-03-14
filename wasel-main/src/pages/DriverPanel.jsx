@@ -196,6 +196,16 @@ export default function DriverPanel() {
 
   const isOnboardingComplete = Boolean(courierProfile?.onboarding_completed);
 
+  const getCourierAssignmentIds = useCallback((user) => {
+    const ids = [
+      user?.assignment_id,
+      user?.auth_id,
+      user?.id,
+    ].filter(Boolean).map((value) => String(value));
+
+    return Array.from(new Set(ids));
+  }, []);
+
   const profileDraftStorageKey = useMemo(() => {
     if (!currentUser?.id) return null;
     return `wasel_driver_profile_draft:${currentUser.id}`;
@@ -332,8 +342,8 @@ export default function DriverPanel() {
   }, [profileDraftStorageKey, driverName, driverPhone, driverLocation, vehicleType, payoutCycle, courierProfile?.id_front_value, courierProfile?.id_back_value]);
 
   const loadAssignedOrders = async (user) => {
-    const assignmentTargetId = user?.assignment_id || user?.id;
-    if (!assignmentTargetId) {
+    const assignmentTargetIds = getCourierAssignmentIds(user);
+    if (assignmentTargetIds.length === 0) {
       setOrders([]);
       return;
     }
@@ -341,7 +351,7 @@ export default function DriverPanel() {
     const { data: assigned, error } = await supabase
       .from('order_assignments')
       .select('*')
-      .eq('delivery_person_id', assignmentTargetId)
+      .in('delivery_person_id', assignmentTargetIds)
       .in('status', ['assigned', 'accepted', 'in_progress', 'delivering', 'completed'])
       .order('created_at', { ascending: false });
 
@@ -495,6 +505,7 @@ export default function DriverPanel() {
         const unified = {
           id: userRow.id,
           assignment_id: authUser.id,
+          auth_id: userRow.auth_id || authUser.id,
           name: userRow.full_name || authUser.email || 'Courier',
           email: userRow.email || authUser.email,
           role: 'courier',
@@ -515,17 +526,27 @@ export default function DriverPanel() {
   }, [navigate]);
 
   useEffect(() => {
-    if (!currentUser?.assignment_id) return undefined;
+    const assignmentTargetIds = getCourierAssignmentIds(currentUser);
+    if (assignmentTargetIds.length === 0) return undefined;
+
     const refresh = () => loadAssignedOrders(currentUser).catch(() => {});
-    const channel = supabase
-      .channel(`driver-assignments-${currentUser.assignment_id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_assignments', filter: `delivery_person_id=eq.${currentUser.assignment_id}` }, refresh)
-      .subscribe();
+    const channel = supabase.channel(`driver-assignments-${assignmentTargetIds.join('-')}`);
+
+    assignmentTargetIds.forEach((assignmentTargetId) => {
+      channel.on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'order_assignments',
+        filter: `delivery_person_id=eq.${assignmentTargetId}`,
+      }, refresh);
+    });
+
+    channel.subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentUser]);
+  }, [currentUser, getCourierAssignmentIds]);
 
   const handleManualRefreshOrders = async () => {
     if (!currentUser) return;
@@ -733,7 +754,7 @@ export default function DriverPanel() {
       });
       supabase.from('order_assignments')
         .select('*', { count: 'exact', head: true })
-        .eq('delivery_person_id', currentUser.assignment_id || currentUser.id)
+        .in('delivery_person_id', getCourierAssignmentIds(currentUser))
         .eq('status', 'completed')
         .then(({ count }) => {
           if ((count || 0) >= 3) {

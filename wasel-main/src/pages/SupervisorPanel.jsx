@@ -1018,12 +1018,11 @@ export default function SupervisorPanel() {
 
   const handleUnassignOrder = async (order) => {
     const existingAssignmentsArr = Array.isArray(order.order_assignments) ? order.order_assignments : (order.order_assignments ? [order.order_assignments] : []);
-      const existingAssignment = existingAssignmentsArr.length > 0 ? existingAssignmentsArr[0] : null;
-    if (!existingAssignment?.id) { toast.info('لا يوجد فرز فعال لهذا الطلب'); return; }
+    if (existingAssignmentsArr.length === 0) { toast.info('لا يوجد فرز فعال لهذا الطلب'); return; }
 
     try {
       setAssigningOrderId(order.id);
-      const { error: deleteAssignmentError } = await supabase.from('order_assignments').delete().eq('id', existingAssignment.id);
+      const { error: deleteAssignmentError } = await supabase.from('order_assignments').delete().eq('order_id', order.id);
       if (deleteAssignmentError) throw deleteAssignmentError;
       const { error: updateOrderError } = await supabase.from('orders').update({ status: 'pending' }).eq('id', order.id);
       if (updateOrderError) {
