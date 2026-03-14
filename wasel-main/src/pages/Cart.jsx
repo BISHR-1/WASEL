@@ -2712,6 +2712,20 @@ const Cart = () => {
   const handleCheckout = useCallback(async () => {
     console.log('🛒 handleCheckout called, paymentMethod:', paymentMethod, 'items:', cartItems.length, 'isCheckingOut:', isCheckingOut);
     
+    // ===================== ✅ GUEST CHECK: REQUIRE LOGIN AT CHECKOUT =====================
+    const identity = localStorage.getItem('wasel_active_identity');
+    if (!identity || identity === 'guest') {
+      localStorage.setItem('wasel_post_login_redirect', '/Cart');
+      toast.error('لإكمال الطلب، يرجى تسجيل الدخول أو إنشاء حساب', {
+        action: {
+          label: 'تسجيل الدخول',
+          onClick: () => navigate('/Login'),
+        },
+        duration: 6000,
+      });
+      return;
+    }
+
     // Safety: prevent double-click if already processing
     if (isCheckingOut) {
       console.log('⚠️ Already checking out, ignoring click');
