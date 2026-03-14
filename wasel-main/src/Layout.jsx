@@ -21,7 +21,6 @@ import {
 import SupportChat from './components/common/SupportChat';
 import AppFooter from '@/components/common/AppFooter';
 import SearchBar from './components/SearchBar';
-import CartAbandonmentReminder from './components/common/CartAbandonmentReminder';
 import AndroidSmartBanner from './components/common/AndroidSmartBanner';
 import NotificationPermissionPrompt from './components/common/NotificationPermissionPrompt';
 import CameraPermissionPrompt from './components/common/CameraPermissionPrompt';
@@ -428,7 +427,6 @@ function LayoutContent({ children, currentPageName }) {
         </div>
       </nav>
 
-      <CartAbandonmentReminder />
       <NotificationPermissionPrompt />
       <CameraPermissionPrompt />
       <AndroidSmartBanner />

@@ -13,7 +13,7 @@ import { createPageUrl } from '@/utils';
 import PriceDisplay from '@/components/common/PriceDisplay';
 import { toast } from 'sonner';
 import { initializePushNotifications } from '@/services/pushNotifications';
-import { initAutoNotifications } from '@/services/autoNotifications';
+
 import { supabase } from '@/lib/supabase';
 import { interleaveByCategory, scoreItemsByBehavior } from '@/lib/recommendationSignals';
 import SmartLottie from '@/components/animations/SmartLottie';
@@ -39,7 +39,6 @@ const Home = () => {
   // تهيئة الإشعارات عند فتح الصفحة الرئيسية
   useEffect(() => {
     initializePushNotifications();
-    initAutoNotifications();
   }, []);
 
   // Auto-hide heart burst animation

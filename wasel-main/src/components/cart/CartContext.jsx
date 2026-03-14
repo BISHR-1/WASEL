@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { startCartReminderTimer, cancelCartReminder } from '@/services/autoNotifications';
 import { saveAbandonedCart } from '@/services/abandonedCart';
 import { supabase } from '@/lib/supabase';
 
@@ -80,8 +79,6 @@ export function CartProvider({ children }) {
       // Set timestamp when first item is added to cart
       if (safeItems.length === 0) {
         localStorage.setItem(cartTimestampKey(), Date.now().toString());
-        // تشغيل مؤقت تذكير السلة المتروكة
-        startCartReminderTimer();
       }
       if (existing) {
         return safeItems.map(i =>
@@ -150,8 +147,6 @@ export function CartProvider({ children }) {
 
   const clearCart = () => {
     setCartItems([]);
-    // إلغاء مؤقت التذكير عند إتمام الشراء
-    cancelCartReminder();
   };
 
   const getTotalPrice = () => {
