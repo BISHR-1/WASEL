@@ -17,7 +17,6 @@ import {
   User,
   RefreshCcw,
   FileText,
-  Wallet,
   Link as LinkIcon,
   Copy,
   ShieldAlert,
@@ -188,7 +187,6 @@ export default function DriverPanel() {
   const [sendingCourierChat, setSendingCourierChat] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
-  const [sendingPayoutRequest, setSendingPayoutRequest] = useState(false);
 
   const [courierProfile, setCourierProfile] = useState(null);
   const [referralStats, setReferralStats] = useState({ registered: 0, qualified: 0 });
@@ -344,6 +342,7 @@ export default function DriverPanel() {
       .from('order_assignments')
       .select('*')
       .eq('delivery_person_id', assignmentTargetId)
+      .in('status', ['assigned', 'accepted', 'in_progress', 'delivering', 'completed'])
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -1163,9 +1162,7 @@ export default function DriverPanel() {
             <select value={vehicleType} onChange={(e) => setVehicleType(e.target.value)} className="rounded-xl border border-[#E5E7EB] bg-[#FAFCFB] p-3 text-sm">
               <option value="motorbike">ماتور</option><option value="car">سيارة</option><option value="bicycle">دراجة</option><option value="other">أخرى</option>
             </select>
-            <select value={payoutCycle} onChange={(e) => setPayoutCycle(e.target.value)} disabled={Boolean(courierProfile?.onboarding_completed && courierProfile?.payout_cycle)} className="rounded-xl border border-[#E5E7EB] bg-[#FAFCFB] p-3 text-sm disabled:opacity-60">
-              <option value="weekly">استلام أسبوعي</option><option value="monthly">استلام شهري</option>
-            </select>
+            <div className="rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] p-3 text-sm text-[#475569]">الراتب يُدار تلقائيًا من الإدارة (بدون اختيار)</div>
           </div>
 
           <div className="grid md:grid-cols-2 gap-3 mt-4">
@@ -1279,23 +1276,6 @@ export default function DriverPanel() {
                 <div className="rounded-2xl bg-gradient-to-br from-[#F0FDF4] to-[#DCFCE7] p-4 border border-[#86EFAC] text-center"><p className="text-3xl font-black text-[#166534]">{referralStats.qualified}</p><p className="text-[11px] text-[#15803D] font-medium mt-1">مؤهلون ({referralBonusUsd}$)</p></div>
               </div>
             </motion.section>
-
-            <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-3xl bg-white border border-[#E5E7EB] p-5 shadow-sm">
-              <div className="flex items-center gap-2 mb-3"><div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#0F766E] to-[#059669] flex items-center justify-center"><Wallet className="w-5 h-5 text-white" /></div><h3 className="font-black text-[#0F172A] text-lg">استلام الراتب</h3></div>
-              <div className="rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] p-3 mb-3">
-                <p className="text-sm text-[#334155] font-medium">الدورة المختارة: <span className="font-black text-[#0F172A]">{(courierProfile?.payout_cycle || payoutCycle) === 'monthly' ? 'شهرية' : 'أسبوعية'}</span></p>
-                {nextPayoutAt ? <p className="text-xs text-[#64748B] mt-1">موعد الاستحقاق: {nextPayoutAt.toLocaleDateString('ar-EG')}</p> : <p className="text-xs text-[#64748B] mt-1">سيبدأ الحساب بعد أول طلب مكتمل.</p>}
-              </div>
-              <div className="mt-1">
-                {canRequestPayout ? (
-                  <Button onClick={handlePayoutRequest} disabled={sendingPayoutRequest} className="rounded-xl bg-[#059669] hover:bg-[#047857] text-white">{sendingPayoutRequest ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <MessageCircle className="w-4 h-4 ml-1" />}إرسال طلب الراتب عبر واتساب</Button>
-                ) : (
-                  <p className="text-sm text-[#92400E] bg-[#FFFBEB] border border-[#FDE68A] rounded-xl p-3">حالياً يظهر الرصيد فقط. زر الاستلام يتفعل عند حلول موعد الدورة.</p>
-                )}
-              </div>
-            </motion.section>
-
-            
 
             {activeTab === 'active' && (
               <>

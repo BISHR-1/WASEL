@@ -1023,7 +1023,8 @@ export default function SupervisorPanel() {
 
     try {
       setAssigningOrderId(order.id);
-      await supabase.from('order_assignments').update({ status: 'failed', updated_at: new Date().toISOString() }).eq('id', existingAssignment.id);
+      const { error: deleteAssignmentError } = await supabase.from('order_assignments').delete().eq('id', existingAssignment.id);
+      if (deleteAssignmentError) throw deleteAssignmentError;
       const { error: updateOrderError } = await supabase.from('orders').update({ status: 'pending' }).eq('id', order.id);
       if (updateOrderError) {
         const canIgnore = updateOrderError?.code === '42501' && String(updateOrderError?.message || '').includes('order_status_history');

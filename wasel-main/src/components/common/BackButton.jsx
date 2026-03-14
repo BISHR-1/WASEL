@@ -6,13 +6,21 @@ import { Button } from "@/components/ui/button";
 export default function BackButton({ className = '', variant = 'default' }) {
   const navigate = useNavigate();
 
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate('/', { replace: true });
+  };
+
   return (
     <Button
-      onClick={() => navigate(-1)}
+      onClick={handleBack}
       variant={variant}
-      className={`fixed top-20 right-4 z-40 bg-gradient-to-r from-[#52B788] to-[#40916C] hover:from-[#40916C] hover:to-[#2D6A4F] text-white shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl ${className}`}
+      className={`inline-flex items-center gap-2 bg-white border border-[#D1D5DB] hover:bg-[#F8FAFC] text-[#1F2933] shadow-sm hover:shadow-md transition-all duration-200 rounded-full px-4 py-2 ${className}`}
     >
-      <ArrowRight className="w-5 h-5 ml-2" />
+      <ArrowRight className="w-4 h-4" />
       رجوع
     </Button>
   );

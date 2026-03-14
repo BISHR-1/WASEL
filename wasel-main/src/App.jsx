@@ -24,6 +24,7 @@ import DownloadApp from './pages/DownloadApp';
 import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
 import { authError, authTrace, authWarn } from '@/lib/authDebug';
+import { ArrowRight } from 'lucide-react';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -50,6 +51,34 @@ const GuestLoginRedirect = () => {
     try { localStorage.setItem('wasel_post_login_redirect', path); } catch {}
   }
   return <Navigate to="/Login" replace />;
+};
+
+const GlobalBackButton = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const hiddenPaths = new Set(['/', '/Home', '/Login', '/DownloadApp']);
+
+  if (hiddenPaths.has(location.pathname)) return null;
+
+  const onBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate('/', { replace: true });
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={onBack}
+      className="fixed bottom-4 right-4 z-[70] rounded-full bg-white/95 backdrop-blur border border-[#D1D5DB] shadow-lg hover:shadow-xl px-4 py-2 text-[#1F2933] text-sm font-bold transition-all flex items-center gap-2"
+      aria-label="رجوع"
+    >
+      <ArrowRight className="w-4 h-4" />
+      <span className="hidden sm:inline">رجوع</span>
+    </button>
+  );
 };
 
 const AuthenticatedApp = () => {
@@ -482,6 +511,8 @@ const AuthenticatedApp = () => {
     };
 
     return (
+      <>
+      <GlobalBackButton />
       <Routes>
         <Route path="/DownloadApp" element={<DownloadApp />} />
         <Route path="/Login" element={<EmailOtpLogin onSuccess={handleLoginSuccess} />} />
@@ -497,6 +528,7 @@ const AuthenticatedApp = () => {
         ))}
         <Route path="*" element={<GuestLoginRedirect />} />
       </Routes>
+      </>
     );
   }
 
@@ -537,6 +569,8 @@ const AuthenticatedApp = () => {
   // Render the main app
   if (isCourier) {
     return (
+      <>
+      <GlobalBackButton />
       <Routes>
         <Route path="/shared-pay/:token" element={<SharedPay />} />
         <Route path="/shared-pay" element={<SharedPay />} />
@@ -551,11 +585,14 @@ const AuthenticatedApp = () => {
         <Route path="/AdminTerms" element={<Pages.AdminTerms />} />
         <Route path="*" element={<Navigate to="/DriverPanel" replace />} />
       </Routes>
+      </>
     );
   }
 
   if (isAdmin) {
     return (
+      <>
+      <GlobalBackButton />
       <Routes>
         <Route path="/shared-pay/:token" element={<SharedPay />} />
         <Route path="/shared-pay" element={<SharedPay />} />
@@ -572,10 +609,13 @@ const AuthenticatedApp = () => {
         <Route path="/AdminDashboard" element={<Navigate to="/SupervisorPanel" replace />} />
         <Route path="*" element={<Navigate to="/SupervisorPanel" replace />} />
       </Routes>
+      </>
     );
   }
 
   return (
+    <>
+    <GlobalBackButton />
     <Routes>
       <Route path="/shared-pay/:token" element={<SharedPay />} />
       <Route path="/shared-pay" element={<SharedPay />} />
@@ -601,6 +641,7 @@ const AuthenticatedApp = () => {
       ))}
       <Route path="*" element={<PageNotFound />} />
     </Routes>
+    </>
   );
 };
 
