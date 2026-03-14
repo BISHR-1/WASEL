@@ -28,6 +28,7 @@ import {
 } from '@/utils/senderReceiverStorage';
 import { supabase } from '@/lib/supabase';
 import ProductDetailModal from '@/components/common/ProductDetailModal';
+import MapAddressPicker from '@/components/cart/MapAddressPicker';
 import { useDarkMode } from '@/lib/DarkModeContext';
 import { useUsdToSypRate } from '@/lib/exchangeRate';
 import { interleaveByCategory, scoreItemsByBehavior, trackPurchase } from '@/lib/recommendationSignals';
@@ -2808,7 +2809,11 @@ const Cart = () => {
           name: recipientName?.trim() || 'غير محدد',
           phone: recipientPhone?.trim() || '',
           address: recipientAddress?.trim() || '',
-          delivery_time: deliveryTime || null
+          delivery_time: deliveryTime || null,
+          ...((() => {
+            const coordMatch = (recipientAddress || '').match(/📍\s*([\d.-]+),\s*([\d.-]+)/);
+            return coordMatch ? { lat: parseFloat(coordMatch[1]), lng: parseFloat(coordMatch[2]) } : {};
+          })()),
         },
         items: cartItems.map(item => ({
           id: item.id,
@@ -3393,16 +3398,25 @@ const Cart = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1" dir="rtl">العنوان بالتفصيل *</label>
-                  <textarea
-                    rows="3"
-                    value={recipientAddress}
-                    onChange={(e) => setRecipientAddress(e.target.value)}
-                    placeholder="المدينة، الحي، الشارع، البناية"
-                    className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none resize-none transition-all ${sharedCartMode ? 'bg-gray-200 border-gray-300 text-gray-500 cursor-not-allowed' : 'bg-gray-50 border-gray-200 focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366]'}`}
-                    dir="rtl"
-                    disabled={sharedCartMode}
-                  />
+                  {insideSyria && !sharedCartMode ? (
+                    <MapAddressPicker
+                      recipientAddress={recipientAddress}
+                      setRecipientAddress={setRecipientAddress}
+                    />
+                  ) : (
+                    <>
+                      <label className="block text-sm font-medium text-gray-700 mb-1" dir="rtl">العنوان بالتفصيل *</label>
+                      <textarea
+                        rows="3"
+                        value={recipientAddress}
+                        onChange={(e) => setRecipientAddress(e.target.value)}
+                        placeholder="المدينة، الحي، الشارع، البناية"
+                        className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none resize-none transition-all ${sharedCartMode ? 'bg-gray-200 border-gray-300 text-gray-500 cursor-not-allowed' : 'bg-gray-50 border-gray-200 focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366]'}`}
+                        dir="rtl"
+                        disabled={sharedCartMode}
+                      />
+                    </>
+                  )}
                 </div>
 
                 {!sharedCartMode && (
