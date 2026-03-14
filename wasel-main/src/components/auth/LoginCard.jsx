@@ -102,6 +102,12 @@ export default function LoginCard({
               <p className="text-sm text-[#1F7A63]/70 mb-6 text-center">
                 {language === 'ar' ? 'مرحباً بعودتك!' : 'Welcome back!'}
               </p>
+              {referralCode && (
+                <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-3 text-center" dir="rtl">
+                  <p className="text-sm font-bold text-blue-800">أنا موصل (ثابت)</p>
+                  <p className="text-xs text-blue-700 mt-1">تم تحديد التسجيل/الدخول كموصل عبر رابط الإحالة ولا يمكن تغييره.</p>
+                </div>
+              )}
 
               {/* Error Message */}
               {error && (

@@ -100,6 +100,12 @@ export default function AnimatedLoginCard({
               <p className="text-sm text-[#1F7A63] mb-6 text-center">
                 {language === 'ar' ? 'أرسل احتياجات أهلك في درعا بسرعة وخلّي الفرحة توصلهم كل يوم' : 'Send what your family needs in Daraa and deliver joy every day'}
               </p>
+              {referralCode && (
+                <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-3 text-center" dir="rtl">
+                  <p className="text-sm font-bold text-blue-800">أنا موصل (ثابت)</p>
+                  <p className="text-xs text-blue-700 mt-1">تم تحديد إنشاء الحساب كموصل عبر رابط الإحالة ولا يمكن تغييره.</p>
+                </div>
+              )}
 
               {/* Social Login */}
               <div className="mb-4" dir="rtl">

@@ -400,6 +400,8 @@ export default function EmailOtpLogin({ onSuccess }) {
         setUserRegion('inside_syria');
         localStorage.setItem('wasel_referral_code', effectiveReferralCode);
         localStorage.setItem('wasel_auth_region_locked', '1');
+        localStorage.setItem('wasel_auth_preferred_mode', 'signup');
+        localStorage.setItem('wasel_post_login_redirect', createPageUrl('DriverPanel'));
       } else if (shouldLockRegion) {
         setRegionLocked(true);
         if (lockedRegionValue === 'outside_syria') {
@@ -412,7 +414,7 @@ export default function EmailOtpLogin({ onSuccess }) {
       }
 
       const preferredMode = localStorage.getItem('wasel_auth_preferred_mode');
-      if (preferredMode === 'signup' || preferredMode === 'login') {
+      if (!effectiveReferralCode && (preferredMode === 'signup' || preferredMode === 'login')) {
         setMode(preferredMode);
         localStorage.removeItem('wasel_auth_preferred_mode');
       }

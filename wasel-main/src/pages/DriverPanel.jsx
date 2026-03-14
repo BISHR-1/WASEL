@@ -170,6 +170,8 @@ export default function DriverPanel() {
   const [kycBackFile, setKycBackFile] = useState(null);
   const [kycFrontPreview, setKycFrontPreview] = useState('');
   const [kycBackPreview, setKycBackPreview] = useState('');
+  const [kycFrontUploading, setKycFrontUploading] = useState(false);
+  const [kycBackUploading, setKycBackUploading] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingOnboarding, setSavingOnboarding] = useState(false);
 
@@ -195,6 +197,11 @@ export default function DriverPanel() {
   const exchangeRate = useUsdToSypRate();
 
   const isOnboardingComplete = Boolean(courierProfile?.onboarding_completed);
+
+  const profileDraftStorageKey = useMemo(() => {
+    if (!currentUser?.id) return null;
+    return `wasel_driver_profile_draft:${currentUser.id}`;
+  }, [currentUser?.id]);
 
   const resolveKycPreviewUrl = useCallback(async (storedValue) => {
     const parsed = parseKycStoredValue(storedValue);
@@ -238,13 +245,67 @@ export default function DriverPanel() {
   }, []);
 
   const handleKycFileChange = useCallback((side, file) => {
-    if (side === 'front') {
-      setKycFrontFile(file || null);
-      setKycFrontPreview(file ? URL.createObjectURL(file) : '');
+    if (!file) {
+      if (side === 'front') {
+        setKycFrontFile(null);
+        setKycFrontPreview('');
+      } else {
+        setKycBackFile(null);
+        setKycBackPreview('');
+      }
       return;
     }
-    setKycBackFile(file || null);
+
+    if (!String(file.type || '').startsWith('image/')) {
+      toast.error('يرجى اختيار صورة فقط للهوية');
+      return;
+    }
+
+    if (side === 'front') {
+      setKycFrontFile(file);
+      setKycFrontPreview(file ? URL.createObjectURL(file) : '');
+      setKycFrontUploading(true);
+      (async () => {
+        try {
+          const uploadedValue = await uploadKycFile('front', file);
+          const previewUrl = await resolveKycPreviewUrl(uploadedValue);
+          setCourierProfile((prev) => ({
+            ...(prev || {}),
+            id_front_value: uploadedValue,
+            id_front_url: previewUrl || prev?.id_front_url || null,
+          }));
+          setKycFrontFile(null);
+          toast.success('تم حفظ صورة الهوية الأمامية');
+        } catch (error) {
+          console.error('Front ID upload error:', error);
+          toast.error('تعذر رفع صورة الهوية الأمامية');
+        } finally {
+          setKycFrontUploading(false);
+        }
+      })();
+      return;
+    }
+    setKycBackFile(file);
     setKycBackPreview(file ? URL.createObjectURL(file) : '');
+    setKycBackUploading(true);
+    (async () => {
+      try {
+        const uploadedValue = await uploadKycFile('back', file);
+        const previewUrl = await resolveKycPreviewUrl(uploadedValue);
+        setCourierProfile((prev) => ({
+          ...(prev || {}),
+          id_back_value: uploadedValue,
+          id_back_url: previewUrl || prev?.id_back_url || null,
+        }));
+        setKycBackFile(null);
+        toast.success('تم حفظ صورة الهوية الخلفية');
+      } catch (error) {
+        console.error('Back ID upload error:', error);
+        toast.error('تعذر رفع صورة الهوية الخلفية');
+      } finally {
+        setKycBackUploading(false);
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -253,6 +314,24 @@ export default function DriverPanel() {
       if (kycBackPreview) URL.revokeObjectURL(kycBackPreview);
     };
   }, [kycFrontPreview, kycBackPreview]);
+
+  useEffect(() => {
+    if (!profileDraftStorageKey) return;
+    try {
+      const draft = {
+        driverName,
+        driverPhone,
+        driverLocation,
+        vehicleType,
+        payoutCycle,
+        id_front_value: courierProfile?.id_front_value || null,
+        id_back_value: courierProfile?.id_back_value || null,
+      };
+      localStorage.setItem(profileDraftStorageKey, JSON.stringify(draft));
+    } catch {
+      // ignore draft persistence failures
+    }
+  }, [profileDraftStorageKey, driverName, driverPhone, driverLocation, vehicleType, payoutCycle, courierProfile?.id_front_value, courierProfile?.id_back_value]);
 
   const loadAssignedOrders = async (user) => {
     const assignmentTargetId = user?.assignment_id || user?.id;
@@ -370,6 +449,19 @@ export default function DriverPanel() {
       first_delivery_completed_at: courierData?.first_delivery_completed_at || null,
       referral_code: courierData?.referral_code || normalizeReferralCode(userId),
     });
+
+    try {
+      const draftRaw = profileDraftStorageKey ? localStorage.getItem(profileDraftStorageKey) : null;
+      const draft = draftRaw ? JSON.parse(draftRaw) : null;
+      if (draft && typeof draft === 'object') {
+        if (draft.driverName && !userData?.full_name) setDriverName(String(draft.driverName));
+        if (draft.driverPhone && !nextPhone) setDriverPhone(String(draft.driverPhone));
+        if (draft.driverLocation && !nextLocation) setDriverLocation(String(draft.driverLocation));
+        if (draft.vehicleType && !courierData?.vehicle_type) setVehicleType(String(draft.vehicleType));
+      }
+    } catch {
+      // ignore invalid draft format
+    }
 
     await loadPrivateSupervisorNotices(userId);
 
@@ -916,7 +1008,7 @@ export default function DriverPanel() {
     }
   };
 
-  const referralLink = `${window.location.origin}${createPageUrl('StaffLogin')}?join=courier&ref=${encodeURIComponent(courierProfile?.referral_code || normalizeReferralCode(currentUser?.id))}`;
+  const referralLink = `${window.location.origin}${createPageUrl('Login')}?join=courier&ref=${encodeURIComponent(courierProfile?.referral_code || normalizeReferralCode(currentUser?.id))}`;
   const copyReferralLink = async () => {
     try {
       await navigator.clipboard.writeText(referralLink);
@@ -944,7 +1036,7 @@ export default function DriverPanel() {
 
   return (
     <div className="min-h-screen bg-[#F7FAF9] font-['Cairo']" dir="rtl">
-      <header className="sticky top-0 z-30 bg-gradient-to-l from-[#1B4332] via-[#2D6A4F] to-[#40916C] shadow-lg">
+      <header className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-l from-[#1B4332] via-[#2D6A4F] to-[#40916C] shadow-lg">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-inner"><Truck className="w-6 h-6 text-white" /></div>
@@ -980,7 +1072,7 @@ export default function DriverPanel() {
         )}
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+      <main className={`max-w-6xl mx-auto px-4 pb-6 space-y-6 ${isOnboardingComplete ? 'pt-40' : 'pt-24'}`}>
         {isOnboardingComplete && activeTab !== 'profile' && (
   <div className="flex gap-2 flex-wrap mb-4 bg-white rounded-2xl p-1.5 shadow-sm border border-[#E5E7EB]">
     <button onClick={() => setActiveTab('active')} className={`flex-1 rounded-xl py-2.5 px-4 text-sm font-bold transition-all ${activeTab === 'active' ? 'bg-[#1B4332] text-white shadow-md' : 'text-[#64748B] hover:bg-[#F1F5F9]'}`}>طلبات حالية ({activeOrders.length})</button>
@@ -1085,6 +1177,7 @@ export default function DriverPanel() {
                 onChange={(e) => handleKycFileChange('front', e.target.files?.[0] || null)}
                 className="block mt-2 w-full text-xs"
               />
+              {kycFrontUploading && <p className="mt-2 text-xs font-bold text-blue-700">جارٍ رفع الصورة...</p>}
               {kycFrontPreview && (
                 <div className="mt-2">
                   <span className="text-xs text-gray-500 block mb-1">معاينة قبل الحفظ:</span>
@@ -1108,6 +1201,7 @@ export default function DriverPanel() {
                 onChange={(e) => handleKycFileChange('back', e.target.files?.[0] || null)}
                 className="block mt-2 w-full text-xs"
               />
+              {kycBackUploading && <p className="mt-2 text-xs font-bold text-blue-700">جارٍ رفع الصورة...</p>}
               {kycBackPreview && (
                 <div className="mt-2">
                   <span className="text-xs text-gray-500 block mb-1">معاينة قبل الحفظ:</span>
@@ -1127,7 +1221,7 @@ export default function DriverPanel() {
           <div className="mt-3 text-xs text-[#64748B] flex items-center gap-2"><ShieldAlert className="w-4 h-4" /> يجب إكمال الهوية والهاتف واختيار دورة الراتب قبل ظهور الطلبات.</div>
           <div className="mt-4 flex flex-wrap gap-2">
             <Button onClick={saveDeliveryProfile} disabled={savingProfile} className="bg-[#1B4332] hover:bg-[#2D6A4F] text-white rounded-xl px-6">{savingProfile ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <Save className="w-4 h-4 ml-1" />}حفظ البيانات العامة</Button>
-            <Button onClick={saveCourierOnboarding} disabled={savingOnboarding} className="bg-[#0EA5E9] hover:bg-[#0284C7] text-white rounded-xl px-6">{savingOnboarding ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <FileText className="w-4 h-4 ml-1" />}{isOnboardingComplete ? 'تحديث معلومات الإلزام' : 'اعتماد بيانات الموصل'}</Button>
+            <Button onClick={saveCourierOnboarding} disabled={savingOnboarding || kycFrontUploading || kycBackUploading} className="bg-[#0EA5E9] hover:bg-[#0284C7] text-white rounded-xl px-6">{savingOnboarding ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <FileText className="w-4 h-4 ml-1" />}{isOnboardingComplete ? 'تحديث معلومات الإلزام' : 'اعتماد بيانات الموصل'}</Button>
           </div>
 
           <div className="mt-4 rounded-2xl border border-[#DBEAFE] bg-[#EFF6FF] p-3">

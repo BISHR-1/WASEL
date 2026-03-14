@@ -1723,7 +1723,7 @@ export default function SupervisorPanel() {
   return (
     <div className="min-h-screen bg-[#F7FAF9] font-['Cairo']" dir="rtl">
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-gradient-to-l from-[#1B4332] via-[#2D6A4F] to-[#40916C] shadow-lg">
+      <header className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-l from-[#1B4332] via-[#2D6A4F] to-[#40916C] shadow-lg">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <img src="/logo/wasel-logo.png" alt="Wasel" className="h-10 w-10 rounded-xl border border-white/30 bg-white p-1"
@@ -1760,7 +1760,7 @@ export default function SupervisorPanel() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+      <main className="max-w-7xl mx-auto px-4 pt-28 pb-6 space-y-6">
         {/* Stats Cards */}
         <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
           {[
