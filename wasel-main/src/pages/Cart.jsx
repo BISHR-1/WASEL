@@ -1020,11 +1020,12 @@ function OrderSummary({ displayedSubtotalSYP, originalTotalSYP, membershipDiscou
   // الخصم الوهمي = الفرق بين السعر المعروض والسعر الأصلي
   const phantomDiscountSYP = displayedSubtotalSYP - originalTotalSYP;
   
-  // ===== نظام الطلبات المجانية (أول 3 طلبات) =====
-  // داخل سوريا: إلغاء رسوم التوصيل فقط (الخدمة بالفعل $0)
-  // خارج سوريا: رسوم خدمة $3 (خصم 50% لفترة محدودة)
-  let SERVICE_FEE_USD = insideSyria ? 0 : 3; // خصم 50% - 3$ بدلاً من 6$
-  let DELIVERY_FEE_USD = insideSyria ? 1 : 2;
+  // ===== نظام الرسوم =====
+  // داخل سوريا: رسوم الخدمة مجانية، توصيل $1
+  // خارج سوريا: رسوم الخدمة $6، توصيل مجاني دائماً
+  // أول 3 طلبات: خصم 50% على رسوم الخدمة + توصيل مجاني
+  let SERVICE_FEE_USD = insideSyria ? 0 : 6;
+  let DELIVERY_FEE_USD = insideSyria ? 1 : 0; // توصيل مجاني دائماً للخارج
   
   // رسوم خاصة للسلة المشتركة: $6 خدمة + $3 توصيل
   if (paymentMethod === 'shared_cart') {
@@ -1032,13 +1033,15 @@ function OrderSummary({ displayedSubtotalSYP, originalTotalSYP, membershipDiscou
     DELIVERY_FEE_USD = 3;
   }
   
-  if (isFreeOrderEligible) {
-    // إذا كان الطلب مجاني، إلغاء رسوم التوصيل للجميع
+  // أول 3 طلبات: خصم 50% على رسوم الخدمة + توصيل مجاني
+  if (userOrdersCount < 3) {
+    SERVICE_FEE_USD = Math.round(SERVICE_FEE_USD * 0.5 * 100) / 100;
     DELIVERY_FEE_USD = 0;
-    if (!insideSyria) {
-      // خارج سوريا: إلغاء رسوم الخدمة أيضاً
-      SERVICE_FEE_USD = 0;
-    }
+  }
+
+  if (isFreeOrderEligible) {
+    DELIVERY_FEE_USD = 0;
+    SERVICE_FEE_USD = 0;
   }
   
   const serviceFeeSYP = SERVICE_FEE_USD * exchangeRate;
@@ -1135,12 +1138,12 @@ function OrderSummary({ displayedSubtotalSYP, originalTotalSYP, membershipDiscou
           </div>
         )}
 
-        {/* Service Fee - خصم 50% لفترة محدودة */}
+        {/* Service Fee */}
         <div className="flex justify-between text-sm relative" dir="rtl">
           <span className="text-gray-600 flex items-center gap-1">
             رسوم الخدمة
-            {!insideSyria && SERVICE_FEE_USD > 0 && (
-              <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold animate-pulse">خصم 50% لمدة محدودة</span>
+            {!insideSyria && userOrdersCount < 3 && SERVICE_FEE_USD > 0 && (
+              <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold animate-pulse">خصم 50% - أول 3 طلبات</span>
             )}
             <button 
               onClick={() => setShowServiceFeeInfo(!showServiceFeeInfo)}
@@ -1150,7 +1153,7 @@ function OrderSummary({ displayedSubtotalSYP, originalTotalSYP, membershipDiscou
             </button>
           </span>
           <div className="text-left">
-            {!insideSyria && SERVICE_FEE_USD > 0 && <span className="text-gray-400 line-through text-xs ml-1">$6.00</span>}
+            {!insideSyria && userOrdersCount < 3 && SERVICE_FEE_USD > 0 && <span className="text-gray-400 line-through text-xs ml-1">$6.00</span>}
             <span className="text-gray-900">{serviceFeeSYP.toLocaleString('en-US')} ل.س</span>
             <span className="text-gray-400 text-xs mx-2">|</span>
             <span className="text-gray-500 text-xs">${SERVICE_FEE_USD.toFixed(2)}</span>
@@ -1174,12 +1177,12 @@ function OrderSummary({ displayedSubtotalSYP, originalTotalSYP, membershipDiscou
           )}
         </AnimatePresence>
 
-        {/* Delivery Fee - يظهر حسب اكتمال الشريط */}
+        {/* Delivery Fee */}
         <div className="flex justify-between text-sm items-center" dir="rtl">
           <span className="text-gray-600">رسوم التوصيل</span>
-          {isFreeDelivery ? (
+          {DELIVERY_FEE_USD === 0 || isFreeDelivery ? (
             <div className="flex items-center gap-2">
-              <span className="text-gray-400 line-through text-xs">{FAKE_DELIVERY_FEE_SYP} ل.س</span>
+              {isFreeDelivery && <span className="text-gray-400 line-through text-xs">{FAKE_DELIVERY_FEE_SYP} ل.س</span>}
               <span className="text-green-600 font-bold">مجاناً 🎁</span>
             </div>
           ) : (
@@ -1396,7 +1399,7 @@ const Cart = () => {
           // في الحالة الأولى، اعتبر جميع الطلبات مجانية
           setIsFreeOrderEligible(true);
           setFreeOrdersRemaining(3);
-          setFreeOrderNotificationMessage('🎉 أول 3 طلبات بتوصيل مجاني!');
+          setFreeOrderNotificationMessage('🎉 أول 3 طلبات: خصم 50% على الخدمة + توصيل مجاني!');
           setShowFreeOrderNotification(true);
           return;
         }
@@ -1408,10 +1411,10 @@ const Cart = () => {
 
           if (remaining > 0) {
             const message = remaining === 3 
-              ? '🎉 الطلبات الثلاثة الأولى بتوصيل مجاني!'
+              ? '🎉 أول 3 طلبات: خصم 50% على الخدمة + توصيل مجاني!'
               : remaining === 1
-              ? '⚠️ هذا آخر طلب مجاني! من الطلب الرابع ستبدأ الرسوم العادية'
-              : `✨ لديك ${remaining} طلبات مجانية متبقية`;
+              ? '⚠️ هذا آخر طلب بخصم! من الطلب الرابع ستبدأ الرسوم العادية'
+              : `✨ لديك ${remaining} طلبات بخصم 50% + توصيل مجاني`;
             
             setFreeOrderNotificationMessage(message);
             setShowFreeOrderNotification(true);
@@ -1698,8 +1701,8 @@ const Cart = () => {
   const isFreeDelivery = originalTotalSYP >= FREE_DELIVERY_THRESHOLD_SYP;
   
   // رسوم التوصيل والخدمة - تطابق ما يراه المستخدم في OrderSummary
-  let SERVICE_FEE_USD = insideSyria ? 0 : 3; // خصم 50% على رسوم الخدمة - 3$ بدلاً من 6$ لفترة محدودة
-  let DELIVERY_FEE_USD = insideSyria ? 1 : 2;
+  let SERVICE_FEE_USD = insideSyria ? 0 : 6;
+  let DELIVERY_FEE_USD = insideSyria ? 1 : 0; // توصيل مجاني دائماً للخارج
 
   // رسوم خاصة للسلة المشتركة: $6 خدمة + $3 توصيل
   if (paymentMethod === 'shared_cart') {
@@ -1707,16 +1710,15 @@ const Cart = () => {
     DELIVERY_FEE_USD = 3;
   }
 
-  // أول 3 طلبات بتوصيل مجاني لجميع المستخدمين
+  // أول 3 طلبات: خصم 50% على رسوم الخدمة + توصيل مجاني
   if (userOrdersCount < 3) {
+    SERVICE_FEE_USD = Math.round(SERVICE_FEE_USD * 0.5 * 100) / 100;
     DELIVERY_FEE_USD = 0;
   }
 
   if (isFreeOrderEligible) {
     DELIVERY_FEE_USD = 0;
-    if (!insideSyria) {
-      SERVICE_FEE_USD = 0;
-    }
+    SERVICE_FEE_USD = 0;
   }
 
   const serviceFeeSYP = SERVICE_FEE_USD * exchangeRate;

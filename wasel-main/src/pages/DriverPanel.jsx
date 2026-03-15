@@ -1058,7 +1058,7 @@ export default function DriverPanel() {
 
   return (
     <div className="min-h-screen bg-[#F7FAF9] font-['Cairo']" dir="rtl">
-      <header className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-l from-[#1B4332] via-[#2D6A4F] to-[#40916C] shadow-lg">
+      <header className="bg-gradient-to-l from-[#1B4332] via-[#2D6A4F] to-[#40916C] shadow-lg">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-inner"><Truck className="w-6 h-6 text-white" /></div>
@@ -1094,7 +1094,7 @@ export default function DriverPanel() {
         )}
       </header>
 
-      <main className={`max-w-6xl mx-auto px-4 pb-6 space-y-6 ${isOnboardingComplete ? 'pt-40' : 'pt-24'}`}>
+      <main className="max-w-6xl mx-auto px-4 pb-6 space-y-6 pt-6">
         {isOnboardingComplete && activeTab !== 'profile' && (
   <div className="flex gap-2 flex-wrap mb-4 bg-white rounded-2xl p-1.5 shadow-sm border border-[#E5E7EB]">
     <button onClick={() => setActiveTab('active')} className={`flex-1 rounded-xl py-2.5 px-4 text-sm font-bold transition-all ${activeTab === 'active' ? 'bg-[#1B4332] text-white shadow-md' : 'text-[#64748B] hover:bg-[#F1F5F9]'}`}>طلبات حالية ({activeOrders.length})</button>

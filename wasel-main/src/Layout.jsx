@@ -62,9 +62,7 @@ function LayoutContent({ children, currentPageName }) {
   const totalItems = Array.isArray(cartItems) ? cartItems.reduce((sum, item) => sum + (Math.max(0, item?.quantity || 1)), 0) : 0;
   const location = useLocation();
 
-  // Scroll visibility logic
-  const [showTopBar, setShowTopBar] = useState(true);
-  const [lastScrollY, setLastScrollY] = useState(0);
+  // Scroll visibility removed — header is static at top
 
   // Sync guest state with identity changes
   useEffect(() => {
@@ -92,20 +90,7 @@ function LayoutContent({ children, currentPageName }) {
     return () => window.removeEventListener('wasel_auth_required', handleAuthRequired);
   }, [navigate, language]);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      if (currentScrollY > lastScrollY && currentScrollY > 80) {
-        setShowTopBar(false);
-      } else {
-        setShowTopBar(true);
-      }
-      setLastScrollY(currentScrollY);
-    };
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [lastScrollY]);
 
   const handleGlobalSearch = (query) => {
     navigate(`${createPageUrl('Home')}?search=${encodeURIComponent(query)}`);
@@ -233,7 +218,7 @@ function LayoutContent({ children, currentPageName }) {
       `}</style>
       
       {/* Top Header - Trust Green Style */}
-      <header className={`w-full ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-[#E5E7EB]'} z-50 shadow-sm border-b pt-safe sticky top-0 transition-transform duration-300 ${showTopBar ? 'translate-y-0' : '-translate-y-full'}`}>
+      <header className={`w-full ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-[#E5E7EB]'} z-50 shadow-sm border-b pt-safe`}>
         
         {/* Search & Address Bar */}
         <div className="px-3 py-1.5 space-y-1.5">
