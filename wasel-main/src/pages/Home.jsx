@@ -331,6 +331,33 @@ const Home = () => {
     enabled: products.length > 0,
   });
 
+  const handleAddToCart = (product) => {
+    addToCart(product);
+    setAddedToCartProductId(product.id);
+  };
+
+  const normalizeShowcaseItem = (item, itemType) => ({
+    ...normalizeItemRating(item),
+    item_type: itemType,
+    name: item?.name || item?.name_ar || (itemType === 'gift' ? 'Gift Item' : 'Package Item'),
+    image_url: item?.image_url || item?.image || item?.images?.[0] || 'https://placehold.co/400x400/F8FAFC/1F2933?text=Wasel',
+    price: Number(item?.price || item?.customer_price || item?.base_price || 0),
+    customer_price: Number(item?.customer_price || item?.price || item?.base_price || 0),
+    description: item?.description || item?.details || item?.description_ar || '',
+  });
+
+  // Category display configs
+  const categoryDisplayConfig = {
+    'electronics': { label: 'الإلكترونيات', icon: Smartphone, gradient: 'from-blue-500 to-indigo-600', bg: 'bg-blue-50', border: 'border-blue-200' },
+    'food': { label: 'أطعمة ومأكولات', icon: Utensils, gradient: 'from-orange-500 to-red-500', bg: 'bg-orange-50', border: 'border-orange-200' },
+    'restaurants': { label: 'من المطاعم', icon: Utensils, gradient: 'from-red-500 to-pink-500', bg: 'bg-red-50', border: 'border-red-200' },
+    'sweets': { label: 'حلويات', icon: IceCream, gradient: 'from-pink-400 to-purple-500', bg: 'bg-pink-50', border: 'border-pink-200' },
+    'supermarket': { label: 'سوبرماركت', icon: Store, gradient: 'from-green-500 to-emerald-600', bg: 'bg-green-50', border: 'border-green-200' },
+    'gifts': { label: 'هدايا مميزة', icon: Gift, gradient: 'from-purple-500 to-pink-500', bg: 'bg-purple-50', border: 'border-purple-200' },
+    'packages': { label: 'باقات وعروض', icon: Package, gradient: 'from-amber-500 to-orange-500', bg: 'bg-amber-50', border: 'border-amber-200' },
+    'other': { label: 'منتجات متنوعة', icon: ShoppingBag, gradient: 'from-slate-500 to-gray-600', bg: 'bg-slate-50', border: 'border-slate-200' },
+  };
+
   // Categorize products for category sections
   const categorizedProducts = useMemo(() => {
     const cats = {};
@@ -344,18 +371,6 @@ const Home = () => {
     if (packages.length > 0) cats['packages'] = packages.map(p => normalizeShowcaseItem(p, 'package'));
     return cats;
   }, [products, gifts, packages]);
-
-  // Category display configs
-  const categoryDisplayConfig = {
-    'electronics': { label: 'الإلكترونيات', icon: Smartphone, gradient: 'from-blue-500 to-indigo-600', bg: 'bg-blue-50', border: 'border-blue-200' },
-    'food': { label: 'أطعمة ومأكولات', icon: Utensils, gradient: 'from-orange-500 to-red-500', bg: 'bg-orange-50', border: 'border-orange-200' },
-    'restaurants': { label: 'من المطاعم', icon: Utensils, gradient: 'from-red-500 to-pink-500', bg: 'bg-red-50', border: 'border-red-200' },
-    'sweets': { label: 'حلويات', icon: IceCream, gradient: 'from-pink-400 to-purple-500', bg: 'bg-pink-50', border: 'border-pink-200' },
-    'supermarket': { label: 'سوبرماركت', icon: Store, gradient: 'from-green-500 to-emerald-600', bg: 'bg-green-50', border: 'border-green-200' },
-    'gifts': { label: 'هدايا مميزة', icon: Gift, gradient: 'from-purple-500 to-pink-500', bg: 'bg-purple-50', border: 'border-purple-200' },
-    'packages': { label: 'باقات وعروض', icon: Package, gradient: 'from-amber-500 to-orange-500', bg: 'bg-amber-50', border: 'border-amber-200' },
-    'other': { label: 'منتجات متنوعة', icon: ShoppingBag, gradient: 'from-slate-500 to-gray-600', bg: 'bg-slate-50', border: 'border-slate-200' },
-  };
 
   const categories = [
     { name: 'الرئيسية', link: 'Home', active: true },
@@ -375,21 +390,6 @@ const Home = () => {
     { name: 'قصص محلية', icon: Sparkles, link: 'LocalSpotlight', image: '/categories/local-spotlight.jpg', fallback: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1000&auto=format&fit=crop' },
     { name: 'تتبع الطلب', icon: Truck, link: 'TrackOrder', image: '/categories/track-order.jpg', fallback: 'https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?q=80&w=1000&auto=format&fit=crop' },
   ];
-
-  const handleAddToCart = (product) => {
-    addToCart(product);
-    setAddedToCartProductId(product.id);
-  };
-
-  const normalizeShowcaseItem = (item, itemType) => ({
-    ...normalizeItemRating(item),
-    item_type: itemType,
-    name: item?.name || item?.name_ar || (itemType === 'gift' ? 'Gift Item' : 'Package Item'),
-    image_url: item?.image_url || item?.image || item?.images?.[0] || 'https://placehold.co/400x400/F8FAFC/1F2933?text=Wasel',
-    price: Number(item?.price || item?.customer_price || item?.base_price || 0),
-    customer_price: Number(item?.customer_price || item?.price || item?.base_price || 0),
-    description: item?.description || item?.details || item?.description_ar || '',
-  });
 
   const mixedRecommendations = useMemo(() => {
     const mixed = [
