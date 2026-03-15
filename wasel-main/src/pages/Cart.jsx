@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 import { base44 } from '@/api/base44Client';
 import PayPalModal from '@/components/payment/PayPalModal';
 import EnvelopeGift from '@/components/cart/EnvelopeGift';
-import { getCountriesArabicNames, getCountryByArabicName, getCallingCode, getCountryByCode, COUNTRIES } from '@/utils/countryData';
+import { getCountriesArabicNames, getCountryByArabicName, getCallingCode, getCountryByCode, COUNTRIES, getCountryFlag } from '@/utils/countryData';
 import {
   getSavedSenderInfo,
   getSavedReceiverInfo,
@@ -1014,7 +1014,7 @@ function PaymentMethodSelector({ selected, onChange, allowOnlinePayment = true, 
 // ORDER SUMMARY - المجموع الفرعي = مجموع الأسعار المعروضة (مع الزيادة)
 // الخصم = الزيادة الوهمية، المجموع بعد الخصم = السعر الأصلي من Base44
 // =====================================================
-function OrderSummary({ displayedSubtotalSYP, originalTotalSYP, membershipDiscountSYP = 0, tipSYP = 0, couponDiscountSYP = 0, isFreeDelivery = false, appliedCouponCode = null, paymentMethod = 'paypal', exchangeRate = EXCHANGE_RATE, insideSyria = false, isFreeOrderEligible = false }) {
+function OrderSummary({ displayedSubtotalSYP, originalTotalSYP, membershipDiscountSYP = 0, tipSYP = 0, couponDiscountSYP = 0, isFreeDelivery = false, appliedCouponCode = null, paymentMethod = 'paypal', exchangeRate = EXCHANGE_RATE, insideSyria = false, isFreeOrderEligible = false, userOrdersCount = 999 }) {
   const [showServiceFeeInfo, setShowServiceFeeInfo] = useState(false);
   
   // الخصم الوهمي = الفرق بين السعر المعروض والسعر الأصلي
@@ -1022,10 +1022,10 @@ function OrderSummary({ displayedSubtotalSYP, originalTotalSYP, membershipDiscou
   
   // ===== نظام الرسوم =====
   // داخل سوريا: رسوم الخدمة مجانية، توصيل $1
-  // خارج سوريا: رسوم الخدمة $6، توصيل مجاني دائماً
+  // خارج سوريا: رسوم التوصيل $3 (كانت $6)، رسوم الخدمة $6
   // أول 3 طلبات: خصم 50% على رسوم الخدمة + توصيل مجاني
   let SERVICE_FEE_USD = insideSyria ? 0 : 6;
-  let DELIVERY_FEE_USD = insideSyria ? 1 : 0; // توصيل مجاني دائماً للخارج
+  let DELIVERY_FEE_USD = insideSyria ? 1 : 3; // كانت $6 صارت $3 للخارج
   
   // رسوم خاصة للسلة المشتركة: $6 خدمة + $3 توصيل
   if (paymentMethod === 'shared_cart') {
@@ -1145,6 +1145,9 @@ function OrderSummary({ displayedSubtotalSYP, originalTotalSYP, membershipDiscou
             {!insideSyria && userOrdersCount < 3 && SERVICE_FEE_USD > 0 && (
               <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold animate-pulse">خصم 50% - أول 3 طلبات</span>
             )}
+            {!insideSyria && userOrdersCount >= 3 && SERVICE_FEE_USD > 0 && (
+              <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full font-bold">رسوم ثابتة</span>
+            )}
             <button 
               onClick={() => setShowServiceFeeInfo(!showServiceFeeInfo)}
               className="text-xs text-blue-500 hover:text-blue-700 cursor-pointer transition-colors"
@@ -1179,9 +1182,15 @@ function OrderSummary({ displayedSubtotalSYP, originalTotalSYP, membershipDiscou
 
         {/* Delivery Fee */}
         <div className="flex justify-between text-sm items-center" dir="rtl">
-          <span className="text-gray-600">رسوم التوصيل</span>
+          <span className="text-gray-600 flex items-center gap-1">
+            رسوم التوصيل
+            {!insideSyria && DELIVERY_FEE_USD > 0 && (
+              <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold">كانت $6</span>
+            )}
+          </span>
           {DELIVERY_FEE_USD === 0 || isFreeDelivery ? (
             <div className="flex items-center gap-2">
+              {!insideSyria && <span className="text-gray-400 line-through text-xs">$6.00</span>}
               {isFreeDelivery && <span className="text-gray-400 line-through text-xs">{FAKE_DELIVERY_FEE_SYP} ل.س</span>}
               <span className="text-green-600 font-bold">مجاناً 🎁</span>
             </div>
@@ -1564,20 +1573,50 @@ const Cart = () => {
 
     // Auto-detect country via IP geolocation for first-time users
     if (!countryWasSet && !insideSyria) {
-      fetch('https://ip2c.org/s')
-        .then(res => res.text())
-        .then(data => {
-          // Format: "1;CC;CCC;Country Name" e.g. "1;AE;ARE;United Arab Emirates"
-          const parts = data.split(';');
-          if (parts[0] === '1' && parts[1]) {
-            const countryCode = parts[1]; // ISO 2-letter code
-            const match = COUNTRIES.find(c => c.code === countryCode);
-            if (match) {
-              setSenderCountry(match.name_ar);
+      // Try browser Geolocation API first for more accuracy
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            // Reverse geocode using Nominatim (free, no API key)
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&accept-language=ar`)
+              .then(r => r.json())
+              .then(geo => {
+                const cc = geo?.address?.country_code?.toUpperCase();
+                if (cc) {
+                  const match = COUNTRIES.find(c => c.code === cc);
+                  if (match) setSenderCountry(match.name_ar);
+                }
+              })
+              .catch(() => {});
+          },
+          () => {
+            // Geolocation denied/failed, fall back to IP
+            fetch('https://ip2c.org/s')
+              .then(res => res.text())
+              .then(data => {
+                const parts = data.split(';');
+                if (parts[0] === '1' && parts[1]) {
+                  const match = COUNTRIES.find(c => c.code === parts[1]);
+                  if (match) setSenderCountry(match.name_ar);
+                }
+              })
+              .catch(() => {});
+          },
+          { enableHighAccuracy: false, timeout: 5000 }
+        );
+      } else {
+        // No Geolocation support, use IP
+        fetch('https://ip2c.org/s')
+          .then(res => res.text())
+          .then(data => {
+            const parts = data.split(';');
+            if (parts[0] === '1' && parts[1]) {
+              const match = COUNTRIES.find(c => c.code === parts[1]);
+              if (match) setSenderCountry(match.name_ar);
             }
-          }
-        })
-        .catch(() => { /* silently fail, keep default */ });
+          })
+          .catch(() => {});
+      }
     }
   }, []);
 
@@ -1702,7 +1741,7 @@ const Cart = () => {
   
   // رسوم التوصيل والخدمة - تطابق ما يراه المستخدم في OrderSummary
   let SERVICE_FEE_USD = insideSyria ? 0 : 6;
-  let DELIVERY_FEE_USD = insideSyria ? 1 : 0; // توصيل مجاني دائماً للخارج
+  let DELIVERY_FEE_USD = insideSyria ? 1 : 3; // كانت $6 صارت $3 للخارج
 
   // رسوم خاصة للسلة المشتركة: $6 خدمة + $3 توصيل
   if (paymentMethod === 'shared_cart') {
@@ -3402,16 +3441,19 @@ const Cart = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1" dir="rtl">الدولة *</label>
-                  <select 
-                    value={senderCountry}
-                    onChange={(e) => setSenderCountry(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366] transition-all" 
-                    dir="rtl"
-                  >
-                    {getCountriesArabicNames().map(country => (
-                      <option key={country} value={country}>{country}</option>
-                    ))}
-                  </select>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">{getCountryFlag(getCountryByArabicName(senderCountry)?.code || 'AE')}</span>
+                    <select 
+                      value={senderCountry}
+                      onChange={(e) => setSenderCountry(e.target.value)}
+                      className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366] transition-all" 
+                      dir="rtl"
+                    >
+                      {COUNTRIES.map(c => (
+                        <option key={c.code} value={c.name_ar}>{getCountryFlag(c.code)} {c.name_ar}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div>
@@ -3631,6 +3673,7 @@ const Cart = () => {
           exchangeRate={exchangeRate}
           insideSyria={insideSyria}
           isFreeOrderEligible={isFreeOrderEligible}
+          userOrdersCount={userOrdersCount}
         />
 
         {insideSyria && (

@@ -1,11 +1,11 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { base44 } from '../api/base44Client';
 
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ChevronDown, Bell, Heart, Star, Package, Gift, Smartphone, Utensils, IceCream, Store, Sparkles, Truck, Plus } from 'lucide-react';
+import { Search, ChevronDown, Bell, Heart, Star, Package, Gift, Smartphone, Utensils, IceCream, Store, Sparkles, Truck, Plus, Crown, TrendingUp, ShoppingBag, Flame } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useCart } from '@/components/cart/CartContext';
@@ -258,6 +258,62 @@ const Home = () => {
     }
   });
 
+  // Best-selling products from order_items
+  const { data: bestSellingProducts = [] } = useQuery({
+    queryKey: ['best-selling-products', products],
+    queryFn: async () => {
+      try {
+        const { data: orderItems } = await supabase
+          .from('order_items')
+          .select('product_name, product_id, quantity, price, image_url');
+        if (!orderItems?.length) return products.slice(0, 8);
+        // Aggregate by product_name
+        const salesMap = {};
+        orderItems.forEach(item => {
+          const key = item.product_name || item.product_id;
+          if (!key) return;
+          if (!salesMap[key]) salesMap[key] = { name: key, totalQty: 0, product_id: item.product_id, image_url: item.image_url, price: item.price };
+          salesMap[key].totalQty += (item.quantity || 1);
+        });
+        const sorted = Object.values(salesMap).sort((a, b) => b.totalQty - a.totalQty).slice(0, 12);
+        // Match with actual products for full data
+        return sorted.map(sale => {
+          const match = products.find(p => p.id === sale.product_id || p.name === sale.name);
+          return match ? { ...match, _soldCount: sale.totalQty } : { id: sale.product_id || sale.name, name: sale.name, price: sale.price, image_url: sale.image_url, _soldCount: sale.totalQty };
+        }).filter(Boolean);
+      } catch {
+        return products.slice(0, 8);
+      }
+    },
+    enabled: products.length > 0,
+  });
+
+  // Categorize products for category sections
+  const categorizedProducts = useMemo(() => {
+    const cats = {};
+    products.forEach(p => {
+      const cat = (p.category || 'other').toLowerCase();
+      if (!cats[cat]) cats[cat] = [];
+      cats[cat].push(p);
+    });
+    // Also add gifts and packages as categories
+    if (gifts.length > 0) cats['gifts'] = gifts.map(g => normalizeShowcaseItem(g, 'gift'));
+    if (packages.length > 0) cats['packages'] = packages.map(p => normalizeShowcaseItem(p, 'package'));
+    return cats;
+  }, [products, gifts, packages]);
+
+  // Category display configs
+  const categoryDisplayConfig = {
+    'electronics': { label: 'الإلكترونيات', icon: Smartphone, gradient: 'from-blue-500 to-indigo-600', bg: 'bg-blue-50', border: 'border-blue-200' },
+    'food': { label: 'أطعمة ومأكولات', icon: Utensils, gradient: 'from-orange-500 to-red-500', bg: 'bg-orange-50', border: 'border-orange-200' },
+    'restaurants': { label: 'من المطاعم', icon: Utensils, gradient: 'from-red-500 to-pink-500', bg: 'bg-red-50', border: 'border-red-200' },
+    'sweets': { label: 'حلويات', icon: IceCream, gradient: 'from-pink-400 to-purple-500', bg: 'bg-pink-50', border: 'border-pink-200' },
+    'supermarket': { label: 'سوبرماركت', icon: Store, gradient: 'from-green-500 to-emerald-600', bg: 'bg-green-50', border: 'border-green-200' },
+    'gifts': { label: 'هدايا مميزة', icon: Gift, gradient: 'from-purple-500 to-pink-500', bg: 'bg-purple-50', border: 'border-purple-200' },
+    'packages': { label: 'باقات وعروض', icon: Package, gradient: 'from-amber-500 to-orange-500', bg: 'bg-amber-50', border: 'border-amber-200' },
+    'other': { label: 'منتجات متنوعة', icon: ShoppingBag, gradient: 'from-slate-500 to-gray-600', bg: 'bg-slate-50', border: 'border-slate-200' },
+  };
+
   const categories = [
     { name: 'الرئيسية', link: 'Home', active: true },
     { name: 'مطاعم', link: 'Restaurants' },
@@ -319,6 +375,46 @@ const Home = () => {
 
     handleAddToCart(item);
   };
+
+  // Auto-scroll component for horizontal carousels
+  const AutoScrollRow = useCallback(({ items, renderCard, speed = 40, className = '' }) => {
+    const scrollRef = useRef(null);
+    const animRef = useRef(null);
+    const pausedRef = useRef(false);
+
+    useEffect(() => {
+      const el = scrollRef.current;
+      if (!el || items.length < 2) return;
+      let pos = 0;
+      const step = () => {
+        if (!pausedRef.current && el) {
+          pos += 0.5;
+          if (pos >= el.scrollWidth / 2) pos = 0;
+          el.scrollLeft = pos;
+        }
+        animRef.current = requestAnimationFrame(step);
+      };
+      animRef.current = requestAnimationFrame(step);
+      return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
+    }, [items]);
+
+    // Duplicate for seamless loop
+    const duplicated = [...items, ...items];
+
+    return (
+      <div
+        ref={scrollRef}
+        className={`flex gap-4 overflow-x-auto scrollbar-hide ${className}`}
+        style={{ scrollBehavior: 'auto' }}
+        onMouseEnter={() => { pausedRef.current = true; }}
+        onMouseLeave={() => { pausedRef.current = false; }}
+        onTouchStart={() => { pausedRef.current = true; }}
+        onTouchEnd={() => { setTimeout(() => { pausedRef.current = false; }, 2000); }}
+      >
+        {duplicated.map((item, idx) => renderCard(item, idx))}
+      </div>
+    );
+  }, []);
 
   return (
     <div className={`${isDarkMode ? 'bg-gray-900' : 'bg-[#F7F8FC]'} min-h-screen pb-24 font-['Cairo']`}>
@@ -401,14 +497,14 @@ const Home = () => {
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}
             onClick={() => navigate(createPageUrl('Cart'))}
             className="rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 p-4 cursor-pointer shadow-md hover:shadow-lg transition-shadow">
-            <p className="text-white font-extrabold text-sm mb-1">🚚 توصيل مجاني</p>
-            <p className="text-white/80 text-[11px]">أول 3 طلبات بتوصيل مجاني لجميع المستخدمين</p>
+            <p className="text-white font-extrabold text-sm mb-1">🚚 توصيل $3 فقط</p>
+            <p className="text-white/80 text-[11px]">كانت $6 صارت $3 + أول 3 طلبات بتوصيل مجاني</p>
           </motion.div>
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }}
             onClick={() => navigate(createPageUrl('Cart'))}
             className="rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 p-4 cursor-pointer shadow-md hover:shadow-lg transition-shadow">
-            <p className="text-white font-extrabold text-sm mb-1">🔥 رسوم خدمة 50%</p>
-            <p className="text-white/80 text-[11px]">رسوم الخدمة $3 بدلاً من $6 لفترة محدودة</p>
+            <p className="text-white font-extrabold text-sm mb-1">🔥 خصم 50% على الخدمة</p>
+            <p className="text-white/80 text-[11px]">أول 3 طلبات رسوم الخدمة $3 بدلاً من $6</p>
           </motion.div>
         </div>
 
@@ -442,6 +538,57 @@ const Home = () => {
             ))}
           </div>
         </div>
+
+        {/* 🔥 Best Selling Products - Auto Scroll */}
+        {bestSellingProducts.length > 0 && (
+          <div className="mb-10" dir="rtl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-2 bg-gradient-to-l from-red-500 to-orange-500 text-white px-4 py-2 rounded-2xl shadow-lg">
+                <Flame className="w-5 h-5" />
+                <h3 className="font-black text-lg">الأكثر مبيعاً</h3>
+              </div>
+              <div className="h-[2px] flex-1 bg-gradient-to-l from-transparent to-red-200 rounded-full" />
+            </div>
+            <AutoScrollRow
+              items={bestSellingProducts}
+              renderCard={(item, idx) => (
+                <motion.div
+                  key={`best-${idx}-${item.id}`}
+                  whileHover={{ y: -4 }}
+                  className={`min-w-[160px] max-w-[180px] shrink-0 rounded-2xl overflow-hidden shadow-md border cursor-pointer relative ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}
+                  onClick={() => { setDetailItem(item); setShowDetailModal(true); }}
+                >
+                  {/* Rank Badge */}
+                  {idx < bestSellingProducts.length && (
+                    <div className={`absolute top-2 right-2 z-10 w-7 h-7 rounded-full flex items-center justify-center text-xs font-black text-white shadow-lg ${
+                      (idx % bestSellingProducts.length) === 0 ? 'bg-gradient-to-br from-yellow-400 to-amber-500' :
+                      (idx % bestSellingProducts.length) === 1 ? 'bg-gradient-to-br from-gray-300 to-gray-400' :
+                      (idx % bestSellingProducts.length) === 2 ? 'bg-gradient-to-br from-amber-600 to-amber-700' :
+                      'bg-gradient-to-br from-blue-500 to-blue-600'
+                    }`}>
+                      {(idx % bestSellingProducts.length) + 1}
+                    </div>
+                  )}
+                  <img
+                    src={item.image_url || 'https://placehold.co/400x400/F9FAF8/1F2933?text=Wasel'}
+                    alt={item.name}
+                    className="w-full h-32 object-contain bg-gradient-to-b from-[#FAFBFC] to-[#F1F5F9] p-3"
+                    loading="lazy"
+                  />
+                  <div className="p-3">
+                    <h4 className={`font-bold text-sm truncate mb-1 ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`}>{item.name}</h4>
+                    {item._soldCount && (
+                      <p className="text-[11px] text-emerald-600 font-semibold mb-1">🛒 تم بيع {item._soldCount}+</p>
+                    )}
+                    <div className="flex items-center justify-between mt-1">
+                      <PriceDisplay basePrice={item.price} />
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            />
+          </div>
+        )}
 
         {/* Product Grid */}
         <div>
@@ -597,6 +744,80 @@ const Home = () => {
             })}
           </div>
         </div>
+        </div>
+
+        {/* 🎯 Category Auto-Scroll Sections */}
+        <div className="px-1 space-y-8 mb-8">
+          {Object.entries(categorizedProducts).map(([catKey, catItems]) => {
+            if (catItems.length < 2) return null;
+            const config = categoryDisplayConfig[catKey] || categoryDisplayConfig['other'];
+            const IconComp = config.icon;
+            const isAltStyle = ['gifts', 'packages', 'sweets', 'food'].includes(catKey);
+
+            return (
+              <div key={catKey} dir="rtl">
+                {/* Section Header */}
+                <div className="flex items-center gap-3 mb-4">
+                  <div className={`flex items-center gap-2 bg-gradient-to-l ${config.gradient} text-white px-4 py-2 rounded-2xl shadow-md`}>
+                    <IconComp className="w-4 h-4" />
+                    <h3 className="font-black text-base">{config.label}</h3>
+                  </div>
+                  <div className={`h-[2px] flex-1 rounded-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                  <button onClick={() => {
+                    const link = catKey === 'gifts' ? 'Gifts' : catKey === 'packages' ? 'Packages' : catKey === 'restaurants' ? 'Restaurants' : catKey === 'electronics' ? 'Electronics' : catKey === 'sweets' ? 'Sweets' : catKey === 'supermarket' ? 'Supermarket' : 'Home';
+                    navigate(createPageUrl(link));
+                  }} className="text-xs text-blue-600 font-bold whitespace-nowrap">عرض الكل ←</button>
+                </div>
+
+                {/* Auto-scrolling cards */}
+                <AutoScrollRow
+                  items={catItems}
+                  renderCard={(item, idx) => (
+                    <motion.div
+                      key={`cat-${catKey}-${idx}-${item.id}`}
+                      whileHover={{ y: -3, scale: 1.02 }}
+                      transition={{ type: 'spring', stiffness: 300 }}
+                      className={`shrink-0 cursor-pointer rounded-2xl overflow-hidden shadow-sm border transition-shadow hover:shadow-lg ${
+                        isAltStyle
+                          ? `${isDarkMode ? 'bg-gray-800 border-gray-700' : `${config.bg} ${config.border}`} min-w-[200px] max-w-[220px]`
+                          : `${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'} min-w-[170px] max-w-[190px]`
+                      }`}
+                      onClick={() => { setDetailItem(item); setShowDetailModal(true); }}
+                    >
+                      <div className="relative">
+                        <img
+                          src={item.image_url || 'https://placehold.co/400x400/F9FAF8/1F2933?text=Wasel'}
+                          alt={item.name}
+                          className={`w-full object-contain p-2 ${isAltStyle ? 'h-36 bg-white/60' : 'h-28 bg-[#FAFBFC]'}`}
+                          loading="lazy"
+                        />
+                        {item.category && (
+                          <span className={`absolute bottom-1 left-1 text-[10px] px-2 py-0.5 rounded-full font-semibold bg-gradient-to-l ${config.gradient} text-white`}>
+                            {item.category}
+                          </span>
+                        )}
+                      </div>
+                      <div className="p-2.5">
+                        <h4 className={`font-bold text-sm truncate ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`}>{item.name}</h4>
+                        {item.description && (
+                          <p className={`text-[11px] line-clamp-1 mt-0.5 ${isDarkMode ? 'text-gray-400' : 'text-[#64748B]'}`}>{item.description}</p>
+                        )}
+                        <div className="flex items-center justify-between mt-2">
+                          <PriceDisplay basePrice={item.price || item.customer_price} />
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }}
+                            className={`w-7 h-7 rounded-full flex items-center justify-center text-white bg-gradient-to-l ${config.gradient} shadow-sm hover:shadow-md transition-shadow`}
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                />
+              </div>
+            );
+          })}
         </div>
 
         {/* Social Proof - آراء العملاء الحقيقية */}

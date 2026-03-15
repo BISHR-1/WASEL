@@ -1309,6 +1309,24 @@ export default function DriverPanel() {
                       <div className="flex items-start justify-between gap-3"><div><h3 className="font-black text-[#1E3A8A] text-xl">طلب #{focusedOrder.order_number || String(focusedOrder.id).slice(0, 8)}</h3><p className="text-sm text-[#475569] mt-1">بطاقة الطلب الحالية. الأزرار تظهر تدريجيًا حسب الحالة.</p></div><Badge className={`${(STATUS_LABELS[focusedOrder.assignment_status] || STATUS_LABELS.assigned).color} border-0`}>{(STATUS_LABELS[focusedOrder.assignment_status] || STATUS_LABELS.assigned).label}</Badge></div>
                       <div className="mt-3 space-y-1 text-sm text-[#334155]"><p className="flex items-center gap-1"><User className="w-4 h-4" /> {focusedOrder.recipient_details?.name || '-'}</p><p className="flex items-center gap-1"><Phone className="w-4 h-4" /> {focusedOrder.recipient_details?.phone || '-'}</p><p className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {focusedOrder.recipient_details?.address || '-'}</p>
 {(() => {
+  const addr = focusedOrder.recipient_details?.address || '';
+  const coordMatch = addr.match(/📍\s*([-\d.]+),\s*([-\d.]+)/);
+  if (!coordMatch) return null;
+  const lat = coordMatch[1];
+  const lng = coordMatch[2];
+  return (
+    <a
+      href={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-2 mt-2 py-2 px-3 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors w-fit"
+    >
+      <MapPin className="w-4 h-4" />
+      فتح الموقع في خرائط Google
+    </a>
+  );
+})()}
+{(() => {
   const userTime = focusedOrder.recipient_details?.delivery_time;
   const supervisorTime = focusedOrder.delivery_time || `${focusedOrder.preferred_delivery_date || ''} ${focusedOrder.preferred_delivery_time || ''}`.trim();
   const timeToShow = userTime || supervisorTime;

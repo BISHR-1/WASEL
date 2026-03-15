@@ -76,3 +76,14 @@ export function getCountryCodeFromArabicName(arabicName) {
   const country = getCountryByArabicName(arabicName);
   return country?.code || null;
 }
+
+/**
+ * Get country flag emoji from 2-letter ISO code
+ */
+export function getCountryFlag(code) {
+  if (!code || code.length !== 2) return '';
+  const upper = code.toUpperCase();
+  return String.fromCodePoint(
+    ...[...upper].map(c => 0x1F1E6 + c.charCodeAt(0) - 65)
+  );
+}
