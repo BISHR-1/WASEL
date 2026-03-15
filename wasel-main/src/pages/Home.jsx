@@ -32,24 +32,35 @@ const AutoScrollRow = ({ items, renderCard, className = '' }) => {
   const animRef = useRef(null);
   const pausedRef = useRef(false);
   const posRef = useRef(0);
+  const startedRef = useRef(false);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || items.length < 2) return;
-    // Start from the right edge for RTL scrolling
-    el.scrollLeft = el.scrollWidth / 2;
-    posRef.current = el.scrollWidth / 2;
+    startedRef.current = false;
+
+    // Delay start so images load and scrollWidth is correct
+    const initTimer = setTimeout(() => {
+      if (!el) return;
+      posRef.current = 0;
+      el.scrollLeft = 0;
+      startedRef.current = true;
+    }, 600);
 
     const step = () => {
-      if (!pausedRef.current && el) {
-        posRef.current -= 0.5; // scroll left (RTL direction)
-        if (posRef.current <= 0) posRef.current = el.scrollWidth / 2;
+      if (startedRef.current && !pausedRef.current && el) {
+        posRef.current += 0.5; // scroll to the left visually (LTR scrollLeft increases)
+        // Reset when we've scrolled through the first copy
+        if (posRef.current >= el.scrollWidth / 2) posRef.current = 0;
         el.scrollLeft = posRef.current;
       }
       animRef.current = requestAnimationFrame(step);
     };
     animRef.current = requestAnimationFrame(step);
-    return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
+    return () => {
+      clearTimeout(initTimer);
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+    };
   }, [items]);
 
   const duplicated = [...items, ...items];
@@ -558,8 +569,7 @@ const Home = () => {
                 <motion.div
                   key={`best-${idx}-${item.id}`}
                   whileHover={{ y: -4 }}
-                  className={`min-w-[160px] max-w-[180px] shrink-0 rounded-2xl overflow-hidden shadow-md border cursor-pointer relative ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}
-                  onClick={() => { setDetailItem(item); setShowDetailModal(true); }}
+                  className={`min-w-[180px] max-w-[200px] shrink-0 rounded-2xl overflow-hidden shadow-md border relative ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}
                 >
                   {/* Rank Badge */}
                   {idx < bestSellingProducts.length && (
@@ -575,16 +585,23 @@ const Home = () => {
                   <img
                     src={item.image_url || 'https://placehold.co/400x400/F9FAF8/1F2933?text=Wasel'}
                     alt={item.name}
-                    className="w-full h-32 object-contain bg-gradient-to-b from-[#FAFBFC] to-[#F1F5F9] p-3"
+                    className="w-full h-32 object-contain bg-gradient-to-b from-[#FAFBFC] to-[#F1F5F9] p-3 cursor-pointer"
                     loading="lazy"
+                    onClick={() => { setDetailItem(item); setShowDetailModal(true); }}
                   />
                   <div className="p-3">
                     <h4 className={`font-bold text-sm truncate mb-1 ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`}>{item.name}</h4>
                     {item._soldCount && (
                       <p className="text-[11px] text-emerald-600 font-semibold mb-1">🛒 تم بيع {item._soldCount}+</p>
                     )}
-                    <div className="flex items-center justify-between mt-1">
+                    <div className="flex items-center justify-between mt-2">
                       <PriceDisplay basePrice={item.price} />
+                      <AddToCartButton
+                        onClick={() => handleAddToCart(item)}
+                        isLoading={addedToCartProductId === item.id}
+                        label="أضف"
+                        className="w-auto px-3 text-xs"
+                      />
                     </div>
                   </div>
                 </motion.div>
@@ -593,8 +610,79 @@ const Home = () => {
           </div>
         )}
 
-        {/* Product Grid */}
-        <div>
+        {/* 🎯 Category Auto-Scroll Sections */}
+        <div className="space-y-8 mb-10">
+          {Object.entries(categorizedProducts).map(([catKey, catItems]) => {
+            if (catItems.length < 2) return null;
+            const config = categoryDisplayConfig[catKey] || categoryDisplayConfig['other'];
+            const IconComp = config.icon;
+
+            return (
+              <div key={catKey} dir="rtl">
+                {/* Section Header */}
+                <div className="flex items-center gap-3 mb-4">
+                  <div className={`flex items-center gap-2 bg-gradient-to-l ${config.gradient} text-white px-4 py-2 rounded-2xl shadow-md`}>
+                    <IconComp className="w-4 h-4" />
+                    <h3 className="font-black text-base">{config.label}</h3>
+                  </div>
+                  <div className={`h-[2px] flex-1 rounded-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                  <button onClick={() => {
+                    const link = catKey === 'gifts' ? 'Gifts' : catKey === 'packages' ? 'Packages' : catKey === 'restaurants' ? 'Restaurants' : catKey === 'electronics' ? 'Electronics' : catKey === 'sweets' ? 'Sweets' : catKey === 'supermarket' ? 'Supermarket' : 'Home';
+                    navigate(createPageUrl(link));
+                  }} className="text-xs text-blue-600 font-bold whitespace-nowrap">عرض الكل ←</button>
+                </div>
+
+                {/* Auto-scrolling cards */}
+                <AutoScrollRow
+                  items={catItems}
+                  renderCard={(item, idx) => (
+                    <motion.div
+                      key={`cat-${catKey}-${idx}-${item.id}`}
+                      whileHover={{ y: -3, scale: 1.02 }}
+                      transition={{ type: 'spring', stiffness: 300 }}
+                      className={`shrink-0 rounded-2xl overflow-hidden shadow-sm border transition-shadow hover:shadow-lg ${
+                        isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'
+                      } min-w-[190px] max-w-[210px]`}
+                    >
+                      <div className="relative">
+                        <img
+                          src={item.image_url || 'https://placehold.co/400x400/F9FAF8/1F2933?text=Wasel'}
+                          alt={item.name}
+                          className="w-full h-32 object-contain p-2 bg-[#FAFBFC] cursor-pointer"
+                          loading="lazy"
+                          onClick={() => { setDetailItem(item); setShowDetailModal(true); }}
+                        />
+                        {item.category && (
+                          <span className={`absolute bottom-1 left-1 text-[10px] px-2 py-0.5 rounded-full font-semibold bg-gradient-to-l ${config.gradient} text-white`}>
+                            {item.category}
+                          </span>
+                        )}
+                      </div>
+                      <div className="p-2.5">
+                        <h4 className={`font-bold text-sm truncate ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`}>{item.name}</h4>
+                        {item.description && (
+                          <p className={`text-[11px] line-clamp-1 mt-0.5 ${isDarkMode ? 'text-gray-400' : 'text-[#64748B]'}`}>{item.description}</p>
+                        )}
+                        <div className="flex items-center justify-between mt-2">
+                          <PriceDisplay basePrice={item.price || item.customer_price} />
+                          <AddToCartButton
+                            onClick={() => handleAddToCart(item)}
+                            isLoading={addedToCartProductId === item.id}
+                            label="أضف"
+                            className="w-auto px-3 text-xs"
+                          />
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                />
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Product Grid - أحدث المنتجات */}
+        <div className="mt-10">
           <h3 className={`font-black text-xl mb-3 ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`} dir="rtl">أحدث المنتجات</h3>
           {productsLoading ? (
             <div className="flex items-center justify-center p-12">
@@ -747,80 +835,6 @@ const Home = () => {
             })}
           </div>
         </div>
-        </div>
-
-        {/* 🎯 Category Auto-Scroll Sections */}
-        <div className="px-1 space-y-8 mb-8">
-          {Object.entries(categorizedProducts).map(([catKey, catItems]) => {
-            if (catItems.length < 2) return null;
-            const config = categoryDisplayConfig[catKey] || categoryDisplayConfig['other'];
-            const IconComp = config.icon;
-            const isAltStyle = ['gifts', 'packages', 'sweets', 'food'].includes(catKey);
-
-            return (
-              <div key={catKey} dir="rtl">
-                {/* Section Header */}
-                <div className="flex items-center gap-3 mb-4">
-                  <div className={`flex items-center gap-2 bg-gradient-to-l ${config.gradient} text-white px-4 py-2 rounded-2xl shadow-md`}>
-                    <IconComp className="w-4 h-4" />
-                    <h3 className="font-black text-base">{config.label}</h3>
-                  </div>
-                  <div className={`h-[2px] flex-1 rounded-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
-                  <button onClick={() => {
-                    const link = catKey === 'gifts' ? 'Gifts' : catKey === 'packages' ? 'Packages' : catKey === 'restaurants' ? 'Restaurants' : catKey === 'electronics' ? 'Electronics' : catKey === 'sweets' ? 'Sweets' : catKey === 'supermarket' ? 'Supermarket' : 'Home';
-                    navigate(createPageUrl(link));
-                  }} className="text-xs text-blue-600 font-bold whitespace-nowrap">عرض الكل ←</button>
-                </div>
-
-                {/* Auto-scrolling cards */}
-                <AutoScrollRow
-                  items={catItems}
-                  renderCard={(item, idx) => (
-                    <motion.div
-                      key={`cat-${catKey}-${idx}-${item.id}`}
-                      whileHover={{ y: -3, scale: 1.02 }}
-                      transition={{ type: 'spring', stiffness: 300 }}
-                      className={`shrink-0 cursor-pointer rounded-2xl overflow-hidden shadow-sm border transition-shadow hover:shadow-lg ${
-                        isAltStyle
-                          ? `${isDarkMode ? 'bg-gray-800 border-gray-700' : `${config.bg} ${config.border}`} min-w-[200px] max-w-[220px]`
-                          : `${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'} min-w-[170px] max-w-[190px]`
-                      }`}
-                      onClick={() => { setDetailItem(item); setShowDetailModal(true); }}
-                    >
-                      <div className="relative">
-                        <img
-                          src={item.image_url || 'https://placehold.co/400x400/F9FAF8/1F2933?text=Wasel'}
-                          alt={item.name}
-                          className={`w-full object-contain p-2 ${isAltStyle ? 'h-36 bg-white/60' : 'h-28 bg-[#FAFBFC]'}`}
-                          loading="lazy"
-                        />
-                        {item.category && (
-                          <span className={`absolute bottom-1 left-1 text-[10px] px-2 py-0.5 rounded-full font-semibold bg-gradient-to-l ${config.gradient} text-white`}>
-                            {item.category}
-                          </span>
-                        )}
-                      </div>
-                      <div className="p-2.5">
-                        <h4 className={`font-bold text-sm truncate ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`}>{item.name}</h4>
-                        {item.description && (
-                          <p className={`text-[11px] line-clamp-1 mt-0.5 ${isDarkMode ? 'text-gray-400' : 'text-[#64748B]'}`}>{item.description}</p>
-                        )}
-                        <div className="flex items-center justify-between mt-2">
-                          <PriceDisplay basePrice={item.price || item.customer_price} />
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }}
-                            className={`w-7 h-7 rounded-full flex items-center justify-center text-white bg-gradient-to-l ${config.gradient} shadow-sm hover:shadow-md transition-shadow`}
-                          >
-                            <Plus className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                />
-              </div>
-            );
-          })}
         </div>
 
         {/* Social Proof - آراء العملاء الحقيقية */}
