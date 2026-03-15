@@ -52,6 +52,10 @@ import AdminTerms from './pages/AdminTerms';
 import Wallet from './pages/Wallet';
 import CustomerSupport from './pages/CustomerSupport';
 import DownloadApp from './pages/DownloadApp';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import ReturnPolicy from './pages/ReturnPolicy';
+import FAQ from './pages/FAQ';
+import DeliveryInDaraa from './pages/DeliveryInDaraa';
 import __Layout from './Layout.jsx';
 
 
@@ -110,6 +114,10 @@ export const PAGES = {
     "Wallet": Wallet,
     "CustomerSupport": CustomerSupport,
     "DownloadApp": DownloadApp,
+    "PrivacyPolicy": PrivacyPolicy,
+    "ReturnPolicy": ReturnPolicy,
+    "FAQ": FAQ,
+    "DeliveryInDaraa": DeliveryInDaraa,
 }
 
 export const pagesConfig = {

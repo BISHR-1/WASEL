@@ -36,10 +36,27 @@ const Home = () => {
   const [addedToCartProductId, setAddedToCartProductId] = useState(null);
   const [detailItem, setDetailItem] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [recentReviews, setRecentReviews] = useState([]);
+  const [deliveredCount, setDeliveredCount] = useState(0);
 
   // تهيئة الإشعارات عند فتح الصفحة الرئيسية
   useEffect(() => {
     initializePushNotifications();
+  }, []);
+
+  // جلب التقييمات الحقيقية وعدد الطلبات المسلّمة
+  useEffect(() => {
+    const loadSocialProof = async () => {
+      try {
+        const [reviewsRes, ordersRes] = await Promise.all([
+          supabase.from('reviews').select('rating, comment, created_at').gt('rating', 3).order('created_at', { ascending: false }).limit(6),
+          supabase.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'delivered'),
+        ]);
+        if (reviewsRes.data) setRecentReviews(reviewsRes.data.filter(r => r.comment?.trim()));
+        if (ordersRes.count) setDeliveredCount(ordersRes.count);
+      } catch (_) { /* silent */ }
+    };
+    loadSocialProof();
   }, []);
 
   // Auto-hide heart burst animation
@@ -342,7 +359,7 @@ const Home = () => {
           </motion.div>
         )}
 
-        {/* Main Banner - enhanced */}
+        {/* Main Hero - Clear Value Proposition */}
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="relative rounded-2xl overflow-hidden h-44 md:h-52 mb-4 shadow-lg w-full">
           <img
             src="/hero/home-hero.jpg"
@@ -352,17 +369,32 @@ const Home = () => {
               event.currentTarget.src = 'https://placehold.co/1600x640/F1F5F9/1F2933?text=Wasel+Hero';
             }}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent" />
-          <div className="absolute bottom-4 right-4 left-4 flex items-end justify-between" dir="rtl">
-            <div>
-              <p className="text-white font-black text-lg drop-shadow-lg">توصيل سريع لكل سوريا 🚀</p>
-              <p className="text-white/80 text-xs">منتجات • مطاعم • حلويات • هدايا</p>
-            </div>
-            <Button className="bg-[#FFB000] text-[#111827] hover:bg-[#F59E0B] font-bold text-sm px-5 py-2 h-10 rounded-xl shadow-lg transition-all duration-300">
-              اطلب الآن
-            </Button>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+          <div className="absolute bottom-4 right-4 left-4 text-center" dir="rtl">
+            <p className="text-white font-black text-xl md:text-2xl drop-shadow-lg mb-1">أرسل هدية أو طلبات لعائلتك في دَرْعَا بسهولة</p>
+            <p className="text-white/90 text-xs md:text-sm">اختر المنتجات، ادفع من أي مكان في العالم، ونحن نوصلها داخل دَرْعَا</p>
           </div>
         </motion.div>
+
+        {/* Trust Badges */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4" dir="rtl">
+          <div className={`flex items-center gap-2 rounded-xl p-2.5 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} border ${isDarkMode ? 'border-gray-700' : 'border-[#E5E7EB]'} shadow-sm`}>
+            <span className="text-lg">🔒</span>
+            <span className={`text-xs font-bold ${isDarkMode ? 'text-gray-200' : 'text-[#1F2933]'}`}>دفع آمن</span>
+          </div>
+          <div className={`flex items-center gap-2 rounded-xl p-2.5 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} border ${isDarkMode ? 'border-gray-700' : 'border-[#E5E7EB]'} shadow-sm`}>
+            <span className="text-lg">🚚</span>
+            <span className={`text-xs font-bold ${isDarkMode ? 'text-gray-200' : 'text-[#1F2933]'}`}>توصيل سريع داخل دَرْعَا</span>
+          </div>
+          <div className={`flex items-center gap-2 rounded-xl p-2.5 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} border ${isDarkMode ? 'border-gray-700' : 'border-[#E5E7EB]'} shadow-sm`}>
+            <span className="text-lg">💬</span>
+            <span className={`text-xs font-bold ${isDarkMode ? 'text-gray-200' : 'text-[#1F2933]'}`}>دعم عبر واتساب</span>
+          </div>
+          <div className={`flex items-center gap-2 rounded-xl p-2.5 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} border ${isDarkMode ? 'border-gray-700' : 'border-[#E5E7EB]'} shadow-sm`}>
+            <span className="text-lg">⭐</span>
+            <span className={`text-xs font-bold ${isDarkMode ? 'text-gray-200' : 'text-[#1F2933]'}`}>خدمة موثوقة للعائلات</span>
+          </div>
+        </div>
 
         {/* Promo Banners - عروض مغرية */}
         <div className="grid grid-cols-2 gap-3 mb-4" dir="rtl">
@@ -566,6 +598,39 @@ const Home = () => {
           </div>
         </div>
         </div>
+
+        {/* Social Proof - آراء العملاء الحقيقية */}
+        {(recentReviews.length > 0 || deliveredCount > 0) && (
+          <div className="mb-8 px-1" dir="rtl">
+            {deliveredCount > 0 && (
+              <div className={`text-center mb-4 py-3 rounded-xl ${isDarkMode ? 'bg-gray-800' : 'bg-[#ECFDF5]'}`}>
+                <p className={`text-lg font-black ${isDarkMode ? 'text-emerald-400' : 'text-[#065F46]'}`}>
+                  📦 {deliveredCount.toLocaleString()}+ طلب تم توصيله بنجاح
+                </p>
+              </div>
+            )}
+            {recentReviews.length > 0 && (
+              <>
+                <h3 className={`font-black text-xl mb-3 ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`}>آراء عملائنا ⭐</h3>
+                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                  {recentReviews.map((review, idx) => (
+                    <div key={idx} className={`min-w-[220px] max-w-[260px] rounded-xl p-3 border shadow-sm shrink-0 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-[#E5E7EB]'}`}>
+                      <div className="flex gap-0.5 mb-1">
+                        {Array.from({ length: review.rating }, (_, i) => (
+                          <Star key={i} className="w-3.5 h-3.5 text-[#F59E0B] fill-[#F59E0B]" />
+                        ))}
+                      </div>
+                      <p className={`text-xs leading-relaxed line-clamp-3 ${isDarkMode ? 'text-gray-300' : 'text-[#475569]'}`}>{review.comment}</p>
+                      <p className="text-[10px] text-[#94A3B8] mt-1">
+                        {new Date(review.created_at).toLocaleDateString('ar-SY', { year: 'numeric', month: 'short', day: 'numeric' })}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         <ProductDetailModal
           item={detailItem}

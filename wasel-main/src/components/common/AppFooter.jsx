@@ -18,6 +18,10 @@ export default function AppFooter() {
     { label: "كيف يعمل واصل؟", path: "/HowItWorks" },
     { label: "الشفافية والثقة", path: "/Transparency" },
     { label: "شروط وأحكام المستخدمين", path: "/TermsAndConditions" },
+    { label: "سياسة الخصوصية", path: "/PrivacyPolicy" },
+    { label: "سياسة الإرجاع", path: "/ReturnPolicy" },
+    { label: "الأسئلة الشائعة", path: "/FAQ" },
+    { label: "التوصيل داخل درعا", path: "/DeliveryInDaraa" },
   ];
 
   return (

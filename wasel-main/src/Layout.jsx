@@ -299,20 +299,17 @@ function LayoutContent({ children, currentPageName }) {
                 <motion.div
                   whileHover={{ scale: 1.01 }}
                   whileTap={{ scale: 0.99 }}
-                  className="rounded-xl p-3 bg-gradient-to-r from-[#1F7A63] via-[#2FA36B] to-[#34D399] text-white shadow-[0_8px_20px_rgba(31,122,99,0.35)]"
+                  className="rounded-lg px-3 py-1.5 bg-gradient-to-r from-[#1F7A63] via-[#2FA36B] to-[#34D399] text-white shadow-sm"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">🎁</span>
-                      <span className="font-extrabold text-sm" dir="rtl">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm">🎁</span>
+                      <span className="font-extrabold text-xs" dir="rtl">
                         سجل الآن واحصل على 3 طلبات توصيل مجانية
                       </span>
                     </div>
-                    <LogIn className="w-5 h-5" />
+                    <LogIn className="w-4 h-4" />
                   </div>
-                  <p className="text-[11px] text-white/90 mt-1" dir="rtl">
-                    {language === 'ar' ? 'أنشئ حسابك في ثوانٍ وابدأ الطلب' : 'Create your account in seconds and start ordering'}
-                  </p>
                 </motion.div>
               </Link>
             ) : (
@@ -323,22 +320,17 @@ function LayoutContent({ children, currentPageName }) {
                 <motion.div
                   whileHover={{ scale: 1.01 }}
                   whileTap={{ scale: 0.99 }}
-                  className="rounded-xl p-3 bg-gradient-to-r from-[#1D4ED8] via-[#0EA5E9] to-[#F59E0B] text-white shadow-[0_8px_20px_rgba(14,165,233,0.35)]"
+                  className="rounded-lg px-3 py-1.5 bg-gradient-to-r from-[#1D4ED8] via-[#0EA5E9] to-[#F59E0B] text-white shadow-sm"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Crown className="w-5 h-5" />
-                      <span className="font-extrabold text-sm" dir="rtl">
+                    <div className="flex items-center gap-1.5">
+                      <Crown className="w-4 h-4" />
+                      <span className="font-extrabold text-xs" dir="rtl">
                         {isWaselPlusMember ? 'أنت مشترك في Wasel+' : 'اشترك بـ Wasel+ ووفر'}
                       </span>
                     </div>
-                    <Sparkles className="w-4 h-4" />
+                    <Sparkles className="w-3.5 h-3.5" />
                   </div>
-                  {!isWaselPlusMember && (
-                    <p className="text-[11px] text-white/90 mt-1" dir="rtl">
-                      خصومات حصرية وتوصيل مجاني أسرع
-                    </p>
-                  )}
                 </motion.div>
               </Link>
             )}
@@ -358,11 +350,11 @@ function LayoutContent({ children, currentPageName }) {
                 initial={{ opacity: 0.9 }}
                 animate={{ opacity: 1 }}
                 transition={{ repeat: Infinity, repeatType: 'reverse', duration: 1.6 }}
-                className="rounded-xl border border-[#FCD34D] bg-gradient-to-r from-[#FFFBEB] via-[#FEF3C7] to-[#FFF7ED] px-3 py-2 shadow-sm"
+                className="rounded-lg border border-[#FCD34D] bg-gradient-to-r from-[#FFFBEB] via-[#FEF3C7] to-[#FFF7ED] px-2.5 py-1 shadow-sm"
               >
                 <div className="flex items-center justify-between text-[#92400E]">
-                  <span className="text-xs font-black" dir="rtl">خصم 50% لوقت محدود على منتجات مختارة</span>
-                  <span className="text-[11px] font-bold text-[#B45309]">{language === 'ar' ? 'اطلب الآن' : 'Order now'}</span>
+                  <span className="text-[11px] font-black" dir="rtl">خصم 50% لوقت محدود على منتجات مختارة</span>
+                  <span className="text-[10px] font-bold text-[#B45309]">{language === 'ar' ? 'اطلب الآن' : 'Order now'}</span>
                 </div>
               </motion.div>
             </Link>

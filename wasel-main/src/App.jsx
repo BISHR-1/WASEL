@@ -41,7 +41,8 @@ const PUBLIC_PAGES = new Set([
   'Transparency', 'LoyaltyProgram', 'LocalSpotlight', 'Contact',
   'TermsAndConditions', 'CustomerSupport', 'WaselPlusMembership',
   'CourierTerms', 'CourierGuide', 'SupervisorGuide', 'AdminTerms',
-  'Cart', 'Favorites',
+  'Cart', 'Favorites', 'PrivacyPolicy', 'ReturnPolicy', 'FAQ',
+  'DeliveryInDaraa',
 ]);
 
 const GuestLoginRedirect = () => {
