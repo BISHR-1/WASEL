@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { base44 } from '../api/base44Client';
 
 import { useNavigate } from 'react-router-dom';
@@ -25,6 +25,49 @@ import { attachRatingsFromReviews, normalizeItemRating } from '@/lib/itemRatings
 import AdBanner from '@/components/ads/AdBanner';
 
 const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+
+// Standalone auto-scroll horizontal carousel component
+const AutoScrollRow = ({ items, renderCard, className = '' }) => {
+  const scrollRef = useRef(null);
+  const animRef = useRef(null);
+  const pausedRef = useRef(false);
+  const posRef = useRef(0);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || items.length < 2) return;
+    // Start from the right edge for RTL scrolling
+    el.scrollLeft = el.scrollWidth / 2;
+    posRef.current = el.scrollWidth / 2;
+
+    const step = () => {
+      if (!pausedRef.current && el) {
+        posRef.current -= 0.5; // scroll left (RTL direction)
+        if (posRef.current <= 0) posRef.current = el.scrollWidth / 2;
+        el.scrollLeft = posRef.current;
+      }
+      animRef.current = requestAnimationFrame(step);
+    };
+    animRef.current = requestAnimationFrame(step);
+    return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
+  }, [items]);
+
+  const duplicated = [...items, ...items];
+
+  return (
+    <div
+      ref={scrollRef}
+      className={`flex gap-4 overflow-x-auto scrollbar-hide ${className}`}
+      style={{ scrollBehavior: 'auto' }}
+      onMouseEnter={() => { pausedRef.current = true; }}
+      onMouseLeave={() => { pausedRef.current = false; }}
+      onTouchStart={() => { pausedRef.current = true; }}
+      onTouchEnd={() => { setTimeout(() => { pausedRef.current = false; }, 2000); }}
+    >
+      {duplicated.map((item, idx) => renderCard(item, idx))}
+    </div>
+  );
+};
 
 const Home = () => {
   const navigate = useNavigate();
@@ -375,46 +418,6 @@ const Home = () => {
 
     handleAddToCart(item);
   };
-
-  // Auto-scroll component for horizontal carousels
-  const AutoScrollRow = useCallback(({ items, renderCard, speed = 40, className = '' }) => {
-    const scrollRef = useRef(null);
-    const animRef = useRef(null);
-    const pausedRef = useRef(false);
-
-    useEffect(() => {
-      const el = scrollRef.current;
-      if (!el || items.length < 2) return;
-      let pos = 0;
-      const step = () => {
-        if (!pausedRef.current && el) {
-          pos += 0.5;
-          if (pos >= el.scrollWidth / 2) pos = 0;
-          el.scrollLeft = pos;
-        }
-        animRef.current = requestAnimationFrame(step);
-      };
-      animRef.current = requestAnimationFrame(step);
-      return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
-    }, [items]);
-
-    // Duplicate for seamless loop
-    const duplicated = [...items, ...items];
-
-    return (
-      <div
-        ref={scrollRef}
-        className={`flex gap-4 overflow-x-auto scrollbar-hide ${className}`}
-        style={{ scrollBehavior: 'auto' }}
-        onMouseEnter={() => { pausedRef.current = true; }}
-        onMouseLeave={() => { pausedRef.current = false; }}
-        onTouchStart={() => { pausedRef.current = true; }}
-        onTouchEnd={() => { setTimeout(() => { pausedRef.current = false; }, 2000); }}
-      >
-        {duplicated.map((item, idx) => renderCard(item, idx))}
-      </div>
-    );
-  }, []);
 
   return (
     <div className={`${isDarkMode ? 'bg-gray-900' : 'bg-[#F7F8FC]'} min-h-screen pb-24 font-['Cairo']`}>
