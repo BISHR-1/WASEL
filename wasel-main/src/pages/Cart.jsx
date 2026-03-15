@@ -45,6 +45,7 @@ import {
   markOrderCreated,
   logSuspiciousPaymentAttempt,
 } from '@/lib/paymentSecurity';
+import { notifyOrderUsers, notifyAdminUsers } from '@/services/firebaseOrderNotifications';
 
 // =====================================================
 // CONSTANTS
@@ -959,7 +960,7 @@ function PaymentMethodSelector({ selected, onChange, allowOnlinePayment = true, 
           </p>
         </motion.button>
 
-        {/* WhatsApp Order */}
+        {/* WhatsApp Order / COD */}
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
@@ -973,11 +974,11 @@ function PaymentMethodSelector({ selected, onChange, allowOnlinePayment = true, 
           <div className="flex items-center justify-center gap-1">
             <MessageCircle className={`w-4 h-4 ${selected === 'whatsapp' ? 'text-[#25D366]' : 'text-gray-500'}`} />
             <span className={`text-xs font-medium ${selected === 'whatsapp' ? 'text-[#25D366]' : 'text-gray-700'}`} dir="rtl">
-              واتساب
+              {insideSyria ? 'الاستلام' : 'واتساب'}
             </span>
           </div>
           <p className="text-[10px] text-gray-500 mt-1 text-center" dir="rtl">
-            {allowOnlinePayment ? 'عبر واتساب' : 'دفع عند الاستلام'}
+            {insideSyria ? 'الدفع عند الاستلام' : (allowOnlinePayment ? 'عبر واتساب' : 'دفع عند الاستلام')}
           </p>
         </motion.button>
 
@@ -2936,6 +2937,23 @@ const Cart = () => {
             });
             toast.success(isSharedPayment ? 'تم دفع السلة المشتركة بنجاح! 💜' : 'تم الدفع بنجاح ✅', { duration: 5000 });
 
+            // Send Firebase push notifications
+            try {
+              if (savedOrder) {
+                if (isSharedPayment) {
+                  await notifyOrderUsers('shared_payment_success', savedOrder, {
+                    payerName: senderName || 'المُرسِل',
+                    recipientName: recipientName || 'المستلم',
+                  });
+                }
+                await notifyAdminUsers('new_order_created', savedOrder, {
+                  paymentMethod: isSharedPayment ? 'shared_cart' : 'wallet',
+                });
+              }
+            } catch (notifyErr) {
+              console.warn('Post-wallet-payment notification warning:', notifyErr);
+            }
+
           } else {
             const errMsg = payResult?.error === 'insufficient_balance'
               ? `رصيد غير كافٍ. رصيدك: ${payResult.balance}$ والمطلوب: ${payResult.required}$`
@@ -2999,21 +3017,37 @@ const Cart = () => {
           activeOrdersTab: isSharedWhatsApp ? 'shared' : 'current',
         });
 
-        // فتح واتساب مباشرة (navigator.share لا يعمل بعد await)
-        const opened = openWhatsAppSafely(whatsappUrl);
-        if (!opened) {
-          try {
-            await navigator.clipboard.writeText(message);
-          } catch {}
-          toast('لإكمال الطلب، يرجى إرسال الرسالة عبر واتساب', {
-            action: {
-              label: 'فتح واتساب',
-              onClick: () => window.location.href = whatsappUrl
-            },
-            duration: 10000
-          });
+        // Send Firebase push notification to admins about the new order
+        try {
+          if (savedOrder) {
+            await notifyAdminUsers('new_order_created', savedOrder, {
+              paymentMethod: insideSyria ? 'cod' : 'whatsapp',
+            });
+          }
+        } catch (notifyErr) {
+          console.warn('Post-whatsapp-order notification warning:', notifyErr);
+        }
+
+        // Inside Syria: COD flow - just redirect to MyOrders without WhatsApp
+        if (insideSyria) {
+          toast.success('تم استقبال طلبك بنجاح! الدفع عند الاستلام ✅', { duration: 5000 });
         } else {
-          toast.success('تم حفظ الطلب وارساله ✅');
+          // Outside Syria: open WhatsApp with order details
+          const opened = openWhatsAppSafely(whatsappUrl);
+          if (!opened) {
+            try {
+              await navigator.clipboard.writeText(message);
+            } catch {}
+            toast('لإكمال الطلب، يرجى إرسال الرسالة عبر واتساب', {
+              action: {
+                label: 'فتح واتساب',
+                onClick: () => window.location.href = whatsappUrl
+              },
+              duration: 10000
+            });
+          } else {
+            toast.success('تم حفظ الطلب وارساله ✅');
+          }
         }
       } else if (paymentMethod === 'shared_cart') {
         // مشاركة السلة مع رسوم التوصيل $3 + رسوم الخدمة
@@ -3123,6 +3157,26 @@ const Cart = () => {
         activeOrdersTab: sharedCartMode ? 'shared' : 'current',
       });
       toast.success(sharedCartMode ? 'تم دفع السلة المشتركة بنجاح! 💜' : 'تم الدفع بنجاح وحفظ الطلب! شكراً لك 🎉');
+
+      // Send Firebase push notifications for the new order
+      try {
+        const savedOrder = persisted?.savedOrder;
+        if (savedOrder) {
+          if (sharedCartMode) {
+            // Shared cart: notify both creator and payer via Firebase push
+            await notifyOrderUsers('shared_payment_success', savedOrder, {
+              payerName: senderName || 'المُرسِل',
+              recipientName: recipientName || 'المستلم',
+            });
+          }
+          // Notify admins about the new order (Firebase push)
+          await notifyAdminUsers('new_order_created', savedOrder, {
+            paymentMethod: sharedCartMode ? 'shared_cart' : 'paypal',
+          });
+        }
+      } catch (notifyErr) {
+        console.warn('Post-payment notification warning:', notifyErr);
+      }
 
       clearCart?.();
       localStorage.removeItem('wasel_shared_cart_session');

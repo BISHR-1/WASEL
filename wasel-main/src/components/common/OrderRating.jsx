@@ -57,18 +57,21 @@ export default function OrderRating({ orderId, isOpen, onClose }) {
   };
 
   const handleSubmit = async () => {
-    // Validate that at least one item is rated or all? Requirement says "Rate items".
-    // We'll require all items to have at least a star or just skip 0s.
-    // Let's submit only rated items.
-    
     const reviewsToInsert = Object.entries(ratings)
         .filter(([_, data]) => data.rating > 0)
-        .map(([itemId, data]) => ({
-            order_id: orderId,
-            order_item_id: itemId,
-            rating: data.rating,
-            comment: data.comment
-        }));
+        .map(([orderItemId, data]) => {
+            const item = items.find(i => String(i.id) === String(orderItemId));
+            const productId = item?.product_id || item?.item_id || orderItemId;
+            return {
+                order_id: orderId,
+                item_type: 'product',
+                item_id: productId,
+                rating: data.rating,
+                comment: data.comment || '',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            };
+        });
 
     if (reviewsToInsert.length === 0) {
         toast.error('يرجى تقييم منتج واحد على الأقل');
@@ -77,9 +80,30 @@ export default function OrderRating({ orderId, isOpen, onClose }) {
 
     setSubmitting(true);
     try {
-        const { error } = await supabase
-            .from('product_reviews') // Make sure this table matches schema
+        // Get current user for user_id field
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.id) {
+            reviewsToInsert.forEach(r => { r.user_id = user.id; r.reviewer_user_id = user.id; });
+        }
+
+        let { error } = await supabase
+            .from('reviews')
             .insert(reviewsToInsert);
+
+        // Fallback: if reviews table rejects (e.g. missing item_type column), try legacy format
+        if (error && (String(error.code) === 'PGRST204' || String(error.code) === '42703')) {
+            const legacyRows = reviewsToInsert.map(r => ({
+                order_id: r.order_id,
+                product_id: r.item_id,
+                rating: r.rating,
+                content: r.comment || '',
+                user_id: r.user_id,
+                created_at: r.created_at,
+                updated_at: r.updated_at,
+            }));
+            const legacyResult = await supabase.from('reviews').insert(legacyRows);
+            error = legacyResult.error;
+        }
             
         if (error) throw error;
         

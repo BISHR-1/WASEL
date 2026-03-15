@@ -1,4 +1,5 @@
 import React from "react";
+import AdBanner from '@/components/ads/AdBanner';
 
 export default function TermsAndConditions() {
   return (
@@ -36,6 +37,11 @@ export default function TermsAndConditions() {
             <h2 className="text-xl font-bold text-[#2D6A4F] mb-3">6. التعديلات</h2>
             <p>نحتفظ بالحق في تعديل هذه الشروط في أي وقت. سيتم إشعاركم بالتغييرات الجوهرية، واستمراركم في استخدام خدماتنا يعني قبولكم بالشروط الجديدة.</p>
           </section>
+        </div>
+
+        {/* إعلان أسفل الصفحة */}
+        <div className="mt-6">
+          <AdBanner format="auto" className="rounded-xl" />
         </div>
       </div>
     </div>

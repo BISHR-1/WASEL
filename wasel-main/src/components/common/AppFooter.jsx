@@ -1,6 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle2 } from "lucide-react";
+import AdBanner from '@/components/ads/AdBanner';
 
 export default function AppFooter() {
   const navigate = useNavigate();
@@ -54,6 +55,11 @@ export default function AppFooter() {
               واصل ستور صُنع بحب ليجمع القلوب ❤️ نوصّل شعورك وهداياك بأمان ✨
             </p>
           </div>
+        </div>
+
+        {/* إعلان في الفوتر */}
+        <div className="mt-3 mb-2">
+          <AdBanner format="horizontal" className="rounded-lg opacity-80" />
         </div>
 
         <div className="border-t border-[#2A6652] mt-3 pt-2 text-center text-[#C6DBD3] text-xs">

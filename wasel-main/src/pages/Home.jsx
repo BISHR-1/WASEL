@@ -22,6 +22,7 @@ import AddToCartButton from '@/components/buttons/AddToCartButton';
 import ProductDetailModal from '@/components/common/ProductDetailModal';
 import { useDarkMode } from '@/lib/DarkModeContext';
 import { attachRatingsFromReviews, normalizeItemRating } from '@/lib/itemRatings';
+import AdBanner from '@/components/ads/AdBanner';
 
 const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
 
@@ -572,6 +573,11 @@ const Home = () => {
           onClose={() => setShowDetailModal(false)}
           onAddToCart={handleAddToCart}
         />
+
+        {/* إعلان أسفل المنتجات - بعيد عن أزرار الشراء */}
+        <div className="max-w-4xl mx-auto px-4 py-6">
+          <AdBanner format="auto" className="rounded-xl" />
+        </div>
       </main>
     </div>
   );

@@ -199,7 +199,7 @@ export default function CustomerSupport() {
 
           <motion.a
             whileTap={{ scale: 0.97 }}
-            href="https://wa.me/963936793637"
+            href="https://wa.me/971502406519"
             target="_blank"
             rel="noopener noreferrer"
             className={`rounded-2xl p-4 text-center ${isDarkMode ? 'bg-[#1A1A2E] border border-gray-700' : 'bg-white border border-gray-200'} shadow-sm block`}
@@ -396,7 +396,7 @@ export default function CustomerSupport() {
           <div className="space-y-2">
             <div className="flex items-center gap-3">
               <Mail className={`w-4 h-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} />
-              <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>support@wasel.app</span>
+              <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>wasel.daraa@gmail.com</span>
             </div>
             <div className="flex items-center gap-3">
               <Clock className={`w-4 h-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} />

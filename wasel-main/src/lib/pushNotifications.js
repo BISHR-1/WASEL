@@ -146,6 +146,16 @@ async function saveDeviceToken(token) {
     // احفظ في localStorage مؤقتاً
     localStorage.setItem('wasel_device_token', token);
     
+      // Detect current login role from admin_session in localStorage (set by resolveUserRole in App.jsx)
+      let loginRole = 'user';
+      try {
+        const adminSession = JSON.parse(localStorage.getItem('admin_session') || 'null');
+        if (adminSession?.role) {
+          const r = String(adminSession.role).toLowerCase();
+          if (['admin', 'supervisor', 'operator', 'support'].includes(r)) loginRole = r;
+        }
+      } catch (_) { /* ignore */ }
+
       // حفظ الـ token في جدول user_devices
       const platform = (window['Capacitor']?.isNativePlatform?.()) ? 'android' : 'web';
 
@@ -158,6 +168,7 @@ async function saveDeviceToken(token) {
            await supabase.from('user_devices').update({
              user_id: userId,
              is_active: true,
+             login_role: loginRole,
              updated_at: new Date().toISOString()
            }).eq('id', existingDevice.id);
         } else {
@@ -166,6 +177,7 @@ async function saveDeviceToken(token) {
              fcm_token: token,
              device_type: platform,
              is_active: true,
+             login_role: loginRole,
              updated_at: new Date().toISOString()
            });
         }

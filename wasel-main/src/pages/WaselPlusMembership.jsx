@@ -319,7 +319,19 @@ export default function WaselPlusMembership() {
       });
 
       if (!result.ok) {
-        toast.error('تم خصم المبلغ لكن فشل حفظ العضوية. تواصل مع الدعم فوراً.');
+        // Refund the wallet since membership save failed
+        try {
+          await supabase.rpc('wallet_topup', {
+            p_user_id: user.id,
+            p_amount_usd: requiredUsd,
+            p_source: 'membership_refund',
+          });
+          toast.error('فشل حفظ العضوية. تم إرجاع المبلغ إلى محفظتك.');
+        } catch (refundErr) {
+          console.error('Wallet refund failed after membership save failure:', refundErr);
+          toast.error('تم خصم المبلغ لكن فشل حفظ العضوية. تواصل مع الدعم فوراً.');
+        }
+        await loadWalletBalance();
         return;
       }
 

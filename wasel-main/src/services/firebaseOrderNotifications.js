@@ -463,11 +463,73 @@ export async function notifyOrderUsers(eventType, order, context = {}) {
   try {
     if (!order?.id) return { success: false, reason: 'missing_order_id' };
 
-    if (isSharedOrder(order) && ['shared_payment_success', 'order_status_changed', 'order_delivered', 'delivery_proof_uploaded'].includes(eventType)) {
-      // DB triggers (028/029/030) handle BOTH in-app notifications AND FCM push for shared orders.
-      // Skip entirely here to avoid duplicate notifications.
-      console.log('📢 notifyOrderUsers: skipping shared order — DB triggers handle notifications', eventType, order.id);
-      return { success: true, skipped: true, reason: 'shared_order_handled_by_db_triggers' };
+    const shared = isSharedOrder(order);
+
+    // For shared orders, send targeted notifications to creator and payer separately
+    if (shared && ['shared_payment_success', 'order_status_changed', 'order_delivered', 'delivery_proof_uploaded'].includes(eventType)) {
+      console.log('📢 notifyOrderUsers: shared order — sending Firebase push to both parties', eventType, order.id);
+
+      const { creatorIds, payerIds } = resolveSharedAudience(order);
+      const dispatches = [];
+
+      // Determine the right event types for each party
+      if (eventType === 'shared_payment_success') {
+        // Notify creator: someone paid their shared cart
+        if (creatorIds.length > 0) {
+          dispatches.push(
+            dispatchToPublicUsers('shared_cart_paid_creator', order, creatorIds, context)
+          );
+        }
+        // Notify payer: thank you for paying
+        if (payerIds.length > 0) {
+          dispatches.push(
+            dispatchToPublicUsers('shared_cart_paid_payer', order, payerIds, context)
+          );
+        }
+      } else if (eventType === 'order_status_changed' || eventType === 'order_delivered') {
+        // Notify creator about status change
+        if (creatorIds.length > 0) {
+          dispatches.push(
+            dispatchToPublicUsers('shared_order_status_creator', order, creatorIds, context)
+          );
+        }
+        // Notify payer about status change
+        if (payerIds.length > 0) {
+          dispatches.push(
+            dispatchToPublicUsers('shared_order_status_payer', order, payerIds, context)
+          );
+        }
+      } else {
+        // delivery_proof_uploaded etc. — notify both with original event type
+        const allIds = toUniqueStrings([...creatorIds, ...payerIds]);
+        if (allIds.length > 0) {
+          dispatches.push(
+            dispatchToPublicUsers(eventType, order, allIds, context)
+          );
+        }
+      }
+
+      const results = await Promise.all(dispatches);
+      const totalSent = results.reduce((sum, r) => sum + Number(r?.sent || 0), 0);
+      const totalFailed = results.reduce((sum, r) => sum + Number(r?.failed || 0), 0);
+
+      const dispatchSummary = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        created_at: new Date().toISOString(),
+        event_type: eventType,
+        order_id: order.id,
+        order_number: order.order_number || null,
+        public_targets: toUniqueStrings([...creatorIds, ...payerIds]).length,
+        auth_targets: totalSent + totalFailed,
+        sent: totalSent,
+        failed: totalFailed,
+        total: totalSent + totalFailed,
+        push_success: totalSent > 0,
+        note: 'shared_order_firebase_push',
+      };
+
+      pushDispatchLog(dispatchSummary);
+      return dispatchSummary;
     }
 
     const publicUserIds = toUniqueStrings([

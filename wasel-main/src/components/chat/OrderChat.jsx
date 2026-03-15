@@ -41,7 +41,7 @@ export default function OrderChat({ orderId, orderNumber, senderType, senderName
         if (order) {
           // تحديد المستلم بناءً على نوع المرسل
           const recipientEmail = senderType === 'customer' 
-            ? 'bishrjr37@gmail.com'
+            ? 'wasel.daraa@gmail.com'
             : order.created_by;
 
           const recipientName = senderType === 'customer'

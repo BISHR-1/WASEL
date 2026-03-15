@@ -5,6 +5,7 @@ import { FileText, Search, Send, Truck, CheckCircle, MessageCircle, ArrowLeft } 
 import { motion } from 'framer-motion';
 import { useLanguage } from '@/components/common/LanguageContext';
 import { useDarkMode } from '@/lib/DarkModeContext';
+import AdBanner from '@/components/ads/AdBanner';
 
 const steps = [
   {
@@ -161,6 +162,11 @@ export default function HowItWorks() {
           </p>
         </motion.div>
       </section>
+
+      {/* إعلان أسفل الصفحة */}
+      <div className="max-w-4xl mx-auto px-4 pb-8">
+        <AdBanner format="auto" className="rounded-xl" />
+      </div>
     </div>
   );
 }

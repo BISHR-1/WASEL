@@ -450,16 +450,27 @@ Deno.serve(async (req) => {
       const allDeviceQueryIds = toUniqueStrings([...staffCandidateIds, ...adminAuthIds]);
       debugInfo.allDeviceQueryIds = allDeviceQueryIds.length;
       if (allDeviceQueryIds.length > 0) {
+        // Only send to devices that were registered during an admin/staff login session.
+        // This prevents regular-user sessions from receiving admin notifications
+        // even if the same person has both roles.
         const { data: devices } = await supabase
           .from('user_devices')
-          .select('fcm_token, is_active')
+          .select('fcm_token, is_active, login_role')
           .in('user_id', allDeviceQueryIds);
 
         debugInfo.matchedDeviceRows = (devices || []).length;
 
         tokens = devices
-          ?.filter((d) => d?.is_active !== false)
-          .map((d) => d.fcm_token)
+          ?.filter((d: any) => {
+            if (d?.is_active === false || !d?.fcm_token) return false;
+            // If login_role column exists and is set, only include admin/staff roles
+            const role = String(d?.login_role || '').toLowerCase();
+            if (role && role !== 'user') return true;
+            // Fallback: if login_role is null/empty (legacy rows), include the device
+            if (!d?.login_role) return true;
+            return false;
+          })
+          .map((d: any) => d.fcm_token)
           .filter(Boolean) || [];
       }
     }
