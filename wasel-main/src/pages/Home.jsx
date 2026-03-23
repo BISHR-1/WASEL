@@ -39,7 +39,6 @@ const AutoScrollRow = ({ items, renderCard, className = '' }) => {
     if (!el || items.length < 2) return;
     startedRef.current = false;
 
-    // Delay start so images load and scrollWidth is correct
     const initTimer = setTimeout(() => {
       if (!el) return;
       posRef.current = 0;
@@ -49,8 +48,7 @@ const AutoScrollRow = ({ items, renderCard, className = '' }) => {
 
     const step = () => {
       if (startedRef.current && !pausedRef.current && el) {
-        posRef.current += 0.5; // scroll to the left visually (LTR scrollLeft increases)
-        // Reset when we've scrolled through the first copy
+        posRef.current += 0.4;
         if (posRef.current >= el.scrollWidth / 2) posRef.current = 0;
         el.scrollLeft = posRef.current;
       }
@@ -63,6 +61,14 @@ const AutoScrollRow = ({ items, renderCard, className = '' }) => {
     };
   }, [items]);
 
+  const pause = () => { pausedRef.current = true; };
+  const resume = () => {
+    // Sync position to where the user scrolled before resuming
+    const el = scrollRef.current;
+    if (el) posRef.current = el.scrollLeft;
+    pausedRef.current = false;
+  };
+
   const duplicated = [...items, ...items];
 
   return (
@@ -70,10 +76,10 @@ const AutoScrollRow = ({ items, renderCard, className = '' }) => {
       ref={scrollRef}
       className={`flex gap-4 overflow-x-auto scrollbar-hide ${className}`}
       style={{ scrollBehavior: 'auto' }}
-      onMouseEnter={() => { pausedRef.current = true; }}
-      onMouseLeave={() => { pausedRef.current = false; }}
-      onTouchStart={() => { pausedRef.current = true; }}
-      onTouchEnd={() => { setTimeout(() => { pausedRef.current = false; }, 2000); }}
+      onMouseEnter={pause}
+      onMouseLeave={resume}
+      onTouchStart={pause}
+      onTouchEnd={() => { setTimeout(resume, 3000); }}
     >
       {duplicated.map((item, idx) => renderCard(item, idx))}
     </div>
