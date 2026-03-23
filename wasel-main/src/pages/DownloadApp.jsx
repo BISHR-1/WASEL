@@ -59,7 +59,7 @@ export default function DownloadApp() {
             transition={{ delay: 0.3 }}
             className="text-3xl md:text-4xl font-black text-white mb-3"
           >
-            وصل — منصة توصيل وتسوّق
+            واصل ستور — منصة توصيل وتسوّق
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
@@ -125,7 +125,7 @@ export default function DownloadApp() {
           viewport={{ once: true }}
           className="text-sm text-gray-600 leading-relaxed text-center mb-4"
         >
-          وصل منصة إلكترونية مصممة لتوفير تجربة تسوّق وتوصيل متكاملة.
+          واصل ستور منصة إلكترونية مصممة لتوفير تجربة تسوّق وتوصيل متكاملة.
           يمكن من خلالها تصفّح المنتجات من متاجر ومطاعم متنوعة، إنشاء طلب، واختيار طريقة الدفع المناسبة.
           يتم توصيل الطلبات عبر فريق متخصص مع إمكانية تتبع كل طلب بشكل مباشر.
         </motion.p>

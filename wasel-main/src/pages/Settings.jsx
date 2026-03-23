@@ -54,7 +54,7 @@ export default function Settings() {
             {t('settings')}
           </h1>
           <p className={`mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-            {language === 'ar' ? 'تخصيص تجربتك في واصل' : 'Customize your Wasel experience'}
+            {language === 'ar' ? 'تخصيص تجربتك في واصل ستور' : 'Customize your Wasel Store experience'}
           </p>
         </div>
       </motion.div>

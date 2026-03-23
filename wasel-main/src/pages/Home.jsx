@@ -31,45 +31,44 @@ const AutoScrollRow = ({ items, renderCard, className = '' }) => {
   const scrollRef = useRef(null);
   const animRef = useRef(null);
   const pausedRef = useRef(false);
-  const dirRef = useRef(1); // 1 = scroll right (LTR), -1 = scroll left (back)
-  const startedRef = useRef(false);
+  const dirRef = useRef(1);
+  const posRef = useRef(0);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || items.length < 2) return;
-    startedRef.current = false;
+    posRef.current = 0;
     dirRef.current = 1;
-
-    const initTimer = setTimeout(() => {
-      if (!el) return;
-      el.scrollLeft = 0;
-      startedRef.current = true;
-    }, 600);
+    el.scrollLeft = 0;
 
     const step = () => {
-      if (startedRef.current && !pausedRef.current && el) {
+      if (!pausedRef.current && el) {
         const maxScroll = el.scrollWidth - el.clientWidth;
-        el.scrollLeft += dirRef.current * 0.4;
-        if (el.scrollLeft >= maxScroll) dirRef.current = -1;
-        if (el.scrollLeft <= 0) dirRef.current = 1;
+        if (maxScroll > 0) {
+          posRef.current += dirRef.current * 0.5;
+          if (posRef.current >= maxScroll) { posRef.current = maxScroll; dirRef.current = -1; }
+          if (posRef.current <= 0) { posRef.current = 0; dirRef.current = 1; }
+          el.scrollLeft = posRef.current;
+        }
       }
       animRef.current = requestAnimationFrame(step);
     };
     animRef.current = requestAnimationFrame(step);
-    return () => {
-      clearTimeout(initTimer);
-      if (animRef.current) cancelAnimationFrame(animRef.current);
-    };
+    return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
   }, [items]);
 
   const pause = () => { pausedRef.current = true; };
-  const resume = () => { pausedRef.current = false; };
+  const resume = () => {
+    const el = scrollRef.current;
+    if (el) posRef.current = el.scrollLeft;
+    pausedRef.current = false;
+  };
 
   return (
     <div
       ref={scrollRef}
       className={`flex gap-4 overflow-x-auto scrollbar-hide ${className}`}
-      style={{ scrollBehavior: 'auto' }}
+      style={{ scrollBehavior: 'auto', direction: 'ltr' }}
       onMouseEnter={pause}
       onMouseLeave={resume}
       onTouchStart={pause}
@@ -604,13 +603,13 @@ const Home = () => {
                     <div className="flex items-center justify-between mt-2">
                       <PriceDisplay basePrice={item.price} />
                       {getCartQty(item.id) > 0 ? (
-                        <div className="flex items-center gap-1">
-                          <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); const q = getCartQty(item.id); if (q <= 1) removeFromCart(item.id); else updateQuantity(item.id, q - 1); }} className="w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center shadow-sm"><Minus className="w-3.5 h-3.5" /></motion.button>
-                          <span className={`text-sm font-black min-w-[20px] text-center ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`}>{getCartQty(item.id)}</span>
-                          <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-7 h-7 rounded-full bg-[#1B4332] text-white flex items-center justify-center shadow-sm"><Plus className="w-3.5 h-3.5" /></motion.button>
+                        <div className="flex items-center gap-2">
+                          <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); const q = getCartQty(item.id); if (q <= 1) removeFromCart(item.id); else updateQuantity(item.id, q - 1); }} className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md active:shadow-lg"><Minus className="w-4 h-4" /></motion.button>
+                          <span className={`text-sm font-black min-w-[22px] text-center ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`}>{getCartQty(item.id)}</span>
+                          <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-[#1B4332] text-white flex items-center justify-center shadow-md active:shadow-lg"><Plus className="w-4 h-4" /></motion.button>
                         </div>
                       ) : (
-                        <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-8 h-8 rounded-full bg-[#1B4332] text-white flex items-center justify-center shadow-md hover:bg-[#163426] transition-colors"><Plus className="w-4 h-4" /></motion.button>
+                        <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-[#1B4332] text-white flex items-center justify-center shadow-md hover:bg-[#163426] active:shadow-lg transition-colors"><Plus className="w-5 h-5" /></motion.button>
                       )}
                     </div>
                   </div>
@@ -676,13 +675,13 @@ const Home = () => {
                         <div className="flex items-center justify-between mt-2">
                           <PriceDisplay basePrice={item.price || item.customer_price} />
                           {getCartQty(item.id) > 0 ? (
-                            <div className="flex items-center gap-1">
-                              <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); const q = getCartQty(item.id); if (q <= 1) removeFromCart(item.id); else updateQuantity(item.id, q - 1); }} className="w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center shadow-sm"><Minus className="w-3.5 h-3.5" /></motion.button>
-                              <span className={`text-sm font-black min-w-[20px] text-center ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`}>{getCartQty(item.id)}</span>
-                              <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-7 h-7 rounded-full bg-[#1B4332] text-white flex items-center justify-center shadow-sm"><Plus className="w-3.5 h-3.5" /></motion.button>
+                            <div className="flex items-center gap-2">
+                              <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); const q = getCartQty(item.id); if (q <= 1) removeFromCart(item.id); else updateQuantity(item.id, q - 1); }} className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md active:shadow-lg"><Minus className="w-4 h-4" /></motion.button>
+                              <span className={`text-sm font-black min-w-[22px] text-center ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`}>{getCartQty(item.id)}</span>
+                              <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-[#1B4332] text-white flex items-center justify-center shadow-md active:shadow-lg"><Plus className="w-4 h-4" /></motion.button>
                             </div>
                           ) : (
-                            <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-8 h-8 rounded-full bg-[#1B4332] text-white flex items-center justify-center shadow-md hover:bg-[#163426] transition-colors"><Plus className="w-4 h-4" /></motion.button>
+                            <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-[#1B4332] text-white flex items-center justify-center shadow-md hover:bg-[#163426] active:shadow-lg transition-colors"><Plus className="w-5 h-5" /></motion.button>
                           )}
                         </div>
                       </div>

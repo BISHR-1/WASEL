@@ -34,7 +34,7 @@ export const translations = {
     dealOfDay: 'تحدي اليوم - عروض حصرية',
     viewAll: 'عرض الكل',
     browseCategories: 'تصفح أقسامنا الرئيسية',
-    whyChooseWasel: 'لماذا تختار واصل؟',
+    whyChooseWasel: 'لماذا تختار واصل ستور؟',
     whyChooseWaselDesc: 'نقدم لك تجربة فريدة تجمع بين السرعة، الجودة، والمصداقية',
     dealDiscount: 'خصم خاص',
     almostSoldOut: 'أوشك على النفاذ!',

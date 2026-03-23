@@ -334,7 +334,7 @@ export default function SupervisorPanel() {
 
       let y = 50;
       doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
-      doc.text('WASEL Invoice', 40, y); y += 24;
+      doc.text('Wasel Store Invoice', 40, y); y += 24;
       doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
       doc.text(`Order: ${orderNumber}`, 40, y); y += 16;
       doc.text(`Date: ${new Date(order.created_at || Date.now()).toLocaleString()}`, 40, y); y += 16;
