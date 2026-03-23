@@ -5,7 +5,7 @@ import { base44 } from '../api/base44Client';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ChevronDown, Bell, Heart, Star, Package, Gift, Smartphone, Utensils, IceCream, Store, Sparkles, Truck, Plus, Crown, TrendingUp, ShoppingBag, Flame } from 'lucide-react';
+import { Search, ChevronDown, Bell, Heart, Star, Package, Gift, Smartphone, Utensils, IceCream, Store, Sparkles, Truck, Plus, Minus, Crown, TrendingUp, ShoppingBag, Flame } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useCart } from '@/components/cart/CartContext';
@@ -26,31 +26,32 @@ import AdBanner from '@/components/ads/AdBanner';
 
 const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
 
-// Standalone auto-scroll horizontal carousel component
+// Standalone auto-scroll horizontal carousel component (ping-pong: right→left then left→right)
 const AutoScrollRow = ({ items, renderCard, className = '' }) => {
   const scrollRef = useRef(null);
   const animRef = useRef(null);
   const pausedRef = useRef(false);
-  const posRef = useRef(0);
+  const dirRef = useRef(1); // 1 = scroll right (LTR), -1 = scroll left (back)
   const startedRef = useRef(false);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || items.length < 2) return;
     startedRef.current = false;
+    dirRef.current = 1;
 
     const initTimer = setTimeout(() => {
       if (!el) return;
-      posRef.current = 0;
       el.scrollLeft = 0;
       startedRef.current = true;
     }, 600);
 
     const step = () => {
       if (startedRef.current && !pausedRef.current && el) {
-        posRef.current += 0.4;
-        if (posRef.current >= el.scrollWidth / 2) posRef.current = 0;
-        el.scrollLeft = posRef.current;
+        const maxScroll = el.scrollWidth - el.clientWidth;
+        el.scrollLeft += dirRef.current * 0.4;
+        if (el.scrollLeft >= maxScroll) dirRef.current = -1;
+        if (el.scrollLeft <= 0) dirRef.current = 1;
       }
       animRef.current = requestAnimationFrame(step);
     };
@@ -62,14 +63,7 @@ const AutoScrollRow = ({ items, renderCard, className = '' }) => {
   }, [items]);
 
   const pause = () => { pausedRef.current = true; };
-  const resume = () => {
-    // Sync position to where the user scrolled before resuming
-    const el = scrollRef.current;
-    if (el) posRef.current = el.scrollLeft;
-    pausedRef.current = false;
-  };
-
-  const duplicated = [...items, ...items];
+  const resume = () => { pausedRef.current = false; };
 
   return (
     <div
@@ -81,14 +75,21 @@ const AutoScrollRow = ({ items, renderCard, className = '' }) => {
       onTouchStart={pause}
       onTouchEnd={() => { setTimeout(resume, 3000); }}
     >
-      {duplicated.map((item, idx) => renderCard(item, idx))}
+      {items.map((item, idx) => renderCard(item, idx))}
     </div>
   );
 };
 
 const Home = () => {
   const navigate = useNavigate();
-  const { addToCart } = useCart();
+  const { addToCart, cartItems, updateQuantity, removeFromCart } = useCart();
+
+  // Helper to get quantity of an item in cart
+  const getCartQty = (itemId) => {
+    const safeItems = Array.isArray(cartItems) ? cartItems : [];
+    const found = safeItems.find(i => i?.id === itemId);
+    return found?.quantity || 0;
+  };
   const { isDarkMode } = useDarkMode();
   const [isWaselPlusMember, setIsWaselPlusMember] = useState(false);
   const [favoriteProductIds, setFavoriteProductIds] = useState([]);
@@ -602,12 +603,15 @@ const Home = () => {
                     )}
                     <div className="flex items-center justify-between mt-2">
                       <PriceDisplay basePrice={item.price} />
-                      <AddToCartButton
-                        onClick={() => handleAddToCart(item)}
-                        isLoading={addedToCartProductId === item.id}
-                        label="أضف"
-                        className="w-auto px-3 text-xs"
-                      />
+                      {getCartQty(item.id) > 0 ? (
+                        <div className="flex items-center gap-1">
+                          <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); const q = getCartQty(item.id); if (q <= 1) removeFromCart(item.id); else updateQuantity(item.id, q - 1); }} className="w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center shadow-sm"><Minus className="w-3.5 h-3.5" /></motion.button>
+                          <span className={`text-sm font-black min-w-[20px] text-center ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`}>{getCartQty(item.id)}</span>
+                          <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-7 h-7 rounded-full bg-[#1B4332] text-white flex items-center justify-center shadow-sm"><Plus className="w-3.5 h-3.5" /></motion.button>
+                        </div>
+                      ) : (
+                        <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-8 h-8 rounded-full bg-[#1B4332] text-white flex items-center justify-center shadow-md hover:bg-[#163426] transition-colors"><Plus className="w-4 h-4" /></motion.button>
+                      )}
                     </div>
                   </div>
                 </motion.div>
@@ -671,12 +675,15 @@ const Home = () => {
                         )}
                         <div className="flex items-center justify-between mt-2">
                           <PriceDisplay basePrice={item.price || item.customer_price} />
-                          <AddToCartButton
-                            onClick={() => handleAddToCart(item)}
-                            isLoading={addedToCartProductId === item.id}
-                            label="أضف"
-                            className="w-auto px-3 text-xs"
-                          />
+                          {getCartQty(item.id) > 0 ? (
+                            <div className="flex items-center gap-1">
+                              <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); const q = getCartQty(item.id); if (q <= 1) removeFromCart(item.id); else updateQuantity(item.id, q - 1); }} className="w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center shadow-sm"><Minus className="w-3.5 h-3.5" /></motion.button>
+                              <span className={`text-sm font-black min-w-[20px] text-center ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`}>{getCartQty(item.id)}</span>
+                              <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-7 h-7 rounded-full bg-[#1B4332] text-white flex items-center justify-center shadow-sm"><Plus className="w-3.5 h-3.5" /></motion.button>
+                            </div>
+                          ) : (
+                            <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-8 h-8 rounded-full bg-[#1B4332] text-white flex items-center justify-center shadow-md hover:bg-[#163426] transition-colors"><Plus className="w-4 h-4" /></motion.button>
+                          )}
                         </div>
                       </div>
                     </motion.div>
