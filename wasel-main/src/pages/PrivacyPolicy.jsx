@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import { Shield, Lock, Eye, Database, Trash2, ArrowLeft } from 'lucide-react';
+import { Shield, Lock, Eye, Database, Trash2, ArrowLeft, Cookie, MonitorSmartphone } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useDarkMode } from '@/lib/DarkModeContext';
 import AdBanner from '@/components/ads/AdBanner';
@@ -61,6 +61,30 @@ export default function PrivacyPolicy() {
             <div className={`space-y-2 text-sm leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
               <p>نطبق إجراءات أمنية متعددة الطبقات لحماية بياناتك. جميع الاتصالات بين تطبيقك وخوادمنا مشفرة باستخدام بروتوكول HTTPS-TLS. كما نستخدم سياسات أمان على مستوى قاعدة البيانات (Row Level Security) لضمان أن كل مستخدم لا يمكنه الوصول إلا إلى بياناته الخاصة فقط.</p>
               <p>نراجع بشكل دوري ممارساتنا الأمنية ونحدث أنظمتنا للتعامل مع أحدث التهديدات. كما نحد من وصول الموظفين إلى بيانات المستخدمين ونقتصر ذلك على الحالات الضرورية لتقديم الدعم الفني أو معالجة الطلبات.</p>
+            </div>
+          </section>
+
+          <section>
+            <div className="flex items-center gap-3 mb-3">
+              <Cookie className={`w-6 h-6 ${isDarkMode ? 'text-emerald-400' : 'text-[#2D6A4F]'}`} />
+              <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-[#1B4332]'}`}>ملفات تعريف الارتباط (Cookies) والإعلانات</h2>
+            </div>
+            <div className={`space-y-2 text-sm leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+              <p>نستخدم ملفات تعريف الارتباط (Cookies) وتقنيات مشابهة لتحسين تجربة استخدام الموقع وتذكّر تفضيلاتك وتحليل حركة الزيارات. ملفات تعريف الارتباط هي ملفات نصية صغيرة يخزنها متصفحك على جهازك عند زيارة موقعنا.</p>
+              <p>نعرض إعلانات من خلال خدمة Google AdSense التي تديرها شركة Google. تستخدم Google وشركاؤها في مجال الإعلانات ملفات تعريف الارتباط لعرض إعلانات مخصصة بناءً على زياراتك السابقة لموقعنا أو مواقع أخرى على الإنترنت. قد تستخدم Google ملف تعريف ارتباط DoubleClick DART لعرض إعلانات مستهدفة.</p>
+              <p>يمكنك التحكم في إعدادات ملفات تعريف الارتباط أو تعطيلها من إعدادات متصفحك في أي وقت. كما يمكنك إلغاء الاشتراك في الإعلانات المخصصة من Google عبر زيارة <span className="font-bold">إعدادات إعلانات Google</span> (adssettings.google.com) أو من خلال موقع <span className="font-bold">aboutads.info</span> لإلغاء الاشتراك في إعلانات الأطراف الثالثة المخصصة.</p>
+              <p>تخضع البيانات التي تجمعها Google من خلال الإعلانات لسياسة خصوصية Google الخاصة. ننصحك بمراجعتها على policies.google.com/privacy للاطلاع على كيفية معالجة Google لبياناتك.</p>
+            </div>
+          </section>
+
+          <section>
+            <div className="flex items-center gap-3 mb-3">
+              <MonitorSmartphone className={`w-6 h-6 ${isDarkMode ? 'text-emerald-400' : 'text-[#2D6A4F]'}`} />
+              <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-[#1B4332]'}`}>تقنيات التتبع والتحليل</h2>
+            </div>
+            <div className={`space-y-2 text-sm leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+              <p>نستخدم أدوات تحليل مثل Google Analytics لفهم كيفية تفاعل الزوار مع موقعنا. تجمع هذه الأدوات معلومات مثل الصفحات التي زرتها ومدة بقائك وطريقة وصولك إلينا. جميع هذه البيانات مجمعة ومجهولة الهوية ولا تُستخدم لتحديد هوية أي فرد.</p>
+              <p>نستخدم هذه المعلومات لتحسين محتوى الموقع وتجربة المستخدم وأداء الخدمة. يمكنك منع Google Analytics من جمع بياناتك عن طريق تثبيت إضافة المتصفح الخاصة بإلغاء الاشتراك في Google Analytics.</p>
             </div>
           </section>
 

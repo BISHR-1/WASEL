@@ -1,4 +1,20 @@
 User-agent: *
 Allow: /
+Disallow: /AdminPanel
+Disallow: /StaffLogin
+Disallow: /StaffDashboard
+Disallow: /DriverPanel
+Disallow: /SupervisorPanel
+Disallow: /RestaurantDashboard
+Disallow: /TestNotifications
+Disallow: /AdminOrders
+Disallow: /AdminProducts
+Disallow: /AdminRestaurants
+Disallow: /AdminMenuItems
+Disallow: /AdminPackages
+Disallow: /AdminGifts
+Disallow: /AdminReports
+Disallow: /AdminStories
+Disallow: /AdminAdvisor
 
-Sitemap: https://www.wasel.life/sitemap.xml
+Sitemap: https://www.waselstore.com/sitemap.xml

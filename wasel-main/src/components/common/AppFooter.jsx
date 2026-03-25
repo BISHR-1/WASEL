@@ -11,6 +11,8 @@ export default function AppFooter() {
     { label: "الهدايا", path: "/Gifts" },
     { label: "المطاعم", path: "/Restaurants" },
     { label: "الباقات", path: "/Packages" },
+    { label: "المدونة", path: "/Blog" },
+    { label: "من نحن", path: "/About" },
   ];
 
   const contactLinks = [
@@ -22,6 +24,7 @@ export default function AppFooter() {
     { label: "سياسة الإرجاع", path: "/ReturnPolicy" },
     { label: "الأسئلة الشائعة", path: "/FAQ" },
     { label: "التوصيل داخل درعا", path: "/DeliveryInDaraa" },
+    { label: "تحميل التطبيق", path: "/DownloadApp" },
   ];
 
   return (

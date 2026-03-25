@@ -43,6 +43,7 @@ const PUBLIC_PAGES = new Set([
   'CourierTerms', 'CourierGuide', 'SupervisorGuide', 'AdminTerms',
   'Cart', 'Favorites', 'PrivacyPolicy', 'ReturnPolicy', 'FAQ',
   'DeliveryInDaraa',
+  'Blog', 'About',
 ]);
 
 const GuestLoginRedirect = () => {

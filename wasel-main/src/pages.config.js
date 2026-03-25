@@ -56,6 +56,8 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import ReturnPolicy from './pages/ReturnPolicy';
 import FAQ from './pages/FAQ';
 import DeliveryInDaraa from './pages/DeliveryInDaraa';
+import Blog from './pages/Blog';
+import About from './pages/About';
 import __Layout from './Layout.jsx';
 
 
@@ -118,6 +120,8 @@ export const PAGES = {
     "ReturnPolicy": ReturnPolicy,
     "FAQ": FAQ,
     "DeliveryInDaraa": DeliveryInDaraa,
+    "Blog": Blog,
+    "About": About,
 }
 
 export const pagesConfig = {
