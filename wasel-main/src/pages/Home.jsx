@@ -575,6 +575,7 @@ const Home = () => {
                 <motion.div
                   key={`best-${idx}-${item.id}`}
                   whileHover={{ y: -4 }}
+                  dir="rtl"
                   className={`min-w-[180px] max-w-[200px] shrink-0 rounded-2xl overflow-hidden shadow-md border relative ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}
                 >
                   {/* Rank Badge */}
@@ -600,16 +601,16 @@ const Home = () => {
                     {item._soldCount && (
                       <p className="text-[11px] text-emerald-600 font-semibold mb-1">🛒 تم بيع {item._soldCount}+</p>
                     )}
-                    <div className="flex items-center justify-between mt-2">
-                      <PriceDisplay basePrice={item.price} />
+                    <PriceDisplay basePrice={item.price} />
+                    <div className="flex items-center justify-center gap-3 mt-2">
                       {getCartQty(item.id) > 0 ? (
-                        <div className="flex items-center gap-2">
-                          <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); const q = getCartQty(item.id); if (q <= 1) removeFromCart(item.id); else updateQuantity(item.id, q - 1); }} className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md active:shadow-lg"><Minus className="w-4 h-4" /></motion.button>
-                          <span className={`text-sm font-black min-w-[22px] text-center ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`}>{getCartQty(item.id)}</span>
-                          <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-[#1B4332] text-white flex items-center justify-center shadow-md active:shadow-lg"><Plus className="w-4 h-4" /></motion.button>
-                        </div>
+                        <>
+                          <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); const q = getCartQty(item.id); if (q <= 1) removeFromCart(item.id); else updateQuantity(item.id, q - 1); }} className="w-9 h-9 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md"><Minus className="w-4 h-4" /></motion.button>
+                          <span className={`text-base font-black min-w-[24px] text-center ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`}>{getCartQty(item.id)}</span>
+                          <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-9 h-9 rounded-full bg-[#1B4332] text-white flex items-center justify-center shadow-md"><Plus className="w-4 h-4" /></motion.button>
+                        </>
                       ) : (
-                        <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-[#1B4332] text-white flex items-center justify-center shadow-md hover:bg-[#163426] active:shadow-lg transition-colors"><Plus className="w-5 h-5" /></motion.button>
+                        <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-10 h-10 rounded-full bg-[#1B4332] text-white flex items-center justify-center shadow-md hover:bg-[#163426] transition-colors"><Plus className="w-5 h-5" /></motion.button>
                       )}
                     </div>
                   </div>
@@ -649,6 +650,7 @@ const Home = () => {
                       key={`cat-${catKey}-${idx}-${item.id}`}
                       whileHover={{ y: -3, scale: 1.02 }}
                       transition={{ type: 'spring', stiffness: 300 }}
+                      dir="rtl"
                       className={`shrink-0 rounded-2xl overflow-hidden shadow-sm border transition-shadow hover:shadow-lg ${
                         isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'
                       } min-w-[190px] max-w-[210px]`}
@@ -672,16 +674,16 @@ const Home = () => {
                         {item.description && (
                           <p className={`text-[11px] line-clamp-1 mt-0.5 ${isDarkMode ? 'text-gray-400' : 'text-[#64748B]'}`}>{item.description}</p>
                         )}
-                        <div className="flex items-center justify-between mt-2">
-                          <PriceDisplay basePrice={item.price || item.customer_price} />
+                        <PriceDisplay basePrice={item.price || item.customer_price} />
+                        <div className="flex items-center justify-center gap-3 mt-2">
                           {getCartQty(item.id) > 0 ? (
-                            <div className="flex items-center gap-2">
-                              <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); const q = getCartQty(item.id); if (q <= 1) removeFromCart(item.id); else updateQuantity(item.id, q - 1); }} className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md active:shadow-lg"><Minus className="w-4 h-4" /></motion.button>
-                              <span className={`text-sm font-black min-w-[22px] text-center ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`}>{getCartQty(item.id)}</span>
-                              <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-[#1B4332] text-white flex items-center justify-center shadow-md active:shadow-lg"><Plus className="w-4 h-4" /></motion.button>
-                            </div>
+                            <>
+                              <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); const q = getCartQty(item.id); if (q <= 1) removeFromCart(item.id); else updateQuantity(item.id, q - 1); }} className="w-9 h-9 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md"><Minus className="w-4 h-4" /></motion.button>
+                              <span className={`text-base font-black min-w-[24px] text-center ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`}>{getCartQty(item.id)}</span>
+                              <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-9 h-9 rounded-full bg-[#1B4332] text-white flex items-center justify-center shadow-md"><Plus className="w-4 h-4" /></motion.button>
+                            </>
                           ) : (
-                            <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-[#1B4332] text-white flex items-center justify-center shadow-md hover:bg-[#163426] active:shadow-lg transition-colors"><Plus className="w-5 h-5" /></motion.button>
+                            <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-10 h-10 rounded-full bg-[#1B4332] text-white flex items-center justify-center shadow-md hover:bg-[#163426] transition-colors"><Plus className="w-5 h-5" /></motion.button>
                           )}
                         </div>
                       </div>
