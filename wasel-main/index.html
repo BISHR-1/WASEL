@@ -7,7 +7,8 @@
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6089432800736094"
          crossorigin="anonymous"></script>
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
-    <link rel="canonical" href="https://www.wasel.life/" />
+    <!-- canonical tag will be set dynamically -->
+    <link rel="canonical" id="dynamic-canonical" href="https://www.wasel.life/" />
     <link rel="icon" type="image/png" href="/logo/wasel-logo.png" />
     <link rel="apple-touch-icon" href="/logo/wasel-logo.png" />
     <title>واصل ستور | أرسل احتياجات أهلك في درعا بكبسة زر 🚀 | Wasel Store</title>
@@ -54,6 +55,19 @@
         "closes": "23:59"
       }
     }
+    </script>
+    <script>
+      // Dynamically set canonical tag to match current URL
+      (function() {
+        var canonical = document.getElementById('dynamic-canonical');
+        var loc = window.location;
+        var canonicalUrl = loc.origin + loc.pathname;
+        // Remove trailing slash except for root
+        if (canonicalUrl.length > loc.origin.length + 1 && canonicalUrl.endsWith('/')) {
+          canonicalUrl = canonicalUrl.slice(0, -1);
+        }
+        canonical.setAttribute('href', canonicalUrl);
+      })();
     </script>
   </head>
   <body>
