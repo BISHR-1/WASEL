@@ -1,46 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* 🎨 Wasel Trust Green Color Palette
-   #F9FAF8 - أبيض دافئ (خلفيات)
-   #E5E7EB - رمادي فاتح (عناصر ثانوية)
-   #1F7A63 - أخضر زيتوني داكن (Primary)
-   #2FA36B - أخضر فاتح (CTA)
-   #1F2933 - أسود ناعم (نصوص)
-*/
+/* ================================================================
+   🎨 Wasel Store — Design System 2.0
+   الهوية البصرية الجديدة لمنصة واصل ستور
+   ================================================================ */
 
 @layer base {
   :root {
-    /* Wasel Trust Green Theme */
-    --background: 100 20% 98%; /* #F9FAF8 */
-    --foreground: 207 26% 16%; /* #1F2933 */
-    --card: 0 0% 100%; /* أبيض */
-    --card-foreground: 207 26% 16%; /* #1F2933 */
+    /* --- ألوان Brand الجديدة --- */
+    --brand-navy:          #0B2545;
+    --brand-navy-dark:     #134074;
+    --brand-navy-light:    #EEF4F8;
+    --brand-orange:        #FF7F11;
+    --brand-orange-dark:   #E16200;
+    --brand-orange-light:  #FFF0E5;
+    --brand-sage:          #A3B18A;
+    --brand-sage-dark:     #588157;
+    --brand-sage-light:    #F4F7F4;
+
+    /* --- ألوان Wasel الأصلية (للتوافق) --- */
+    --wasel-green:  #1F7A63;
+    --wasel-cta:    #2FA36B;
+    --wasel-dark:   #1F2933;
+    --wasel-cream:  #F9FAF8;
+    --wasel-gray:   #E5E7EB;
+
+    /* --- متغيرات shadcn/ui --- */
+    --background: 100 20% 98%;
+    --foreground: 207 26% 16%;
+    --card: 0 0% 100%;
+    --card-foreground: 207 26% 16%;
     --popover: 0 0% 100%;
     --popover-foreground: 207 26% 16%;
-    --primary: 163 59% 30%; /* #1F7A63 */
-    --primary-foreground: 0 0% 100%; /* أبيض */
-    --secondary: 216 12% 91%; /* #E5E7EB */
-    --secondary-foreground: 207 26% 16%; /* #1F2933 */
+    --primary: 163 59% 30%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 216 12% 91%;
+    --secondary-foreground: 207 26% 16%;
     --muted: 216 12% 91%;
     --muted-foreground: 207 20% 40%;
-    --accent: 150 55% 41%; /* #2FA36B */
+    --accent: 150 55% 41%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
     --border: 216 12% 85%;
     --input: 216 12% 91%;
-    --ring: 163 59% 30%; /* #1F7A63 */
+    --ring: 163 59% 30%;
     --chart-1: 163 59% 30%;
     --chart-2: 150 55% 41%;
     --chart-3: 207 26% 16%;
     --chart-4: 100 20% 98%;
     --chart-5: 216 12% 91%;
-    --radius: 0.5rem;
-    --sidebar-background: 163 59% 30%; /* #1F7A63 */
-    --sidebar-foreground: 0 0% 100%; /* أبيض */
-    --sidebar-primary: 150 55% 41%; /* #2FA36B */
+    --radius: 0.75rem;
+    --sidebar-background: 163 59% 30%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 150 55% 41%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 163 50% 25%;
     --sidebar-accent-foreground: 0 0% 100%;
@@ -49,14 +66,13 @@
   }
 
   .dark {
-    /* Dark mode with Trust Green */
     --background: 207 26% 10%;
-    --foreground: 100 20% 98%; /* #F9FAF8 */
+    --foreground: 100 20% 98%;
     --card: 207 26% 14%;
     --card-foreground: 100 20% 98%;
     --popover: 207 26% 14%;
     --popover-foreground: 100 20% 98%;
-    --primary: 163 59% 30%; /* #1F7A63 */
+    --primary: 163 59% 30%;
     --primary-foreground: 0 0% 100%;
     --secondary: 207 20% 25%;
     --secondary-foreground: 100 20% 98%;
@@ -85,14 +101,200 @@
   }
 }
 
-
-
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    -webkit-tap-highlight-color: transparent;
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Cairo', 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overscroll-behavior-y: contain;
   }
+}
+
+/* ================================================================
+   🔧 Utility Classes المساعدة
+   ================================================================ */
+@layer utilities {
+  /* إخفاء شريط التمرير */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* تأثير الزجاج (Glassmorphism) */
+  .glass {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .glass-dark {
+    background: rgba(11, 37, 69, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* تدرج Hero */
+  .hero-gradient {
+    background: linear-gradient(135deg, #0B2545 0%, #134074 50%, #1F7A63 100%);
+  }
+
+  /* تدرج CTA برتقالي */
+  .cta-gradient {
+    background: linear-gradient(135deg, #FF7F11 0%, #E16200 100%);
+  }
+
+  /* تدرج Sage خضر */
+  .sage-gradient {
+    background: linear-gradient(135deg, #A3B18A 0%, #588157 100%);
+  }
+
+  /* الرسوم المتحركة للشريط السفلي */
+  .nav-hidden {
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .nav-visible {
+    transform: translateY(0);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* ظل بطاقة المنتج */
+  .product-card-shadow {
+    box-shadow: 0 2px 12px rgba(11, 37, 69, 0.06);
+    transition: box-shadow 0.25s ease, transform 0.25s ease;
+  }
+
+  .product-card-shadow:hover {
+    box-shadow: 0 12px 32px rgba(11, 37, 69, 0.14);
+    transform: translateY(-3px);
+  }
+
+  /* نبضة الثقة */
+  .trust-pulse {
+    animation: trust-pulse 3s ease-in-out infinite;
+  }
+
+  /* خلفية shimmer للتحميل */
+  .skeleton-shimmer {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s linear infinite;
+  }
+
+  /* آمن للـ safe area في الأجهزة الحديثة */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+/* ================================================================
+   📦 Component Classes
+   ================================================================ */
+@layer components {
+  /* زر CTA الرئيسي */
+  .btn-cta {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl font-bold text-white text-sm
+           transition-all duration-200 active:scale-95 shadow-cta;
+    background: linear-gradient(135deg, #FF7F11, #E16200);
+  }
+
+  .btn-cta:hover {
+    box-shadow: 0 12px 28px rgba(255, 127, 17, 0.45);
+    transform: translateY(-1px);
+  }
+
+  /* زر Navy ثانوي */
+  .btn-navy {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl font-bold text-white text-sm
+           transition-all duration-200 active:scale-95;
+    background: linear-gradient(135deg, #0B2545, #134074);
+  }
+
+  /* بطاقة مصغّرة */
+  .card-wasel {
+    @apply bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden
+           transition-all duration-200 cursor-pointer;
+  }
+
+  .card-wasel:hover {
+    @apply shadow-card-hover;
+    transform: translateY(-2px);
+  }
+
+  /* شارة الهدية */
+  .gift-badge {
+    @apply inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full;
+    background: linear-gradient(135deg, #FFF0E5, #FFE0C2);
+    color: #E16200;
+    border: 1px solid #FECDAA;
+  }
+
+  /* مربع إدخال RTL */
+  .input-rtl {
+    @apply w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-right
+           text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2
+           focus:ring-brand-orange/30 focus:border-brand-orange transition-all duration-200;
+    direction: rtl;
+  }
+}
+
+/* ================================================================
+   🎬 Custom Keyframes
+   ================================================================ */
+@keyframes trust-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 127, 17, 0.3); }
+  50%       { box-shadow: 0 0 0 8px rgba(255, 127, 17, 0); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes float-up {
+  0%   { transform: translateY(0px); }
+  50%  { transform: translateY(-6px); }
+  100% { transform: translateY(0px); }
+}
+
+/* ================================================================
+   📱 Mobile-first Overrides
+   ================================================================ */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* منع الـ overscroll خلف الـ modal */
+body.modal-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
 }

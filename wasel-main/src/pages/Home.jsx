@@ -1,11 +1,19 @@
+// =====================================================
+// WASEL — الصفحة الرئيسية 2.0 (بدون AutoScroll)
+// ملف: src/pages/Home.jsx
+// =====================================================
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '../api/base44Client';
-
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ChevronDown, Bell, Heart, Star, Package, Gift, Smartphone, Utensils, IceCream, Store, Sparkles, Truck, Plus, Minus, Crown, TrendingUp, ShoppingBag, Flame } from 'lucide-react';
+import {
+  Search, ChevronLeft, Heart, Star, Package, Gift,
+  Smartphone, Utensils, IceCream, Store, Sparkles, Truck,
+  Plus, Minus, Crown, ShoppingBag, Flame, ArrowLeft,
+  MapPin, Shield, Camera
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useCart } from '@/components/cart/CartContext';
@@ -13,7 +21,6 @@ import { createPageUrl } from '@/utils';
 import PriceDisplay from '@/components/common/PriceDisplay';
 import { toast } from 'sonner';
 import { initializePushNotifications } from '@/services/pushNotifications';
-
 import { supabase } from '@/lib/supabase';
 import { interleaveByCategory, scoreItemsByBehavior } from '@/lib/recommendationSignals';
 import SmartLottie from '@/components/animations/SmartLottie';
@@ -24,73 +31,176 @@ import { useDarkMode } from '@/lib/DarkModeContext';
 import { attachRatingsFromReviews, normalizeItemRating } from '@/lib/itemRatings';
 import AdBanner from '@/components/ads/AdBanner';
 
-const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+const isUuid = (v) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(v || ''));
 
-// Standalone auto-scroll horizontal carousel component (ping-pong: right→left then left→right)
-const AutoScrollRow = ({ items, renderCard, className = '' }) => {
-  const scrollRef = useRef(null);
-  const animRef = useRef(null);
-  const pausedRef = useRef(false);
-  const dirRef = useRef(1);
-  const posRef = useRef(0);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el || items.length < 2) return;
-    posRef.current = 0;
-    dirRef.current = 1;
-    el.scrollLeft = 0;
-
-    const step = () => {
-      if (!pausedRef.current && el) {
-        const maxScroll = el.scrollWidth - el.clientWidth;
-        if (maxScroll > 0) {
-          posRef.current += dirRef.current * 0.5;
-          if (posRef.current >= maxScroll) { posRef.current = maxScroll; dirRef.current = -1; }
-          if (posRef.current <= 0) { posRef.current = 0; dirRef.current = 1; }
-          el.scrollLeft = posRef.current;
-        }
-      }
-      animRef.current = requestAnimationFrame(step);
-    };
-    animRef.current = requestAnimationFrame(step);
-    return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
-  }, [items]);
-
-  const pause = () => { pausedRef.current = true; };
-  const resume = () => {
-    const el = scrollRef.current;
-    if (el) posRef.current = el.scrollLeft;
-    pausedRef.current = false;
-  };
-
-  return (
-    <div
-      ref={scrollRef}
-      className={`flex gap-4 overflow-x-auto scrollbar-hide ${className}`}
-      style={{ scrollBehavior: 'auto', direction: 'ltr' }}
-      onMouseEnter={pause}
-      onMouseLeave={resume}
-      onTouchStart={pause}
-      onTouchEnd={() => { setTimeout(resume, 3000); }}
-    >
-      {items.map((item, idx) => renderCard(item, idx))}
-    </div>
-  );
+// =====================================================
+// إعدادات الأصناف مع التدرجات الجديدة
+// =====================================================
+const CATEGORY_CONFIG = {
+  electronics: { label: 'الإلكترونيات', icon: Smartphone, color: '#0B2545', bg: '#EEF4F8' },
+  food:        { label: 'أطعمة',          icon: Utensils,   color: '#588157', bg: '#F4F7F4' },
+  restaurants: { label: 'مطاعم',          icon: Utensils,   color: '#E16200', bg: '#FFF0E5' },
+  sweets:      { label: 'حلويات',         icon: IceCream,   color: '#9333EA', bg: '#F5F3FF' },
+  supermarket: { label: 'سوبرماركت',      icon: Store,      color: '#0B2545', bg: '#EEF4F8' },
+  gifts:       { label: 'هدايا مميزة',    icon: Gift,       color: '#E16200', bg: '#FFF0E5' },
+  packages:    { label: 'باقات وعروض',    icon: Package,    color: '#0B2545', bg: '#EEF4F8' },
+  other:       { label: 'منتجات متنوعة',  icon: ShoppingBag,color: '#588157', bg: '#F4F7F4' },
 };
 
+// =====================================================
+// شبكة الأصناف الثابتة
+// =====================================================
+const SHOP_CATEGORIES = [
+  { name: 'السوبرماركت',   icon: Store,      link: 'Supermarket',    emoji: '🛒', color: '#0B2545', bg: '#EEF4F8' },
+  { name: 'المطاعم',       icon: Utensils,   link: 'Restaurants',    emoji: '🍽️', color: '#E16200', bg: '#FFF0E5' },
+  { name: 'الحلويات',      icon: IceCream,   link: 'Sweets',         emoji: '🍬', color: '#9333EA', bg: '#F5F3FF' },
+  { name: 'الإلكترونيات',  icon: Smartphone, link: 'Electronics',    emoji: '📱', color: '#0369A1', bg: '#F0F9FF' },
+  { name: 'الهدايا',       icon: Gift,       link: 'Gifts',          emoji: '🎁', color: '#E16200', bg: '#FFF0E5' },
+  { name: 'الباقات',       icon: Package,    link: 'Packages',       emoji: '📦', color: '#0B2545', bg: '#EEF4F8' },
+];
+
+// =====================================================
+// شارات الثقة — بدون ذكر طريقة التوصيل
+// =====================================================
+const TRUST_BADGES = [
+  { emoji: '🔒', label: 'دفع آمن 100%' },
+  { emoji: '⚡', label: 'تنفيذ سريع' },
+  { emoji: '💬', label: 'دعم واتساب' },
+  { emoji: '⭐', label: 'خدمة موثوقة' },
+];
+
+// =====================================================
+// مكوّن بطاقة منتج مصغّرة داخل الصفحة الرئيسية
+// =====================================================
+function HomeProductCard({ item, onAdd, onRemove, onUpdate, onOpenDetail, cartQty, isDarkMode }) {
+  const [imgError, setImgError] = useState(false);
+  const imgSrc = item.image_url || item.image || '';
+
+  return (
+    <motion.div
+      whileHover={{ y: -3, boxShadow: '0 12px 28px rgba(11,37,69,0.12)' }}
+      whileTap={{ scale: 0.98 }}
+      dir="rtl"
+      className={`shrink-0 rounded-2xl overflow-hidden border transition-shadow
+        ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-[#E8EAED]'}
+        min-w-[160px] max-w-[180px] shadow-sm`}
+    >
+      {/* صورة المنتج — نسبة 1:1 وخلفية بيضاء */}
+      <div
+        className="w-full aspect-square bg-white flex items-center justify-center cursor-pointer overflow-hidden"
+        onClick={() => onOpenDetail?.(item)}
+      >
+        {!imgError && imgSrc ? (
+          <img
+            src={imgSrc}
+            alt={item.name}
+            className="w-[85%] h-[85%] object-contain transition-transform duration-300 hover:scale-105"
+            loading="lazy"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-[#EEF4F8]">
+            <span className="text-4xl opacity-30">📦</span>
+          </div>
+        )}
+      </div>
+
+      {/* معلومات المنتج */}
+      <div className="p-2.5">
+        <h4 className={`font-bold text-sm truncate mb-1 ${isDarkMode ? 'text-white' : 'text-[#0B2545]'}`}>
+          {item.name}
+        </h4>
+        <PriceDisplay basePrice={item.price || item.customer_price} />
+
+        {/* أزرار الكمية */}
+        <div className="flex items-center justify-center gap-2 mt-2">
+          {cartQty > 0 ? (
+            <>
+              <motion.button
+                whileTap={{ scale: 0.85 }}
+                onClick={(e) => { e.stopPropagation(); if (cartQty <= 1) onRemove(item.id); else onUpdate(item.id, cartQty - 1); }}
+                className="w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center shadow-sm"
+              >
+                <Minus className="w-3.5 h-3.5" />
+              </motion.button>
+              <span className={`text-base font-black min-w-[20px] text-center ${isDarkMode ? 'text-white' : 'text-[#0B2545]'}`}>{cartQty}</span>
+              <motion.button
+                whileTap={{ scale: 0.85 }}
+                onClick={(e) => { e.stopPropagation(); onAdd(item); }}
+                className="w-8 h-8 rounded-full text-white flex items-center justify-center shadow-sm"
+                style={{ background: 'linear-gradient(135deg, #0B2545, #134074)' }}
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </motion.button>
+            </>
+          ) : (
+            <motion.button
+              whileTap={{ scale: 0.85 }}
+              onClick={(e) => { e.stopPropagation(); onAdd(item); }}
+              className="w-9 h-9 rounded-full text-white flex items-center justify-center shadow-md hover:opacity-90 transition-opacity"
+              style={{ background: 'linear-gradient(135deg, #FF7F11, #E16200)' }}
+            >
+              <Plus className="w-4 h-4" />
+            </motion.button>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// =====================================================
+// صف عرض أفقي قابل للسحب (بدون auto-scroll)
+// =====================================================
+function ManualScrollRow({ items, title, titleColor = '#0B2545', icon: Icon, onAdd, onRemove, onUpdate, onOpenDetail, getCartQty, isDarkMode, onViewAll }) {
+  if (!items || items.length < 2) return null;
+
+  return (
+    <div dir="rtl" className="mb-8">
+      {/* رأس القسم */}
+      <div className="flex items-center justify-between mb-3 px-1">
+        <div className="flex items-center gap-2">
+          {Icon && (
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: titleColor + '20' }}>
+              <Icon className="w-4 h-4" style={{ color: titleColor }} />
+            </div>
+          )}
+          <h3 className={`font-black text-lg ${isDarkMode ? 'text-white' : 'text-[#0B2545]'}`}>{title}</h3>
+        </div>
+        {onViewAll && (
+          <button onClick={onViewAll} className="flex items-center gap-1 text-sm font-bold" style={{ color: titleColor }}>
+            الكل <ArrowLeft className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {/* الصف الأفقي — قابل للسحب يدوياً */}
+      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide" style={{ direction: 'rtl' }}>
+        {items.map((item, idx) => (
+          <HomeProductCard
+            key={`${title}-${idx}-${item.id}`}
+            item={item}
+            onAdd={onAdd}
+            onRemove={onRemove}
+            onUpdate={onUpdate}
+            onOpenDetail={onOpenDetail}
+            cartQty={getCartQty(item.id)}
+            isDarkMode={isDarkMode}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// =====================================================
+// المكوّن الرئيسي — الصفحة الرئيسية
+// =====================================================
 const Home = () => {
   const navigate = useNavigate();
   const { addToCart, cartItems, updateQuantity, removeFromCart } = useCart();
-
-  // Helper to get quantity of an item in cart
-  const getCartQty = (itemId) => {
-    const safeItems = Array.isArray(cartItems) ? cartItems : [];
-    const found = safeItems.find(i => i?.id === itemId);
-    return found?.quantity || 0;
-  };
   const { isDarkMode } = useDarkMode();
-  const [isWaselPlusMember, setIsWaselPlusMember] = useState(false);
+
   const [favoriteProductIds, setFavoriteProductIds] = useState([]);
   const [likedProductId, setLikedProductId] = useState(null);
   const [addedToCartProductId, setAddedToCartProductId] = useState(null);
@@ -98,13 +208,17 @@ const Home = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [recentReviews, setRecentReviews] = useState([]);
   const [deliveredCount, setDeliveredCount] = useState(0);
+  const [isWaselPlusMember, setIsWaselPlusMember] = useState(false);
 
-  // تهيئة الإشعارات عند فتح الصفحة الرئيسية
-  useEffect(() => {
-    initializePushNotifications();
-  }, []);
+  const getCartQty = (itemId) => {
+    const safe = Array.isArray(cartItems) ? cartItems : [];
+    return safe.find((i) => i?.id === itemId)?.quantity || 0;
+  };
 
-  // جلب التقييمات الحقيقية وعدد الطلبات المسلّمة
+  // تهيئة الإشعارات
+  useEffect(() => { initializePushNotifications(); }, []);
+
+  // تحميل الدليل الاجتماعي
   useEffect(() => {
     const loadSocialProof = async () => {
       try {
@@ -112,789 +226,403 @@ const Home = () => {
           supabase.from('reviews').select('rating, comment, created_at').gt('rating', 3).order('created_at', { ascending: false }).limit(6),
           supabase.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'delivered'),
         ]);
-        if (reviewsRes.data) setRecentReviews(reviewsRes.data.filter(r => r.comment?.trim()));
+        if (reviewsRes.data) setRecentReviews(reviewsRes.data.filter((r) => r.comment?.trim()));
         if (ordersRes.count) setDeliveredCount(ordersRes.count);
-      } catch (_) { /* silent */ }
+      } catch (_) {}
     };
     loadSocialProof();
   }, []);
 
-  // Auto-hide heart burst animation
+  // تلاشي أنيميشن القلب
   useEffect(() => {
     if (!likedProductId) return;
-    const timer = setTimeout(() => {
-      setLikedProductId(null);
-    }, 1500);
-    return () => clearTimeout(timer);
+    const t = setTimeout(() => setLikedProductId(null), 1500);
+    return () => clearTimeout(t);
   }, [likedProductId]);
 
-  // Auto-hide add-to-cart animation
-  useEffect(() => {
-    if (!addedToCartProductId) return;
-    const timer = setTimeout(() => {
-      setAddedToCartProductId(null);
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [addedToCartProductId]);
-
-  useEffect(() => {
-    const loadMembershipState = async () => {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        const userEmail = user?.email;
-        if (!userEmail) {
-          setIsWaselPlusMember(false);
-          return;
-        }
-
-        const { data, error } = await supabase
-          .from('wasel_plus_memberships')
-          .select('status, end_date, trial_end')
-          .eq('user_email', userEmail)
-          .order('updated_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (error || !data) {
-          setIsWaselPlusMember(false);
-          return;
-        }
-
-        const now = Date.now();
-        const activeEnd = data?.status === 'active' && data?.end_date ? Date.parse(data.end_date) : null;
-        const trialEnd = data?.status === 'trialing' && data?.trial_end ? Date.parse(data.trial_end) : null;
-        const isActive =
-          (data.status === 'active' && (!activeEnd || activeEnd > now)) ||
-          (data.status === 'trialing' && (!trialEnd || trialEnd > now));
-
-        setIsWaselPlusMember(Boolean(isActive));
-      } catch (error) {
-        console.error('Failed to load Wasel+ state on home:', error);
-        setIsWaselPlusMember(false);
-      }
-    };
-
-    loadMembershipState();
-  }, []);
-
+  // تحميل بيانات المنتجات
   const { data: products = [], isLoading: productsLoading } = useQuery({
     queryKey: ['home-products'],
     queryFn: async () => {
-      const list = await base44.entities.Product.list({ limit: 10, sort: { created_date: -1 } });
-      const normalized = Array.isArray(list) ? list.map((item) => normalizeItemRating(item)) : [];
-      return await attachRatingsFromReviews(normalized, { itemType: 'product' });
-    }
+      const list = await base44.entities.Product.list({ limit: 20, sort: { created_date: -1 } });
+      const norm = Array.isArray(list) ? list.map((i) => normalizeItemRating(i)) : [];
+      return await attachRatingsFromReviews(norm, { itemType: 'product' });
+    },
   });
-
-  useEffect(() => {
-    let mounted = true;
-
-    const loadFavoriteIds = async () => {
-      try {
-        const localFavorites = JSON.parse(localStorage.getItem('wasel_favorites') || '[]');
-        const localIds = localFavorites.map((item) => item?.id).filter(Boolean);
-
-        const { data: { session } } = await supabase.auth.getSession();
-        const userId = session?.user?.id;
-
-        if (!userId) {
-          if (mounted) setFavoriteProductIds(localIds);
-          return;
-        }
-
-        const productIds = products.map((product) => product?.id).filter(Boolean);
-        const uuidProductIds = productIds.filter((id) => isUuid(id));
-        if (!uuidProductIds.length) {
-          if (mounted) setFavoriteProductIds(localIds);
-          return;
-        }
-
-        const { data, error } = await supabase
-          .from('favorites')
-          .select('item_id')
-          .eq('user_id', userId)
-          .eq('item_type', 'product')
-          .in('item_id', uuidProductIds);
-
-        if (error) throw error;
-
-        const remoteIds = Array.isArray(data) ? data.map((row) => row.item_id) : [];
-        const merged = [...new Set([...localIds, ...remoteIds])];
-        if (mounted) setFavoriteProductIds(merged);
-      } catch (error) {
-        console.error('Failed to load favorites on home:', error);
-      }
-    };
-
-    loadFavoriteIds();
-
-    return () => {
-      mounted = false;
-    };
-  }, [products]);
-
-  const handleToggleFavorite = async (event, product) => {
-    event.stopPropagation();
-
-    const productId = product?.id;
-    if (!productId) return;
-
-    try {
-      const currentlyFavorited = favoriteProductIds.includes(productId);
-      const localFavorites = JSON.parse(localStorage.getItem('wasel_favorites') || '[]');
-
-      if (currentlyFavorited) {
-        const updatedLocal = localFavorites.filter((fav) => fav.id !== productId);
-        localStorage.setItem('wasel_favorites', JSON.stringify(updatedLocal));
-        setFavoriteProductIds((prev) => prev.filter((id) => id !== productId));
-
-        const { data: { session } } = await supabase.auth.getSession();
-        const userId = session?.user?.id;
-        if (userId && isUuid(productId)) {
-          await supabase
-            .from('favorites')
-            .delete()
-            .eq('user_id', userId)
-            .eq('item_type', 'product')
-            .eq('item_id', productId);
-        }
-
-        toast.success('تمت الإزالة من المفضلة');
-        return;
-      }
-
-      const updatedLocal = [...localFavorites, { ...product, addedAt: new Date().toISOString() }];
-      localStorage.setItem('wasel_favorites', JSON.stringify(updatedLocal));
-      setFavoriteProductIds((prev) => [...new Set([...prev, productId])]);
-      setLikedProductId(productId); // Trigger heart animation
-
-      const { data: { session } } = await supabase.auth.getSession();
-      const userId = session?.user?.id;
-      if (userId && isUuid(productId)) {
-        const { data: existing } = await supabase
-          .from('favorites')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('item_type', 'product')
-          .eq('item_id', productId)
-          .limit(1);
-
-        if (!existing || existing.length === 0) {
-          await supabase
-            .from('favorites')
-            .insert({
-              user_id: userId,
-              item_type: 'product',
-              item_id: productId,
-            });
-        }
-      }
-
-      toast.success('تمت الإضافة إلى المفضلة');
-    } catch (error) {
-      console.error('Failed to toggle favorite on home:', error);
-      toast.error('تعذر تحديث المفضلة حالياً');
-    }
-  };
 
   const { data: gifts = [] } = useQuery({
     queryKey: ['home-gifts'],
     queryFn: async () => {
       const list = await base44.entities.Gift.list({ limit: 12, sort: { created_date: -1 } });
-      const normalized = Array.isArray(list) ? list.map((item) => normalizeItemRating(item)) : [];
-      return await attachRatingsFromReviews(normalized, { itemType: 'gift' });
-    }
+      const norm = Array.isArray(list) ? list.map((i) => normalizeItemRating(i)) : [];
+      return await attachRatingsFromReviews(norm, { itemType: 'gift' });
+    },
   });
 
   const { data: packages = [] } = useQuery({
     queryKey: ['home-packages'],
     queryFn: async () => {
       const list = await base44.entities.Package.list({ limit: 12, sort: { created_date: -1 } });
-      const normalized = Array.isArray(list) ? list.map((item) => normalizeItemRating(item)) : [];
-      return await attachRatingsFromReviews(normalized, { itemType: 'package' });
-    }
+      const norm = Array.isArray(list) ? list.map((i) => normalizeItemRating(i)) : [];
+      return await attachRatingsFromReviews(norm, { itemType: 'package' });
+    },
   });
 
-  // Best-selling products from order_items
-  const { data: bestSellingProducts = [] } = useQuery({
-    queryKey: ['best-selling-products', products],
+  // الأكثر مبيعاً
+  const { data: bestSelling = [] } = useQuery({
+    queryKey: ['best-selling', products],
+    enabled: products.length > 0,
     queryFn: async () => {
       try {
-        const { data: orderItems } = await supabase
-          .from('order_items')
-          .select('product_name, product_id, quantity, price, image_url');
-        if (!orderItems?.length) return products.slice(0, 8);
-        // Aggregate by product_name
-        const salesMap = {};
-        orderItems.forEach(item => {
-          const key = item.product_name || item.product_id;
-          if (!key) return;
-          if (!salesMap[key]) salesMap[key] = { name: key, totalQty: 0, product_id: item.product_id, image_url: item.image_url, price: item.price };
-          salesMap[key].totalQty += (item.quantity || 1);
+        const { data: orderItems } = await supabase.from('order_items').select('product_name, product_id, quantity, price, image_url');
+        if (!orderItems?.length) return products.slice(0, 10);
+        const map = {};
+        orderItems.forEach((oi) => {
+          const k = oi.product_name || oi.product_id;
+          if (!k) return;
+          if (!map[k]) map[k] = { name: k, totalQty: 0, product_id: oi.product_id, image_url: oi.image_url, price: oi.price };
+          map[k].totalQty += oi.quantity || 1;
         });
-        const sorted = Object.values(salesMap).sort((a, b) => b.totalQty - a.totalQty).slice(0, 12);
-        // Match with actual products for full data
-        return sorted.map(sale => {
-          const match = products.find(p => p.id === sale.product_id || p.name === sale.name);
-          return match ? { ...match, _soldCount: sale.totalQty } : { id: sale.product_id || sale.name, name: sale.name, price: sale.price, image_url: sale.image_url, _soldCount: sale.totalQty };
+        return Object.values(map).sort((a, b) => b.totalQty - a.totalQty).slice(0, 12).map((s) => {
+          const match = products.find((p) => p.id === s.product_id || p.name === s.name);
+          return match ? { ...match, _soldCount: s.totalQty } : { id: s.product_id || s.name, name: s.name, price: s.price, image_url: s.image_url, _soldCount: s.totalQty };
         }).filter(Boolean);
-      } catch {
-        return products.slice(0, 8);
-      }
+      } catch { return products.slice(0, 10); }
     },
-    enabled: products.length > 0,
   });
 
-  const handleAddToCart = (product) => {
-    addToCart(product);
-    setAddedToCartProductId(product.id);
-  };
-
-  const normalizeShowcaseItem = (item, itemType) => ({
+  const normalizeItem = (item, itemType) => ({
     ...normalizeItemRating(item),
     item_type: itemType,
-    name: item?.name || item?.name_ar || (itemType === 'gift' ? 'Gift Item' : 'Package Item'),
-    image_url: item?.image_url || item?.image || item?.images?.[0] || 'https://placehold.co/400x400/F8FAFC/1F2933?text=Wasel',
+    name: item?.name || item?.name_ar || 'منتج',
+    image_url: item?.image_url || item?.image || item?.images?.[0] || '',
     price: Number(item?.price || item?.customer_price || item?.base_price || 0),
     customer_price: Number(item?.customer_price || item?.price || item?.base_price || 0),
     description: item?.description || item?.details || item?.description_ar || '',
   });
 
-  // Category display configs
-  const categoryDisplayConfig = {
-    'electronics': { label: 'الإلكترونيات', icon: Smartphone, gradient: 'from-blue-500 to-indigo-600', bg: 'bg-blue-50', border: 'border-blue-200' },
-    'food': { label: 'أطعمة ومأكولات', icon: Utensils, gradient: 'from-orange-500 to-red-500', bg: 'bg-orange-50', border: 'border-orange-200' },
-    'restaurants': { label: 'من المطاعم', icon: Utensils, gradient: 'from-red-500 to-pink-500', bg: 'bg-red-50', border: 'border-red-200' },
-    'sweets': { label: 'حلويات', icon: IceCream, gradient: 'from-pink-400 to-purple-500', bg: 'bg-pink-50', border: 'border-pink-200' },
-    'supermarket': { label: 'سوبرماركت', icon: Store, gradient: 'from-green-500 to-emerald-600', bg: 'bg-green-50', border: 'border-green-200' },
-    'gifts': { label: 'هدايا مميزة', icon: Gift, gradient: 'from-purple-500 to-pink-500', bg: 'bg-purple-50', border: 'border-purple-200' },
-    'packages': { label: 'باقات وعروض', icon: Package, gradient: 'from-amber-500 to-orange-500', bg: 'bg-amber-50', border: 'border-amber-200' },
-    'other': { label: 'منتجات متنوعة', icon: ShoppingBag, gradient: 'from-slate-500 to-gray-600', bg: 'bg-slate-50', border: 'border-slate-200' },
+  const handleAddToCart = (product) => {
+    addToCart(product);
+    setAddedToCartProductId(product.id);
+    setTimeout(() => setAddedToCartProductId(null), 1500);
   };
 
-  // Categorize products for category sections
-  const categorizedProducts = useMemo(() => {
-    const cats = {};
-    products.forEach(p => {
-      const cat = (p.category || 'other').toLowerCase();
-      if (!cats[cat]) cats[cat] = [];
-      cats[cat].push(p);
-    });
-    // Also add gifts and packages as categories
-    if (gifts.length > 0) cats['gifts'] = gifts.map(g => normalizeShowcaseItem(g, 'gift'));
-    if (packages.length > 0) cats['packages'] = packages.map(p => normalizeShowcaseItem(p, 'package'));
-    return cats;
-  }, [products, gifts, packages]);
-
-  const categories = [
-    { name: 'الرئيسية', link: 'Home', active: true },
-    { name: 'مطاعم', link: 'Restaurants' },
-    { name: 'حلويات', link: 'Sweets' },
-    { name: 'ماركت', link: 'Supermarket' },
-    { name: 'إلكترونيات', link: 'Electronics' },
-  ];
-
-  const shopByCategory = [
-    { name: 'السوبرماركت', icon: Store, link: 'Supermarket', image: '/categories/supermarket.jpg', fallback: 'https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=1000&auto=format&fit=crop' },
-    { name: 'المطاعم', icon: Utensils, link: 'Restaurants', image: '/categories/restaurants.jpg', fallback: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=1000&auto=format&fit=crop' },
-    { name: 'الحلويات', icon: IceCream, link: 'Sweets', image: '/categories/sweets.jpg', fallback: 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?q=80&w=1000&auto=format&fit=crop' },
-    { name: 'الإلكترونيات', icon: Smartphone, link: 'Electronics', image: '/categories/electronics.jpg', fallback: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=1000&auto=format&fit=crop' },
-    { name: 'الهدايا', icon: Gift, link: 'Gifts', image: '/categories/gifts.jpg', fallback: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=1000&auto=format&fit=crop' },
-    { name: 'الباقات', icon: Package, link: 'Packages', image: '/categories/packages.jpg', fallback: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?q=80&w=1000&auto=format&fit=crop' },
-    { name: 'قصص محلية', icon: Sparkles, link: 'LocalSpotlight', image: '/categories/local-spotlight.jpg', fallback: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1000&auto=format&fit=crop' },
-    { name: 'تتبع الطلب', icon: Truck, link: 'TrackOrder', image: '/categories/track-order.jpg', fallback: 'https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?q=80&w=1000&auto=format&fit=crop' },
-  ];
-
-  const mixedRecommendations = useMemo(() => {
-    const mixed = [
-      ...products.slice(0, 15).map((item) => normalizeShowcaseItem(item, 'product')),
-      ...gifts.slice(0, 12).map((item) => normalizeShowcaseItem(item, 'gift')),
-      ...packages.slice(0, 12).map((item) => normalizeShowcaseItem(item, 'package')),
-    ].filter((item) => item?.id && item?.name);
-
-    const ranked = scoreItemsByBehavior(mixed);
-    return interleaveByCategory(ranked, 10);
-  }, [products, gifts, packages]);
-
-  const openMixedItem = (item) => {
-    const type = String(item?.item_type || '').toLowerCase();
-    const search = item?.name || '';
-
-    if (type === 'gift') {
-      navigate(createPageUrl('Gifts', { search }));
-      return;
-    }
-
-    if (type === 'package') {
-      navigate(createPageUrl('Packages', { search }));
-      return;
-    }
-
-    handleAddToCart(item);
-  };
+  // بيانات الأصناف
+  const foodPackages = useMemo(() => packages.map((p) => normalizeItem(p, 'package')), [packages]);
+  const giftItems = useMemo(() => gifts.map((g) => normalizeItem(g, 'gift')), [gifts]);
 
   return (
-    <div className={`${isDarkMode ? 'bg-gray-900' : 'bg-[#F7F8FC]'} min-h-screen pb-24 font-['Cairo']`}>
+    <div className={`${isDarkMode ? 'bg-gray-900' : 'bg-[#F8F9FA]'} min-h-screen pb-28 font-cairo`}>
       <main className="max-w-[1400px] mx-auto">
-        {/* Search Bar - Noon/Amazon style */}
-        <div className="sticky top-0 z-20 bg-gradient-to-l from-[#1B4332] to-[#2D6A4F] px-4 py-3 shadow-md">
-          <div className="relative max-w-2xl mx-auto">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="ابحث عن منتجات، هدايا، مطاعم..."
-              className="w-full bg-white rounded-xl py-3 pr-11 pl-4 text-sm text-[#1F2933] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#FFB000] shadow-sm"
-              dir="rtl"
-              onFocus={() => navigate(createPageUrl('Supermarket'))}
-            />
+
+        {/* ===== Hero Banner العاطفي ===== */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="relative overflow-hidden mx-3 mt-3 mb-4 rounded-3xl"
+          style={{ minHeight: '200px', background: 'linear-gradient(135deg, #0B2545 0%, #134074 45%, #1F7A63 100%)' }}
+        >
+          {/* خلفية نجمية ديناميكية */}
+          <div className="absolute inset-0 opacity-10">
+            {[...Array(12)].map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute w-1 h-1 bg-white rounded-full"
+                style={{ top: `${Math.random() * 100}%`, left: `${Math.random() * 100}%` }}
+                animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.2, 0.8] }}
+                transition={{ duration: 2 + Math.random() * 3, repeat: Infinity, delay: Math.random() * 2 }}
+              />
+            ))}
           </div>
-        </div>
 
-        <div className="p-4">
-        {isWaselPlusMember && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-4 rounded-2xl border border-[#D1FAE5] bg-gradient-to-r from-[#ECFDF5] to-[#F0F9FF] p-4 flex items-center gap-4"
-            dir="rtl"
-          >
-            <SmartLottie
-              animationPath={ANIMATION_PRESETS.premiumCrown.path}
-              width={50}
-              height={50}
-              trigger="immediate"
-              loop={true}
-            />
-            <div className="flex-1">
-              <p className="font-extrabold text-[#065F46]">أنت مشترك في Wasel+ ⭐</p>
-              <p className="text-xs text-[#0F766E] mt-1">خصوماتك الحصرية وتوصيلك المجاني مفعلان على الحساب.</p>
+          <div className="relative z-10 p-6 flex flex-col justify-between" style={{ minHeight: '200px' }}>
+            {/* شارة واصل+ */}
+            <div className="flex justify-between items-start">
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 }}
+                className="bg-white/20 backdrop-blur-sm text-white text-[11px] font-bold px-3 py-1.5 rounded-full"
+              >
+                ✨ واصل ستور — الثقة والأمان
+              </motion.div>
+              <motion.div
+                animate={{ rotate: [0, 10, -10, 0] }}
+                transition={{ duration: 3, repeat: Infinity }}
+                className="text-4xl"
+              >
+                🎁
+              </motion.div>
             </div>
-          </motion.div>
-        )}
 
-        {/* Main Hero - Clear Value Proposition */}
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="relative rounded-2xl overflow-hidden h-44 md:h-52 mb-4 shadow-lg w-full">
-          <img
-            src="/hero/home-hero.jpg"
-            className="w-full h-full object-contain object-center bg-[#E5E7EB]"
-            alt="Banner"
-            onError={(event) => {
-              event.currentTarget.src = 'https://placehold.co/1600x640/F1F5F9/1F2933?text=Wasel+Hero';
-            }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-          <div className="absolute bottom-4 right-4 left-4 text-center" dir="rtl">
-            <p className="text-white font-black text-xl md:text-2xl drop-shadow-lg mb-1">أرسل هدية أو طلبات لعائلتك في دَرْعَا بسهولة</p>
-            <p className="text-white/90 text-xs md:text-sm">اختر المنتجات، ادفع من أي مكان في العالم، ونحن نوصلها داخل دَرْعَا</p>
+            {/* النص الرئيسي */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              dir="rtl"
+            >
+              <h1 className="text-white font-black text-2xl md:text-3xl leading-tight mb-2 drop-shadow-lg">
+                من غربتكم<br />
+                <span style={{ color: '#FF7F11' }}>لقلب درعا</span>
+              </h1>
+              <p className="text-white/80 text-sm leading-relaxed mb-4">
+                نوصل محبتكم وهداياكم لذويكم بكل فخر وموثوقية
+              </p>
+
+              {/* زر CTA */}
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => navigate(createPageUrl('Gifts'))}
+                className="inline-flex items-center gap-2 text-white font-black text-sm px-5 py-2.5 rounded-2xl shadow-lg"
+                style={{ background: 'linear-gradient(135deg, #FF7F11, #E16200)' }}
+              >
+                <Gift className="w-4 h-4" />
+                أرسل هدية الآن
+              </motion.button>
+            </motion.div>
           </div>
         </motion.div>
 
-        {/* Trust Badges */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4" dir="rtl">
-          <div className={`flex items-center gap-2 rounded-xl p-2.5 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} border ${isDarkMode ? 'border-gray-700' : 'border-[#E5E7EB]'} shadow-sm`}>
-            <span className="text-lg">🔒</span>
-            <span className={`text-xs font-bold ${isDarkMode ? 'text-gray-200' : 'text-[#1F2933]'}`}>دفع آمن</span>
-          </div>
-          <div className={`flex items-center gap-2 rounded-xl p-2.5 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} border ${isDarkMode ? 'border-gray-700' : 'border-[#E5E7EB]'} shadow-sm`}>
-            <span className="text-lg">🚚</span>
-            <span className={`text-xs font-bold ${isDarkMode ? 'text-gray-200' : 'text-[#1F2933]'}`}>توصيل سريع داخل دَرْعَا</span>
-          </div>
-          <div className={`flex items-center gap-2 rounded-xl p-2.5 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} border ${isDarkMode ? 'border-gray-700' : 'border-[#E5E7EB]'} shadow-sm`}>
-            <span className="text-lg">💬</span>
-            <span className={`text-xs font-bold ${isDarkMode ? 'text-gray-200' : 'text-[#1F2933]'}`}>دعم عبر واتساب</span>
-          </div>
-          <div className={`flex items-center gap-2 rounded-xl p-2.5 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} border ${isDarkMode ? 'border-gray-700' : 'border-[#E5E7EB]'} shadow-sm`}>
-            <span className="text-lg">⭐</span>
-            <span className={`text-xs font-bold ${isDarkMode ? 'text-gray-200' : 'text-[#1F2933]'}`}>خدمة موثوقة للعائلات</span>
-          </div>
-        </div>
-
-        {/* Promo Banners - عروض مغرية */}
-        <div className="grid grid-cols-2 gap-3 mb-4" dir="rtl">
-          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}
-            onClick={() => navigate(createPageUrl('Cart'))}
-            className="rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 p-4 cursor-pointer shadow-md hover:shadow-lg transition-shadow">
-            <p className="text-white font-extrabold text-sm mb-1">🚚 توصيل $3 فقط</p>
-            <p className="text-white/80 text-[11px]">كانت $6 صارت $3 + أول 3 طلبات بتوصيل مجاني</p>
-          </motion.div>
-          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }}
-            onClick={() => navigate(createPageUrl('Cart'))}
-            className="rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 p-4 cursor-pointer shadow-md hover:shadow-lg transition-shadow">
-            <p className="text-white font-extrabold text-sm mb-1">🔥 خصم 50% على الخدمة</p>
-            <p className="text-white/80 text-[11px]">أول 3 طلبات رسوم الخدمة $3 بدلاً من $6</p>
-          </motion.div>
-        </div>
-
-        {/* Category Chips */}
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-hide">
-          {categories.map(cat => (
-            <Button key={cat.name} onClick={() => navigate(createPageUrl(cat.link))} variant={cat.active ? 'default' : 'outline'} className={`rounded-full whitespace-nowrap ${cat.active ? 'bg-[#0F172A] text-white hover:bg-[#111827]' : 'border-[#D1D5DB] text-[#1F2933] hover:bg-[#EEF2FF]'}`}>
-              {cat.name}
-            </Button>
-          ))}
-        </div>
-
-        {/* Shop by Category - enhanced grid */}
-        <div className="mb-10">
-          <h3 className={`font-black text-xl mb-5 ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`} dir="rtl">تسوق حسب الفئات</h3>
-          <div className="grid grid-cols-4 gap-3">
-            {shopByCategory.map(cat => (
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} key={cat.name} onClick={() => navigate(createPageUrl(cat.link))} className={`flex flex-col items-center gap-2 text-center cursor-pointer p-2 rounded-2xl ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-white'} hover:shadow-md transition-all`}>
-                <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-[#E5E7EB] shadow-sm bg-gradient-to-br from-[#F8FAFC] to-white">
-                  <img
-                    src={cat.image}
-                    alt={cat.name}
-                    className="w-full h-full object-cover"
-                    onError={(event) => {
-                      event.currentTarget.src = cat.fallback;
-                    }}
-                  />
-                </div>
-                <span className={`text-xs font-bold ${isDarkMode ? 'text-gray-200' : 'text-[#1F2933]'} leading-tight`}>{cat.name}</span>
+        <div className="px-3">
+          {/* ===== شارات الثقة ===== */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-5" dir="rtl">
+            {TRUST_BADGES.map((badge, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.08 }}
+                className={`flex items-center gap-2 rounded-xl p-2.5 border ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-[#E8EAED]'} shadow-sm`}
+              >
+                <span className="text-lg shrink-0">{badge.emoji}</span>
+                <span className={`text-xs font-bold ${isDarkMode ? 'text-gray-200' : 'text-[#0B2545]'}`}>{badge.label}</span>
               </motion.div>
             ))}
           </div>
-        </div>
 
-        {/* 🔥 Best Selling Products - Auto Scroll */}
-        {bestSellingProducts.length > 0 && (
-          <div className="mb-10" dir="rtl">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex items-center gap-2 bg-gradient-to-l from-red-500 to-orange-500 text-white px-4 py-2 rounded-2xl shadow-lg">
-                <Flame className="w-5 h-5" />
-                <h3 className="font-black text-lg">الأكثر مبيعاً</h3>
-              </div>
-              <div className="h-[2px] flex-1 bg-gradient-to-l from-transparent to-red-200 rounded-full" />
-            </div>
-            <AutoScrollRow
-              items={bestSellingProducts}
-              renderCard={(item, idx) => (
+          {/* ===== شبكة الأصناف الثابتة — 3 أعمدة موبايل، 6 ديسكتوب ===== */}
+          <div className="mb-8">
+            <h2 className={`font-black text-lg mb-4 ${isDarkMode ? 'text-white' : 'text-[#0B2545]'}`} dir="rtl">
+              تسوّق حسب الفئة
+            </h2>
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+              {SHOP_CATEGORIES.map((cat, i) => (
                 <motion.div
-                  key={`best-${idx}-${item.id}`}
-                  whileHover={{ y: -4 }}
-                  dir="rtl"
-                  className={`min-w-[180px] max-w-[200px] shrink-0 rounded-2xl overflow-hidden shadow-md border relative ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}
+                  key={cat.name}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: i * 0.05 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => navigate(createPageUrl(cat.link))}
+                  className={`flex flex-col items-center gap-2 text-center cursor-pointer p-3 rounded-2xl border transition-all
+                    ${isDarkMode ? 'bg-gray-800 border-gray-700 hover:border-gray-600' : 'bg-white border-[#E8EAED] hover:border-[#FF7F11]/40'} shadow-sm hover:shadow-md`}
                 >
-                  {/* Rank Badge */}
-                  {idx < bestSellingProducts.length && (
-                    <div className={`absolute top-2 right-2 z-10 w-7 h-7 rounded-full flex items-center justify-center text-xs font-black text-white shadow-lg ${
-                      (idx % bestSellingProducts.length) === 0 ? 'bg-gradient-to-br from-yellow-400 to-amber-500' :
-                      (idx % bestSellingProducts.length) === 1 ? 'bg-gradient-to-br from-gray-300 to-gray-400' :
-                      (idx % bestSellingProducts.length) === 2 ? 'bg-gradient-to-br from-amber-600 to-amber-700' :
-                      'bg-gradient-to-br from-blue-500 to-blue-600'
-                    }`}>
-                      {(idx % bestSellingProducts.length) + 1}
-                    </div>
-                  )}
-                  <img
-                    src={item.image_url || 'https://placehold.co/400x400/F9FAF8/1F2933?text=Wasel'}
-                    alt={item.name}
-                    className="w-full h-32 object-contain bg-gradient-to-b from-[#FAFBFC] to-[#F1F5F9] p-3 cursor-pointer"
-                    loading="lazy"
-                    onClick={() => { setDetailItem(item); setShowDetailModal(true); }}
-                  />
-                  <div className="p-3">
-                    <h4 className={`font-bold text-sm truncate mb-1 ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`}>{item.name}</h4>
-                    {item._soldCount && (
-                      <p className="text-[11px] text-emerald-600 font-semibold mb-1">🛒 تم بيع {item._soldCount}+</p>
-                    )}
-                    <PriceDisplay basePrice={item.price} />
-                    <div className="flex items-center justify-center gap-3 mt-2">
-                      {getCartQty(item.id) > 0 ? (
-                        <>
-                          <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); const q = getCartQty(item.id); if (q <= 1) removeFromCart(item.id); else updateQuantity(item.id, q - 1); }} className="w-9 h-9 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md"><Minus className="w-4 h-4" /></motion.button>
-                          <span className={`text-base font-black min-w-[24px] text-center ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`}>{getCartQty(item.id)}</span>
-                          <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-9 h-9 rounded-full bg-[#1B4332] text-white flex items-center justify-center shadow-md"><Plus className="w-4 h-4" /></motion.button>
-                        </>
-                      ) : (
-                        <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-10 h-10 rounded-full bg-[#1B4332] text-white flex items-center justify-center shadow-md hover:bg-[#163426] transition-colors"><Plus className="w-5 h-5" /></motion.button>
-                      )}
-                    </div>
+                  {/* أيقونة إيموجي داخل دائرة ملوّنة */}
+                  <div
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-sm"
+                    style={{ background: cat.bg, border: `1px solid ${cat.color}20` }}
+                  >
+                    {cat.emoji}
                   </div>
+                  <span className={`text-xs font-bold leading-tight ${isDarkMode ? 'text-gray-200' : 'text-[#0B2545]'}`}>
+                    {cat.name}
+                  </span>
                 </motion.div>
-              )}
-            />
-          </div>
-        )}
-
-        {/* 🎯 Category Auto-Scroll Sections */}
-        <div className="space-y-8 mb-10">
-          {Object.entries(categorizedProducts).map(([catKey, catItems]) => {
-            if (catItems.length < 2) return null;
-            const config = categoryDisplayConfig[catKey] || categoryDisplayConfig['other'];
-            const IconComp = config.icon;
-
-            return (
-              <div key={catKey} dir="rtl">
-                {/* Section Header */}
-                <div className="flex items-center gap-3 mb-4">
-                  <div className={`flex items-center gap-2 bg-gradient-to-l ${config.gradient} text-white px-4 py-2 rounded-2xl shadow-md`}>
-                    <IconComp className="w-4 h-4" />
-                    <h3 className="font-black text-base">{config.label}</h3>
-                  </div>
-                  <div className={`h-[2px] flex-1 rounded-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
-                  <button onClick={() => {
-                    const link = catKey === 'gifts' ? 'Gifts' : catKey === 'packages' ? 'Packages' : catKey === 'restaurants' ? 'Restaurants' : catKey === 'electronics' ? 'Electronics' : catKey === 'sweets' ? 'Sweets' : catKey === 'supermarket' ? 'Supermarket' : 'Home';
-                    navigate(createPageUrl(link));
-                  }} className="text-xs text-blue-600 font-bold whitespace-nowrap">عرض الكل ←</button>
-                </div>
-
-                {/* Auto-scrolling cards */}
-                <AutoScrollRow
-                  items={catItems}
-                  renderCard={(item, idx) => (
-                    <motion.div
-                      key={`cat-${catKey}-${idx}-${item.id}`}
-                      whileHover={{ y: -3, scale: 1.02 }}
-                      transition={{ type: 'spring', stiffness: 300 }}
-                      dir="rtl"
-                      className={`shrink-0 rounded-2xl overflow-hidden shadow-sm border transition-shadow hover:shadow-lg ${
-                        isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'
-                      } min-w-[190px] max-w-[210px]`}
-                    >
-                      <div className="relative">
-                        <img
-                          src={item.image_url || 'https://placehold.co/400x400/F9FAF8/1F2933?text=Wasel'}
-                          alt={item.name}
-                          className="w-full h-32 object-contain p-2 bg-[#FAFBFC] cursor-pointer"
-                          loading="lazy"
-                          onClick={() => { setDetailItem(item); setShowDetailModal(true); }}
-                        />
-                        {item.category && (
-                          <span className={`absolute bottom-1 left-1 text-[10px] px-2 py-0.5 rounded-full font-semibold bg-gradient-to-l ${config.gradient} text-white`}>
-                            {item.category}
-                          </span>
-                        )}
-                      </div>
-                      <div className="p-2.5">
-                        <h4 className={`font-bold text-sm truncate ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`}>{item.name}</h4>
-                        {item.description && (
-                          <p className={`text-[11px] line-clamp-1 mt-0.5 ${isDarkMode ? 'text-gray-400' : 'text-[#64748B]'}`}>{item.description}</p>
-                        )}
-                        <PriceDisplay basePrice={item.price || item.customer_price} />
-                        <div className="flex items-center justify-center gap-3 mt-2">
-                          {getCartQty(item.id) > 0 ? (
-                            <>
-                              <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); const q = getCartQty(item.id); if (q <= 1) removeFromCart(item.id); else updateQuantity(item.id, q - 1); }} className="w-9 h-9 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md"><Minus className="w-4 h-4" /></motion.button>
-                              <span className={`text-base font-black min-w-[24px] text-center ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`}>{getCartQty(item.id)}</span>
-                              <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-9 h-9 rounded-full bg-[#1B4332] text-white flex items-center justify-center shadow-md"><Plus className="w-4 h-4" /></motion.button>
-                            </>
-                          ) : (
-                            <motion.button whileTap={{ scale: 0.85 }} onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-10 h-10 rounded-full bg-[#1B4332] text-white flex items-center justify-center shadow-md hover:bg-[#163426] transition-colors"><Plus className="w-5 h-5" /></motion.button>
-                          )}
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                />
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Product Grid - أحدث المنتجات */}
-        <div className="mt-10">
-          <h3 className={`font-black text-xl mb-3 ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`} dir="rtl">أحدث المنتجات</h3>
-          {productsLoading ? (
-            <div className="flex items-center justify-center p-12">
-              <div className="flex flex-col items-center gap-4">
-                <SmartLottie
-                  animationPath={ANIMATION_PRESETS.pageLoading.path}
-                  width={80}
-                  height={80}
-                  trigger="never"
-                  autoplay={true}
-                  loop={true}
-                />
-                <p className="text-[#1F2933] font-semibold">جاري تحميل المنتجات...</p>
-              </div>
+              ))}
             </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4">
-              {products.map(product => (
-                <motion.div key={product.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-[#E5E7EB]'} rounded-xl shadow-sm overflow-hidden border w-full max-w-[260px] mx-auto`}>
-                  <div className="relative">
-                    <img
-                      src={product.image_url || 'https://placehold.co/400x400/F9FAF8/1F2933?text=Wasel'}
-                      alt={product.name}
-                      className="w-full h-28 md:h-24 lg:h-28 object-contain bg-[#F8FAFC] p-2 cursor-pointer"
-                      loading="lazy"
-                      onClick={() => { setDetailItem(product); setShowDetailModal(true); }}
-                    />
+          </div>
 
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(event) => handleToggleFavorite(event, product)}
-                      className={`absolute top-1 right-1 h-8 w-8 rounded-full transition-colors ${favoriteProductIds.includes(product.id) ? 'bg-[#DC2626] text-white hover:bg-[#B91C1C]' : 'bg-[#0F172A]/50 text-white hover:bg-[#111827]'}`}
+          {/* ===== عرض ترويجي ===== */}
+          <div className="grid grid-cols-2 gap-3 mb-6" dir="rtl">
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+              onClick={() => navigate(createPageUrl('Cart'))}
+              className="rounded-2xl p-4 cursor-pointer shadow-md hover:shadow-lg transition-shadow text-white"
+              style={{ background: 'linear-gradient(135deg, #0B2545, #134074)' }}
+            >
+              <p className="font-extrabold text-sm mb-1">🚀 رسوم مخفّضة</p>
+              <p className="text-white/75 text-[11px]">أول 3 طلبات بتكلفة مخفّضة حصرية</p>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 }}
+              onClick={() => navigate(createPageUrl('Gifts'))}
+              className="rounded-2xl p-4 cursor-pointer shadow-md hover:shadow-lg transition-shadow text-white"
+              style={{ background: 'linear-gradient(135deg, #FF7F11, #E16200)' }}
+            >
+              <p className="font-extrabold text-sm mb-1">🎁 هدايا بالبطاقة</p>
+              <p className="text-white/75 text-[11px]">أرسل بطاقة تهنئة مجانية مع كل هدية</p>
+            </motion.div>
+          </div>
+
+          {/* ===== الأكثر مبيعاً — صف أفقي يدوي ===== */}
+          <ManualScrollRow
+            items={bestSelling}
+            title="الأكثر مبيعاً 🔥"
+            titleColor="#E16200"
+            icon={Flame}
+            onAdd={handleAddToCart}
+            onRemove={removeFromCart}
+            onUpdate={updateQuantity}
+            onOpenDetail={(item) => { setDetailItem(item); setShowDetailModal(true); }}
+            getCartQty={getCartQty}
+            isDarkMode={isDarkMode}
+            onViewAll={() => navigate(createPageUrl('Supermarket'))}
+          />
+
+          {/* ===== السلال الغذائية — صف أفقي يدوي ===== */}
+          <ManualScrollRow
+            items={foodPackages}
+            title="السلال الغذائية الأكثر طلباً"
+            titleColor="#588157"
+            icon={Package}
+            onAdd={handleAddToCart}
+            onRemove={removeFromCart}
+            onUpdate={updateQuantity}
+            onOpenDetail={(item) => { setDetailItem(item); setShowDetailModal(true); }}
+            getCartQty={getCartQty}
+            isDarkMode={isDarkMode}
+            onViewAll={() => navigate(createPageUrl('Packages'))}
+          />
+
+          {/* ===== الهدايا — صف أفقي يدوي ===== */}
+          <ManualScrollRow
+            items={giftItems}
+            title="هدايا مميزة لأحبائكم"
+            titleColor="#E16200"
+            icon={Gift}
+            onAdd={handleAddToCart}
+            onRemove={removeFromCart}
+            onUpdate={updateQuantity}
+            onOpenDetail={(item) => { setDetailItem(item); setShowDetailModal(true); }}
+            getCartQty={getCartQty}
+            isDarkMode={isDarkMode}
+            onViewAll={() => navigate(createPageUrl('Gifts'))}
+          />
+
+          {/* ===== شبكة أحدث المنتجات ===== */}
+          <div className="mt-4 mb-8">
+            <h2 className={`font-black text-lg mb-4 ${isDarkMode ? 'text-white' : 'text-[#0B2545]'}`} dir="rtl">
+              أحدث المنتجات
+            </h2>
+            {productsLoading ? (
+              <div className="flex items-center justify-center p-12">
+                <div className="flex flex-col items-center gap-4">
+                  <SmartLottie animationPath={ANIMATION_PRESETS.pageLoading.path} width={80} height={80} trigger="never" autoplay={true} loop={true} />
+                  <p className="text-gray-400 font-medium text-sm">جاري تحميل المنتجات...</p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3" dir="rtl">
+                {products.map((product) => (
+                  <motion.div
+                    key={product.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-[#E8EAED]'} rounded-2xl shadow-sm overflow-hidden border w-full`}
+                  >
+                    {/* صورة المنتج — نسبة 1:1 */}
+                    <div
+                      className="w-full aspect-square bg-white flex items-center justify-center cursor-pointer overflow-hidden"
+                      onClick={() => { setDetailItem(product); setShowDetailModal(true); }}
                     >
-                      <Heart className={`w-4 h-4 ${favoriteProductIds.includes(product.id) ? 'fill-current' : ''}`} />
-                    </Button>
-                    
-                    {/* Heart Burst Animation */}
-                    <AnimatePresence>
-                      {likedProductId === product.id && (
-                        <div className="absolute top-1 right-1">
-                          <SmartLottie
-                            animationPath={ANIMATION_PRESETS.heartBurst.path}
-                            width={100}
-                            height={100}
-                            trigger="immediate"
-                            hideWhenDone={true}
-                          />
-                        </div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                  <div className="p-3">
-                    <h4 className="font-bold text-sm truncate mb-1 text-[#1F2933]">{product.name}</h4>
-                    <p className="text-xs text-[#475569] capitalize mb-1">{product.category}</p>
-                    <p className="text-xs text-[#64748B] line-clamp-2 min-h-[2rem] mb-2">{product.description || product.description_ar || 'بدون وصف حالياً'}</p>
-                    <div className="flex items-center gap-1 text-xs mb-3">
-                      <Star className="w-4 h-4 text-[#F59E0B] fill-[#F59E0B]" />
-                      <span className="font-bold text-[#1F2933]">{Number(product.avg_rating ?? product.rating_avg ?? product.rating ?? 0).toFixed(1)}</span>
-                      <span className="text-[#94A3B8]">({Number(product.review_count ?? product.rating_count ?? 0)})</span>
+                      <img
+                        src={product.image_url || 'https://placehold.co/400x400/EEF4F8/0B2545?text=Wasel'}
+                        alt={product.name}
+                        className="w-[85%] h-[85%] object-contain hover:scale-105 transition-transform duration-300"
+                        loading="lazy"
+                        onError={(e) => { e.currentTarget.src = 'https://placehold.co/400x400/EEF4F8/0B2545?text=Wasel'; }}
+                      />
                     </div>
-                    <div className="flex flex-col gap-2 relative">
+                    <div className="p-3" dir="rtl">
+                      <h4 className={`font-bold text-sm truncate mb-1 ${isDarkMode ? 'text-white' : 'text-[#0B2545]'}`}>{product.name}</h4>
+                      <p className="text-xs text-gray-400 capitalize mb-2">{product.category}</p>
+                      <div className="flex items-center gap-1 text-xs mb-2">
+                        <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
+                        <span className="font-bold text-[#0B2545]">{Number(product.avg_rating ?? product.rating ?? 0).toFixed(1)}</span>
+                        <span className="text-gray-400">({Number(product.review_count ?? 0)})</span>
+                      </div>
                       <PriceDisplay basePrice={product.price} />
                       <AddToCartButton
                         onClick={() => handleAddToCart(product)}
                         isLoading={addedToCartProductId === product.id}
                         label="أضف للسلة"
+                        className="mt-2 h-8 text-xs w-full"
                       />
                     </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Mixed Smart Feed */}
-        <div className="mt-10">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-black text-xl text-[#1F2933]">اقتراحات مختلطة لك</h3>
-            <span className="text-xs text-[#1D4ED8] font-semibold bg-blue-50 px-3 py-1 rounded-full">حسب بحثك واهتماماتك</span>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
-            {mixedRecommendations.map((item) => {
-              const itemType = String(item.item_type || '').toLowerCase();
-              const isGiftOrPackage = itemType === 'gift' || itemType === 'package';
-
-              return (
-                <motion.div key={`mix-${item.item_type}-${item.id}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-[#E5E7EB]'} rounded-xl shadow-sm overflow-hidden border w-full max-w-[280px] mx-auto`}>
-                  <img
-                    src={item.image_url}
-                    alt={item.name}
-                    className="w-full h-28 md:h-24 lg:h-28 object-contain bg-[#F8FAFC] p-2 cursor-pointer"
-                    loading="lazy"
-                    onClick={() => { setDetailItem(item); setShowDetailModal(true); }}
-                  />
-                  <div className="p-3">
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <h4 className="font-bold text-sm text-[#1F2933] line-clamp-1">{item.name}</h4>
-                      <Badge className="bg-[#E0F2FE] text-[#075985] border border-[#BAE6FD]">
-                        {itemType === 'gift' ? 'هدية' : itemType === 'package' ? 'باقة' : 'منتج'}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-[#64748B] line-clamp-2 min-h-[2rem]">{item.description || 'وصف مختصر للمنتج'}</p>
-                    <div className="flex items-center justify-between mt-2">
-                      <PriceDisplay basePrice={item.price} />
-                      <AddToCartButton
-                        onClick={() => openMixedItem(item)}
-                        isLoading={addedToCartProductId === item.id && !isGiftOrPackage}
-                        label={'أضف للسلة'}
-                        className="w-auto px-4"
-                      />
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Gifts Section */}
-        <div className="mt-10">
-          <h3 className="font-bold text-lg mb-3 text-[#1F2933]">الهدايا</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
-            {gifts.slice(0, 4).map((rawItem) => {
-              const item = normalizeShowcaseItem(rawItem, 'gift');
-              return (
-              <motion.div key={`${item.id}-${item.name}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-[#E5E7EB]'} rounded-xl shadow-sm overflow-hidden border w-full max-w-[280px] mx-auto`}>
-                <img
-                  src={item.image_url}
-                  alt={item.name}
-                  className="w-full h-28 md:h-24 lg:h-28 object-contain bg-[#F8FAFC] p-2 cursor-pointer"
-                  loading="lazy"
-                  onClick={() => { setDetailItem(item); setShowDetailModal(true); }}
-                />
-                <div className="p-3">
-                  <h4 className="font-bold text-sm mb-1 text-[#1F2933] line-clamp-1">{item.name}</h4>
-                  <p className="text-xs text-[#64748B] line-clamp-2 min-h-[2rem]">{item.description || 'بدون وصف حالياً'}</p>
-                  <div className="flex flex-col gap-2 mt-2 relative">
-                    <PriceDisplay basePrice={item.price} />
-                    <AddToCartButton
-                      onClick={() => handleAddToCart(item)}
-                      isLoading={addedToCartProductId === item.id}
-                      label="أضف للسلة"
-                    />
-                  </div>
-                </div>
-              </motion.div>
-              );
-            })}
-          </div>
-        </div>
-        </div>
-
-        {/* Social Proof - آراء العملاء الحقيقية */}
-        {(recentReviews.length > 0 || deliveredCount > 0) && (
-          <div className="mb-8 px-1" dir="rtl">
-            {deliveredCount > 0 && (
-              <div className={`text-center mb-4 py-3 rounded-xl ${isDarkMode ? 'bg-gray-800' : 'bg-[#ECFDF5]'}`}>
-                <p className={`text-lg font-black ${isDarkMode ? 'text-emerald-400' : 'text-[#065F46]'}`}>
-                  📦 {deliveredCount.toLocaleString()}+ طلب تم توصيله بنجاح
-                </p>
+                  </motion.div>
+                ))}
               </div>
             )}
-            {recentReviews.length > 0 && (
-              <>
-                <h3 className={`font-black text-xl mb-3 ${isDarkMode ? 'text-white' : 'text-[#1F2933]'}`}>آراء عملائنا ⭐</h3>
-                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                  {recentReviews.map((review, idx) => (
-                    <div key={idx} className={`min-w-[220px] max-w-[260px] rounded-xl p-3 border shadow-sm shrink-0 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-[#E5E7EB]'}`}>
-                      <div className="flex gap-0.5 mb-1">
-                        {Array.from({ length: review.rating }, (_, i) => (
-                          <Star key={i} className="w-3.5 h-3.5 text-[#F59E0B] fill-[#F59E0B]" />
-                        ))}
-                      </div>
-                      <p className={`text-xs leading-relaxed line-clamp-3 ${isDarkMode ? 'text-gray-300' : 'text-[#475569]'}`}>{review.comment}</p>
-                      <p className="text-[10px] text-[#94A3B8] mt-1">
-                        {new Date(review.created_at).toLocaleDateString('ar-SY', { year: 'numeric', month: 'short', day: 'numeric' })}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
           </div>
-        )}
 
+          {/* ===== الدليل الاجتماعي — آراء العملاء ===== */}
+          {(recentReviews.length > 0 || deliveredCount > 0) && (
+            <div className="mb-8" dir="rtl">
+              {deliveredCount > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="text-center mb-4 py-4 rounded-2xl border border-[#A3B18A]/30"
+                  style={{ background: 'linear-gradient(135deg, #F4F7F4, #F8F9FA)' }}
+                >
+                  <p className="text-lg font-black text-[#588157]">
+                    📦 {deliveredCount.toLocaleString()}+ طلب تم تنفيذه بنجاح
+                  </p>
+                  <p className="text-sm text-gray-400 mt-1">عائلات سورية تبتسم بسببكم ❤️</p>
+                </motion.div>
+              )}
+
+              {recentReviews.length > 0 && (
+                <>
+                  <h3 className={`font-black text-lg mb-3 ${isDarkMode ? 'text-white' : 'text-[#0B2545]'}`}>
+                    ⭐ آراء عملائنا
+                  </h3>
+                  <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                    {recentReviews.map((review, idx) => (
+                      <div
+                        key={idx}
+                        className={`min-w-[230px] max-w-[270px] rounded-2xl p-4 border shadow-sm shrink-0
+                          ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-[#E8EAED]'}`}
+                      >
+                        <div className="flex gap-0.5 mb-2">
+                          {Array.from({ length: review.rating }, (_, i) => (
+                            <Star key={i} className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
+                          ))}
+                        </div>
+                        <p className={`text-xs leading-relaxed line-clamp-3 ${isDarkMode ? 'text-gray-300' : 'text-[#475569]'}`}>
+                          {review.comment}
+                        </p>
+                        <p className="text-[10px] text-gray-400 mt-2">
+                          {new Date(review.created_at).toLocaleDateString('ar-SY', { year: 'numeric', month: 'short', day: 'numeric' })}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ===== إعلان ===== */}
+          <div className="max-w-4xl mx-auto py-4">
+            <AdBanner format="auto" className="rounded-xl" />
+          </div>
+        </div>
+
+        {/* ===== مودال تفاصيل المنتج ===== */}
         <ProductDetailModal
           item={detailItem}
           isOpen={showDetailModal}
           onClose={() => setShowDetailModal(false)}
           onAddToCart={handleAddToCart}
         />
-
-        {/* إعلان أسفل المنتجات - بعيد عن أزرار الشراء */}
-        <div className="max-w-4xl mx-auto px-4 py-6">
-          <AdBanner format="auto" className="rounded-xl" />
-        </div>
       </main>
     </div>
   );

@@ -1,22 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createPageUrl } from './utils';
-import { 
-  Home, 
-  Grid, 
-  List, 
-  User, 
-  ShoppingCart, 
-  Wallet, 
-  MapPin, 
-  Bell, 
-  Menu,
+import {
+  Home,
+  Grid,
+  User,
+  ShoppingBag,
+  Wallet,
+  MapPin,
+  Bell,
   ChevronDown,
   Crown,
   Sparkles,
   ClipboardList,
-  LogIn
+  LogIn,
+  LayoutGrid,
 } from 'lucide-react';
 import SupportChat from './components/common/SupportChat';
 import AppFooter from '@/components/common/AppFooter';
@@ -26,7 +25,7 @@ import NotificationPermissionPrompt from './components/common/NotificationPermis
 import CameraPermissionPrompt from './components/common/CameraPermissionPrompt';
 import { CartProvider, useCart } from './components/cart/CartContext.jsx';
 import { LanguageProvider, useLanguage } from './components/common/LanguageContext';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { getUnreadCount } from './lib/inAppNotifications';
 import { getSelectedAddress } from './utils/senderReceiverStorage';
@@ -42,19 +41,37 @@ function LayoutContent({ children, currentPageName }) {
   const [user, setUser] = useState(null);
   const [isWaselPlusMember, setIsWaselPlusMember] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
-  const [deliveryLabel, setDeliveryLabel] = useState('Daraa, Syria');
+  const [deliveryLabel, setDeliveryLabel] = useState('درعا، سوريا');
   const [isGuest, setIsGuest] = useState(() => {
     try {
       const id = localStorage.getItem('wasel_active_identity');
       return !id || id === 'guest';
     } catch { return true; }
   });
+  // --- سلوك إخفاء الشريط السفلي عند التمرير ---
+  const [navVisible, setNavVisible] = useState(true);
+  const lastScrollY = useRef(0);
   const navigate = useNavigate();
-  
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentY = window.scrollY;
+      if (currentY < 50) { setNavVisible(true); return; }
+      if (currentY < lastScrollY.current) {
+        setNavVisible(true);
+      } else if (currentY > lastScrollY.current + 8) {
+        setNavVisible(false);
+      }
+      lastScrollY.current = currentY;
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   const handleLanguageToggle = () => {
     const newLang = language === 'ar' ? 'en' : 'ar';
     if (typeof changeLanguage === 'function') {
-      // @ts-ignore - changeLanguage accepts lang parameter
+      // @ts-ignore
       changeLanguage(newLang);
     }
   };
@@ -201,26 +218,27 @@ function LayoutContent({ children, currentPageName }) {
   const isActive = (path) => location.pathname.includes(path);
 
   return (
-    <div className={`min-h-screen flex flex-col ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-[#F9FAF8]'} ${language === 'ar' ? "font-['Cairo',sans-serif]" : "font-sans"}`}>
+    <div className={`min-h-screen flex flex-col ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-[#F8F9FA]'} font-cairo`}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap');
         :root {
-          --primary: #1F7A63; 
-          --dark: #1F2933;
-          --wasel-cream: #F9FAF8;
-          --wasel-gray: #E5E7EB;
+          --brand-navy: #0B2545;
+          --brand-orange: #FF7F11;
           --wasel-green: #1F7A63;
           --wasel-cta: #2FA36B;
+          --wasel-cream: #F9FAF8;
+          --wasel-dark: #1F2933;
         }
         * { -webkit-tap-highlight-color: transparent; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .font-cairo { font-family: 'Cairo', sans-serif; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
-      
-      {/* Top Header - Trust Green Style */}
-      <header className={`w-full ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-[#E5E7EB]'} z-50 shadow-sm border-b pt-safe`}>
-        
-        {/* Search & Address Bar */}
+
+      {/* ===== الهيدر العلوي ===== */}
+      <header className={`w-full ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-[#E8EAED]'} z-50 shadow-sm border-b pt-safe`}>
         <div className="px-3 py-1.5 space-y-1.5">
             {/* Top Actions Bar */}
             <div className="flex items-center justify-between mb-1.5">
