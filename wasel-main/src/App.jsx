@@ -25,6 +25,7 @@ import SmartLottie from '@/components/animations/SmartLottie';
 import { ANIMATION_PRESETS } from '@/components/animations/animationPresets';
 import { authError, authTrace, authWarn } from '@/lib/authDebug';
 import { ArrowRight } from 'lucide-react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -724,6 +725,7 @@ function App() {
           </AuthProvider>
         </DarkModeProvider>
       </GoogleOAuthProvider>
+      <SpeedInsights />
     </ErrorBoundary>
   )
 }
