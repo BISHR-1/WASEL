@@ -12,15 +12,17 @@ export const useDarkMode = () => {
   }
   return context;
 };
-
+/** @param {{ children: React.ReactNode }} props */
 export const DarkModeProvider = ({ children }) => {
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    const saved = localStorage.getItem('wasel_dark_mode');
+    const saved = typeof window !== 'undefined' ? window.localStorage.getItem('wasel_dark_mode') : null;
     return saved === 'true';
   });
 
   useEffect(() => {
-    localStorage.setItem('wasel_dark_mode', String(isDarkMode));
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+    window.localStorage.setItem('wasel_dark_mode', String(isDarkMode));
     
     // تطبيق Dark mode على body
     if (isDarkMode) {

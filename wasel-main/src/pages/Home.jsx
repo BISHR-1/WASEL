@@ -51,12 +51,12 @@ const CATEGORY_CONFIG = {
 // شبكة الأصناف الثابتة
 // =====================================================
 const SHOP_CATEGORIES = [
-  { name: 'السوبرماركت',   icon: Store,      link: 'Supermarket',    emoji: '🛒', color: '#0B2545', bg: '#EEF4F8' },
-  { name: 'المطاعم',       icon: Utensils,   link: 'Restaurants',    emoji: '🍽️', color: '#E16200', bg: '#FFF0E5' },
-  { name: 'الحلويات',      icon: IceCream,   link: 'Sweets',         emoji: '🍬', color: '#9333EA', bg: '#F5F3FF' },
-  { name: 'الإلكترونيات',  icon: Smartphone, link: 'Electronics',    emoji: '📱', color: '#0369A1', bg: '#F0F9FF' },
-  { name: 'الهدايا',       icon: Gift,       link: 'Gifts',          emoji: '🎁', color: '#E16200', bg: '#FFF0E5' },
-  { name: 'الباقات',       icon: Package,    link: 'Packages',       emoji: '📦', color: '#0B2545', bg: '#EEF4F8' },
+  { name: 'السوبرماركت', link: 'Supermarket', image: '/categories/supermarket.png' },
+  { name: 'المطاعم', link: 'Restaurants', image: '/categories/restaurants.png' },
+  { name: 'الحلويات', link: 'Sweets', image: '/categories/sweets.png' },
+  { name: 'الإلكترونيات', link: 'Electronics', image: '/categories/electronics.png' },
+  { name: 'الهدايا', link: 'Gifts', image: '/categories/gifts.png' },
+  { name: 'الباقات', link: 'Packages', image: '/categories/packages.png' },
 ];
 
 // =====================================================
@@ -315,74 +315,17 @@ const Home = () => {
     <div className={`${isDarkMode ? 'bg-gray-900' : 'bg-[#F8F9FA]'} min-h-screen pb-28 font-cairo`}>
       <main className="max-w-[1400px] mx-auto">
 
-        {/* ===== Hero Banner العاطفي ===== */}
+        {/* ===== Hero Banner ===== */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="relative overflow-hidden mx-3 mt-3 mb-4 rounded-3xl"
-          style={{ minHeight: '200px', background: 'linear-gradient(135deg, #0B2545 0%, #134074 45%, #1F7A63 100%)' }}
+          className="mx-3 mt-3 mb-4 overflow-hidden rounded-2xl"
         >
-          {/* خلفية نجمية ديناميكية */}
-          <div className="absolute inset-0 opacity-10">
-            {[...Array(12)].map((_, i) => (
-              <motion.div
-                key={i}
-                className="absolute w-1 h-1 bg-white rounded-full"
-                style={{ top: `${Math.random() * 100}%`, left: `${Math.random() * 100}%` }}
-                animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.2, 0.8] }}
-                transition={{ duration: 2 + Math.random() * 3, repeat: Infinity, delay: Math.random() * 2 }}
-              />
-            ))}
-          </div>
-
-          <div className="relative z-10 p-6 flex flex-col justify-between" style={{ minHeight: '200px' }}>
-            {/* شارة واصل+ */}
-            <div className="flex justify-between items-start">
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2 }}
-                className="bg-white/20 backdrop-blur-sm text-white text-[11px] font-bold px-3 py-1.5 rounded-full"
-              >
-                ✨ واصل ستور — الثقة والأمان
-              </motion.div>
-              <motion.div
-                animate={{ rotate: [0, 10, -10, 0] }}
-                transition={{ duration: 3, repeat: Infinity }}
-                className="text-4xl"
-              >
-                🎁
-              </motion.div>
-            </div>
-
-            {/* النص الرئيسي */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              dir="rtl"
-            >
-              <h1 className="text-white font-black text-2xl md:text-3xl leading-tight mb-2 drop-shadow-lg">
-                من غربتكم<br />
-                <span style={{ color: '#FF7F11' }}>لقلب درعا</span>
-              </h1>
-              <p className="text-white/80 text-sm leading-relaxed mb-4">
-                نوصل محبتكم وهداياكم لذويكم بكل فخر وموثوقية
-              </p>
-
-              {/* زر CTA */}
-              <motion.button
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => navigate(createPageUrl('Gifts'))}
-                className="inline-flex items-center gap-2 text-white font-black text-sm px-5 py-2.5 rounded-2xl shadow-lg"
-                style={{ background: 'linear-gradient(135deg, #FF7F11, #E16200)' }}
-              >
-                <Gift className="w-4 h-4" />
-                أرسل هدية الآن
-              </motion.button>
-            </motion.div>
-          </div>
+          <img
+            src="/hero/home-hero.png"
+            alt=""
+            className="block h-[200px] w-full object-cover object-center md:h-[350px]"
+          />
         </motion.div>
 
         <div className="px-3">
@@ -420,14 +363,15 @@ const Home = () => {
                   className={`flex flex-col items-center gap-2 text-center cursor-pointer p-3 rounded-2xl border transition-all
                     ${isDarkMode ? 'bg-gray-800 border-gray-700 hover:border-gray-600' : 'bg-white border-[#E8EAED] hover:border-[#FF7F11]/40'} shadow-sm hover:shadow-md`}
                 >
-                  {/* أيقونة إيموجي داخل دائرة ملوّنة */}
-                  <div
-                    className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-sm"
-                    style={{ background: cat.bg, border: `1px solid ${cat.color}20` }}
-                  >
-                    {cat.emoji}
+                  <div className="flex h-[100px] w-[100px] items-center justify-center rounded-xl bg-white p-2">
+                    <img
+                      src={cat.image}
+                      alt={cat.name}
+                      className="h-full w-full object-contain"
+                      loading="lazy"
+                    />
                   </div>
-                  <span className={`text-xs font-bold leading-tight ${isDarkMode ? 'text-gray-200' : 'text-[#0B2545]'}`}>
+                  <span className={`text-sm font-extrabold leading-tight ${isDarkMode ? 'text-gray-200' : 'text-[#0B2545]'}`}>
                     {cat.name}
                   </span>
                 </motion.div>
