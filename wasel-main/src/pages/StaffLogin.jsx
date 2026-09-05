@@ -31,7 +31,7 @@ import { createPageUrl } from '@/utils';
 export default function StaffLogin() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [mode, setMode] = useState('role'); // start by choosing a role
+  const [mode, setMode] = useState('login');
   const [selectedRole, setSelectedRole] = useState(null);
   const [referralCode, setReferralCode] = useState(null);
 
@@ -279,59 +279,6 @@ export default function StaffLogin() {
           <p className="text-purple-300 text-sm">لوحة تحكم المشرفين والموصلين</p>
         </motion.div>
 
-        {/* ROLE SELECTION MODE */}
-        {mode === 'role' && (
-          <AnimatePresence mode="wait">
-            <motion.div
-              key="role-mode"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
-              className="space-y-4"
-            >
-              <p className="text-center text-white mb-6" dir="rtl">
-                اختر دورك لكي تبدأ
-              </p>
-
-              {roles.map((role, index) => (
-                <motion.button
-                  key={role.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  whileHover={{ scale: 1.02, translateX: 10 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => handleRoleSelect(role.id)}
-                  className="w-full p-4 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl hover:border-white/30 transition-all"
-                >
-                  <div className="flex items-center gap-4" dir="rtl">
-                    <span className="text-3xl">{role.icon}</span>
-                    <div className="flex-1 text-right">
-                      <p className="font-bold text-white">{role.name_ar}</p>
-                      <p className="text-xs text-purple-200">{role.description}</p>
-                    </div>
-                    <ArrowRight className="w-5 h-5 text-purple-400" />
-                  </div>
-                </motion.button>
-              ))}
-
-              <motion.button
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.4 }}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setMode('login')}
-                className="w-full mt-6 p-3 bg-white text-slate-900 rounded-xl font-bold hover:bg-purple-100 transition-all flex items-center justify-center gap-2"
-              >
-                <LogIn className="w-4 h-4" />
-                لديك حساب؟ تسجيل دخول
-              </motion.button>
-            </motion.div>
-          </AnimatePresence>
-        )}
-
         {/* LOGIN MODE */}
         {mode === 'login' && (
           <AnimatePresence mode="wait">
@@ -343,21 +290,6 @@ export default function StaffLogin() {
               transition={{ duration: 0.3 }}
             >
               <form onSubmit={handleLoginSubmit} className="space-y-4">
-                {/* Back Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode('role');
-                    setSelectedRole(null);
-                    setLoginData({ email: '', password: '' });
-                    setErrors({});
-                  }}
-                  className="flex items-center gap-2 text-purple-300 hover:text-purple-200 transition-colors text-sm"
-                >
-                  <ArrowRight className="w-4 h-4" />
-                  الرجوع لاختيار الدور
-                </button>
-
                 <p className="text-center text-white mb-2">
                   تسجيل دخول {selectedRole ? roles.find(r=>r.id===selectedRole).name_ar : ''}
                 </p>
@@ -465,21 +397,6 @@ export default function StaffLogin() {
               transition={{ duration: 0.3 }}
             >
               <form onSubmit={handleRegisterSubmit} className="space-y-4">
-                {/* Back to role selection */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode('role');
-                    setSelectedRole(null);
-                    setRegisterData({ name: '', email: '', password: '', confirmPassword: '' });
-                    setErrors({});
-                  }}
-                  className="flex items-center gap-2 text-purple-300 hover:text-purple-200 transition-colors text-sm"
-                >
-                  <ArrowRight className="w-4 h-4" />
-                  الرجوع لاختيار الدور
-                </button>
-
                 <p className="text-center text-white mb-2">
                   إنشاء حساب {selectedRole ? roles.find(r => r.id === selectedRole).name_ar : ''}
                 </p>
@@ -637,20 +554,6 @@ export default function StaffLogin() {
               transition={{ duration: 0.3 }}
             >
               <form onSubmit={handleLoginSubmit} className="space-y-4">
-                {/* Back Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode('role');
-                    setLoginData({ email: '', password: '' });
-                    setErrors({});
-                  }}
-                  className="flex items-center gap-2 text-purple-300 hover:text-purple-200 transition-colors text-sm"
-                >
-                  <ArrowRight className="w-4 h-4" />
-                  العودة
-                </button>
-
                 {/* Email Input */}
                 <div>
                   <label className="block text-white text-sm font-medium mb-2" dir="rtl">

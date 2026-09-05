@@ -88,6 +88,41 @@ const BANK_TRANSFER_DETAILS = {
   swift: 'ABDIAEADXXX',
   currency: 'AED',
 };
+const DAILY_CAPACITY_LIMIT = 5;
+const DELIVERY_LOOKAHEAD_DAYS = 14;
+
+function formatDateKey(date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function addDays(baseDate, days) {
+  const next = new Date(baseDate);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function computeEarliestDeliveryDays(cartItems = []) {
+  const hasGiftOrPackage = (cartItems || []).some((item) => {
+    const haystack = [
+      item?.item_type,
+      item?.category,
+      item?.type,
+      item?.name_ar,
+      item?.name,
+      item?.source_type,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+
+    return /gift|هدية|package|باقة|bundle|envelope|ظرف/.test(haystack);
+  });
+
+  return hasGiftOrPackage ? 2 : 1;
+}
 
 function isMissingRpcFunctionError(error, functionName) {
   const haystack = [
@@ -1665,9 +1700,101 @@ const Cart = () => {
   const [recipientPhone, setRecipientPhone] = useState('');
   const [recipientAddress, setRecipientAddress] = useState('');
   const [deliveryTime, setDeliveryTime] = useState('');
+  const [dailyCapacity, setDailyCapacity] = useState({});
+  const [deliveryDateMessage, setDeliveryDateMessage] = useState('');
   const [additionalNotes, setAdditionalNotes] = useState('');
   const [addressSavedManually, setAddressSavedManually] = useState(false);
   const [creatingCartShareLink, setCreatingCartShareLink] = useState(false);
+
+  const minimumDeliveryLeadDays = useMemo(() => computeEarliestDeliveryDays(cartItems), [cartItems]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadDailyCapacity = async () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const startKey = formatDateKey(today);
+      const endDate = addDays(today, DELIVERY_LOOKAHEAD_DAYS);
+      const endKey = formatDateKey(endDate);
+
+      const { data, error } = await supabase
+        .from('orders')
+        .select('preferred_delivery_date, status')
+        .in('status', ['processing'])
+        .gte('preferred_delivery_date', startKey)
+        .lte('preferred_delivery_date', endKey);
+
+      if (!active) return;
+
+      const map = {};
+      if (!error && Array.isArray(data)) {
+        data.forEach((order) => {
+          const key = String(order?.preferred_delivery_date || '').slice(0, 10);
+          if (!key) return;
+          map[key] = (map[key] || 0) + 1;
+        });
+      }
+
+      setDailyCapacity(map);
+    };
+
+    loadDailyCapacity();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const earliestSelectableDate = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+
+    for (let offset = 0; offset <= DELIVERY_LOOKAHEAD_DAYS; offset += 1) {
+      const candidate = addDays(start, offset);
+      const key = formatDateKey(candidate);
+      const dayDelta = offset;
+      const allowed = dayDelta >= minimumDeliveryLeadDays;
+      const used = Number(dailyCapacity[key] || 0);
+      const available = allowed && used < DAILY_CAPACITY_LIMIT;
+
+      if (available) return key;
+    }
+
+    return '';
+  }, [dailyCapacity, minimumDeliveryLeadDays]);
+
+  useEffect(() => {
+    if (!deliveryTime && earliestSelectableDate) {
+      setDeliveryTime(earliestSelectableDate);
+    }
+  }, [deliveryTime, earliestSelectableDate]);
+
+  useEffect(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const firstBlockedReason = (() => {
+      for (let offset = 0; offset <= DELIVERY_LOOKAHEAD_DAYS; offset += 1) {
+        const candidate = addDays(today, offset);
+        const key = formatDateKey(candidate);
+        const used = Number(dailyCapacity[key] || 0);
+        const allowed = offset >= minimumDeliveryLeadDays;
+
+        if (!allowed) {
+          return `أقل تاريخ متاح هو ${formatDateKey(addDays(today, minimumDeliveryLeadDays))} بسبب سياسة التوصيل المسبق.`;
+        }
+
+        if (used >= DAILY_CAPACITY_LIMIT) {
+          return `هذا اليوم غير متاح لأن عدد الطلبات المقبولة تم استنفاده.`;
+        }
+      }
+
+      return '';
+    })();
+
+    setDeliveryDateMessage(firstBlockedReason);
+  }, [dailyCapacity, minimumDeliveryLeadDays]);
 
   // Calling code for sender
   const senderCallingCode = senderCountry ? getCallingCode(getCountryByArabicName(senderCountry)?.code) : '+971';
@@ -2933,6 +3060,11 @@ const Cart = () => {
       }
     }
 
+    if (!deliveryTime) {
+      toast.error('يرجى اختيار تاريخ التوصيل قبل المتابعة إلى الدفع');
+      return;
+    }
+
     setIsCheckingOut(true);
 
     try {
@@ -3759,16 +3891,88 @@ const Cart = () => {
               </div>
             </div>
 
-            {/* Delivery Time (Optional) */}
+            {/* Delivery Date Calendar */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2" dir="rtl">وقت التوصيل (اختياري)</label>
-              <input
-                type="datetime-local"
-                value={deliveryTime}
-                onChange={(e) => setDeliveryTime(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366] transition-all"
-                dir="rtl"
-              />
+              <div className="flex items-center justify-between mb-3" dir="rtl">
+                <label className="block text-sm font-medium text-gray-700">تاريخ التوصيل</label>
+                <span className="text-[11px] text-gray-500">الطلبات المقبولة فقط تُحسب في السعة</span>
+              </div>
+
+              <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
+                <div className="grid grid-cols-7 gap-2 text-center" dir="rtl">
+                  {Array.from({ length: 7 }, (_, index) => {
+                    const dayNames = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+                    return (
+                      <div key={dayNames[index]} className="text-[11px] font-semibold text-gray-500 pb-1">
+                        {dayNames[index]}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="grid grid-cols-7 gap-2 mt-2" dir="rtl">
+                  {Array.from({ length: 14 }, (_, index) => {
+                    const base = new Date();
+                    base.setHours(0, 0, 0, 0);
+                    const date = addDays(base, index);
+                    const key = formatDateKey(date);
+                    const isPast = index < 0;
+                    const dayOffset = index;
+                    const allowed = dayOffset >= minimumDeliveryLeadDays;
+                    const used = Number(dailyCapacity[key] || 0);
+                    const available = allowed && used < DAILY_CAPACITY_LIMIT;
+                    const isSelected = deliveryTime === key;
+
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => {
+                          if (!available) {
+                            toast.error('هذا اليوم غير متاح الآن بسبب استنفاد السعة الحالية.');
+                            return;
+                          }
+                          setDeliveryTime(key);
+                        }}
+                        disabled={!available}
+                        className={`relative flex h-14 flex-col items-center justify-center rounded-xl border text-xs font-bold transition-all ${
+                          isSelected
+                            ? 'border-emerald-500 bg-emerald-100 text-emerald-800 shadow-sm'
+                            : available
+                              ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-400 hover:bg-emerald-100'
+                              : 'border-red-200 bg-red-50 text-red-600 cursor-not-allowed'
+                        } ${isPast ? 'opacity-40' : ''}`}
+                      >
+                        <span className="text-[10px]">{date.getDate()}</span>
+                        <span className={`absolute -bottom-1 h-2.5 w-2.5 rounded-full ${available ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-4 flex items-center justify-between gap-2 text-[11px]" dir="rtl">
+                  <div className="flex items-center gap-2 text-emerald-700 font-medium">
+                    <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                    متاح
+                  </div>
+                  <div className="flex items-center gap-2 text-red-700 font-medium">
+                    <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-500" />
+                    غير متاح
+                  </div>
+                </div>
+
+                {deliveryDateMessage && (
+                  <div className="mt-3 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-[11px] text-red-700" dir="rtl">
+                    {deliveryDateMessage}
+                  </div>
+                )}
+
+                {deliveryTime && (
+                  <div className="mt-3 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-[12px] text-emerald-700" dir="rtl">
+                    تاريخ التوصيل المختار: <span className="font-bold">{new Date(`${deliveryTime}T00:00:00`).toLocaleDateString('ar-SY', { weekday: 'long', day: 'numeric', month: 'short' })}</span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Additional Notes */}

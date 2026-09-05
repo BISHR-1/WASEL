@@ -177,6 +177,53 @@ function orderFlowBadgeClass(type) {
   return 'bg-emerald-100 text-emerald-700';
 }
 
+function formatSyriaDateTime(value) {
+  if (!value) return '-';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+
+  return new Intl.DateTimeFormat('ar-SY', {
+    timeZone: 'Asia/Damascus',
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date);
+}
+
+function formatSyriaDateOnly(value) {
+  if (!value) return '-';
+
+  const date = normalizeSyriaDateValue(value);
+  if (!date) return '-';
+
+  return new Intl.DateTimeFormat('ar-SY', {
+    timeZone: 'Asia/Damascus',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+  }).format(date);
+}
+
+function normalizeSyriaDateValue(value) {
+  if (!value) return null;
+
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return new Date(`${raw}T12:00:00+03:00`);
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}(:\d{2})?$/.test(raw)) {
+    const iso = raw.includes('T') ? raw : raw.replace(' ', 'T');
+    const parsed = new Date(iso);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 function getSharedCartUrl(order) {
   const senderMeta = order?.sender_details?.meta || {};
   const metadata = order?.metadata || {};
@@ -728,6 +775,11 @@ export default function SupervisorPanel() {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [activeConversation?.id]);
+
+  const getRequestedDeliveryDateLabel = (order) => {
+    const candidate = order?.preferred_delivery_date || order?.delivery_time || order?.recipient_details?.delivery_time || order?.recipient_details?.preferred_delivery_date || order?.sender_details?.delivery_time || order?.sender_details?.preferred_delivery_date;
+    return formatSyriaDateOnly(candidate);
+  };
 
   const filteredOrders = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -2126,6 +2178,17 @@ export default function SupervisorPanel() {
                           <Badge className="bg-[#FEF3C7] text-[#92400E] border-0 text-xs font-bold">
                             {Math.round(getOrderTotalSYP(order)).toLocaleString('en-US')} ل.س
                           </Badge>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 grid gap-2 text-[11px] text-[#475569] sm:grid-cols-2">
+                        <div className="rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] px-3 py-2">
+                          <span className="block text-[#64748B] mb-1">تاريخ الطلب</span>
+                          <span className="font-bold text-[#1B4332]">{formatSyriaDateTime(order.created_at)}</span>
+                        </div>
+                        <div className="rounded-xl bg-[#F0FDF4] border border-[#BBF7D0] px-3 py-2">
+                          <span className="block text-[#166534] mb-1">تاريخ التسليم المطلوب</span>
+                          <span className="font-bold text-[#166534]">{getRequestedDeliveryDateLabel(order)}</span>
                         </div>
                       </div>
 
