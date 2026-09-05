@@ -10,7 +10,7 @@ import {
   Minus, Plus, Trash2, ShoppingBag, ArrowRight, Tag,
   Truck, Gift, CreditCard, ChevronLeft,
   Heart, Sparkles, CheckCircle, X, Loader2, Edit3,
-  Phone, Shield, MessageCircle, Eye, FileDown, Share2, Copy, Wallet, Bell, Lock
+  Phone, Shield, MessageCircle, Eye, FileDown, Share2, Copy, Wallet, Bell, Lock, Landmark
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -70,6 +70,14 @@ const PAYPAL_PENDING_ORDERS_KEY = 'wasel_paypal_pending_orders_v1';
 const PAYPAL_SAVED_CAPTURES_KEY = 'wasel_paypal_saved_captures_v1';
 const MAX_PAYPAL_SAVE_RETRIES = 3;
 const WASEL_PLUS_STATUSES = ['active', 'trialing'];
+const BANK_TRANSFER_DETAILS = {
+  bankName: 'ADIB',
+  accountHolder: 'BASHR A H JARAR',
+  accountNumber: '29586278',
+  iban: 'AE030500000000029586278',
+  swift: 'ABDIAEADXXX',
+  currency: 'AED',
+};
 
 function isMissingRpcFunctionError(error, functionName) {
   const haystack = [
@@ -916,7 +924,7 @@ function PaymentMethodSelector({ selected, onChange, allowOnlinePayment = true, 
     >
       <h3 className="font-bold text-gray-900 mb-3 text-base" dir="rtl">طريقة إتمام الطلب</h3>
       
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         {allowOnlinePayment && (
           <motion.button
             whileHover={{ scale: 1.02 }}
@@ -937,6 +945,25 @@ function PaymentMethodSelector({ selected, onChange, allowOnlinePayment = true, 
             <p className="text-[10px] text-[#003087] font-bold mt-1 text-center">PayPal</p>
           </motion.button>
         )}
+
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => onChange('bank_transfer')}
+          className={`p-3 rounded-xl border-2 transition-all ${
+            selected === 'bank_transfer' 
+              ? 'border-[#0F766E] bg-[#CCFBF1]/80' 
+              : 'border-gray-200 hover:border-gray-300'
+          }`}
+        >
+          <div className="flex items-center justify-center gap-1">
+            <Landmark className={`w-4 h-4 ${selected === 'bank_transfer' ? 'text-[#0F766E]' : 'text-gray-500'}`} />
+            <span className={`text-xs font-medium ${selected === 'bank_transfer' ? 'text-[#0F766E]' : 'text-gray-700'}`} dir="rtl">
+              تحويل بنكي
+            </span>
+          </div>
+          <p className="text-[10px] text-[#0F766E] font-bold mt-1 text-center" dir="rtl">ADIB</p>
+        </motion.button>
 
         {/* Wallet Payment */}
         <motion.button
@@ -1006,6 +1033,90 @@ function PaymentMethodSelector({ selected, onChange, allowOnlinePayment = true, 
           </motion.button>
         )}
       </div>
+    </motion.div>
+  );
+}
+
+function BankTransferDetails({ totalUsd, senderCountry, onConfirm }) {
+  const countryInfo = getCountryByArabicName(senderCountry) || COUNTRIES.find((country) => country.currency === 'AED') || COUNTRIES[0];
+  const currencyRate = Number(countryInfo?.currencyRate || 3.67);
+  const convertedAmount = Number(totalUsd || 0) * currencyRate;
+  const accountItems = [
+    { label: 'اسم البنك', value: BANK_TRANSFER_DETAILS.bankName },
+    { label: 'اسم صاحب الحساب', value: BANK_TRANSFER_DETAILS.accountHolder },
+    { label: 'رقم الحساب', value: BANK_TRANSFER_DETAILS.accountNumber },
+    { label: 'الآيبان', value: BANK_TRANSFER_DETAILS.iban },
+    { label: 'السويفت', value: BANK_TRANSFER_DETAILS.swift },
+    { label: 'العملة', value: BANK_TRANSFER_DETAILS.currency },
+  ];
+
+  const copyValue = async (value, label) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(`${label} تم نسخه بنجاح`);
+    } catch (error) {
+      toast.error('تعذر نسخ البيانات، يرجى النسخ يدويًا');
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white rounded-2xl p-4 mt-4 border border-emerald-200 shadow-sm"
+      dir="rtl"
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <p className="text-xs text-emerald-700">الدفع البنكي</p>
+          <h3 className="text-lg font-black text-emerald-900">تفاصيل التحويل البنكي</h3>
+        </div>
+        <div className="rounded-full bg-emerald-100 p-2 text-emerald-700">
+          <Landmark className="w-5 h-5" />
+        </div>
+      </div>
+
+      <div className="rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 p-4 border border-emerald-200 mb-4">
+        <p className="text-xs text-emerald-700 mb-1">المبلغ المطلوب</p>
+        <p className="text-2xl font-black text-emerald-800">
+          {convertedAmount.toFixed(2)} {BANK_TRANSFER_DETAILS.currency}
+        </p>
+        <p className="text-xs text-emerald-600 mt-1">
+          {Number(totalUsd || 0).toFixed(2)} USD ≈ {convertedAmount.toFixed(2)} {BANK_TRANSFER_DETAILS.currency}
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        {accountItems.map((item) => (
+          <div key={item.label} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-slate-500">{item.label}</span>
+              <button
+                type="button"
+                onClick={() => copyValue(item.value, item.label)}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+              >
+                <Copy className="w-3 h-3" /> نسخ
+              </button>
+            </div>
+            <p className="mt-1 font-bold text-slate-800 break-all">{item.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-5 rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800" dir="rtl">
+        بعد إتمام التحويل، اضغط على زر <span className="font-bold">تم الدفع</span> وسنحفظ طلبك ونرسل لك رسالة شكر فوراً.
+      </div>
+
+      <motion.button
+        whileHover={{ scale: 1.01 }}
+        whileTap={{ scale: 0.99 }}
+        type="button"
+        onClick={onConfirm}
+        className="mt-5 w-full rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black py-3 shadow-lg hover:from-emerald-700 hover:to-teal-700 transition-all"
+      >
+        تم الدفع
+      </motion.button>
     </motion.div>
   );
 }
@@ -2805,7 +2916,7 @@ const Cart = () => {
 
     try {
       // ===================== ✅ SECURITY: VALIDATE PAYMENT METHOD =====================
-      if (!paymentMethod || !['paypal', 'wallet', 'whatsapp', 'shared_cart'].includes(paymentMethod)) {
+      if (!paymentMethod || !['paypal', 'bank_transfer', 'wallet', 'whatsapp', 'shared_cart'].includes(paymentMethod)) {
         console.log('❌ Invalid payment method:', paymentMethod);
         await logSuspiciousPaymentAttempt(supabase, currentUserEmail, 'invalid_payment_method', { paymentMethod });
         toast.error('طريقة دفع غير صحيحة');
@@ -2896,6 +3007,52 @@ const Cart = () => {
         // ===================== ✅ PAYPAL PAYMENT =====================
         console.log('💳 Opening PayPal...');
         setShowPayPal(true);
+      } else if (paymentMethod === 'bank_transfer') {
+        console.log('🏦 Bank transfer flow: saving order...');
+        const savedOrder = await saveOrderToSupabase({ ...orderData, paymentMethod: 'bank_transfer' });
+        await sendOrderToBase44({ ...orderData, paymentMethod: 'bank_transfer' });
+
+        if (isFreeOrderEligible && freeOrdersRemaining > 0) {
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const userId = session?.user?.id;
+            const userEmail = session?.user?.email || currentUserEmail;
+            const { data, error } = await supabase.rpc('decrement_free_orders', {
+              p_user_id: userId || null,
+              p_email: userEmail
+            });
+            if (!error && data && data.length > 0) {
+              setFreeOrdersRemaining(data[0].free_orders_remaining || 0);
+              toast.info(data[0].message || 'تم تحديث طلباتك المجانية', { duration: 4000 });
+            }
+          } catch (err) {
+            console.warn('Could not update free orders for bank transfer:', err);
+          }
+        }
+
+        clearCart?.();
+        localStorage.removeItem('wasel_shared_cart_session');
+        setShowPaymentSuccessAnimation(true);
+        setPaymentSuccessMessage(
+          sharedCartMode
+            ? `تم إنشاء طلب السلة المشتركة بنجاح! 💜 سيتم إشعار ${recipientName || 'المستلم'} بعد تأكيد التحويل.`
+            : 'تم استلام طلبك بنجاح! يرجى إكمال التحويل البنكي ثم الضغط على زر تم الدفع في تفاصيل الحساب.'
+        );
+        setPaymentSuccessRedirectState({
+          showInvoicePrompt: true,
+          invoiceOrderId: savedOrder?.id || null,
+          activeOrdersTab: sharedCartMode ? 'shared' : 'current',
+        });
+        toast.success('تم حفظ الطلب بنجاح، يمكنك إكمال التحويل البنكي الآن ✅', { duration: 5000 });
+        try {
+          if (savedOrder) {
+            await notifyAdminUsers('new_order_created', savedOrder, {
+              paymentMethod: 'bank_transfer',
+            });
+          }
+        } catch (notifyErr) {
+          console.warn('Post-bank-transfer notification warning:', notifyErr);
+        }
       } else if (paymentMethod === 'wallet') {
         // ===================== ✅ WALLET PAYMENT =====================
         try {
@@ -3391,7 +3548,7 @@ const Cart = () => {
         />
 
         {/* Address Form - مطلوب لكلٍ من واتساب و PayPal و المحفظة */}
-        {(paymentMethod === 'whatsapp' || paymentMethod === 'paypal' || paymentMethod === 'wallet' || paymentMethod === 'shared_cart') && (
+        {(paymentMethod === 'whatsapp' || paymentMethod === 'paypal' || paymentMethod === 'bank_transfer' || paymentMethod === 'wallet' || paymentMethod === 'shared_cart') && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -3659,6 +3816,98 @@ const Cart = () => {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {paymentMethod === 'bank_transfer' && (
+          <BankTransferDetails
+            totalUsd={finalTotalUSD}
+            senderCountry={senderCountry}
+            onConfirm={async () => {
+              try {
+                const savedOrder = await saveOrderToSupabase({
+                  sender: {
+                    name: insideSyria ? (recipientName?.trim() || 'غير محدد') : (senderName?.trim() || 'غير محدد'),
+                    email: currentUserEmail || 'guest@example.com',
+                    phone: insideSyria ? (recipientPhone?.trim() || '') : (senderPhone?.trim() || ''),
+                    country: insideSyria ? 'syria' : (senderCountry || 'uae')
+                  },
+                  recipient: {
+                    name: recipientName?.trim() || 'غير محدد',
+                    phone: recipientPhone?.trim() || '',
+                    address: recipientAddress?.trim() || '',
+                    delivery_time: deliveryTime || null,
+                  },
+                  items: cartItems.map(item => ({
+                    id: item.id,
+                    name: item.name_ar || item.name,
+                    name_ar: item.name_ar || item.name,
+                    quantity: Math.floor(item.quantity),
+                    priceSYP: Math.max(0, item.customer_price || item.price || 0),
+                    priceUSD: Math.max(0, (item.customer_price || item.price || 0) / exchangeRate),
+                    image_url: item.image_url || item.image
+                  })),
+                  totalSYP: finalTotalSYP,
+                  totalUSD: finalTotalUSD,
+                  membershipDiscountSYP: Math.max(0, membershipDiscountSYP),
+                  paymentMethod: 'bank_transfer',
+                  notes: (additionalNotes || '').substring(0, 500),
+                  deliveryTime: deliveryTime || null,
+                  tip: selectedTipSYP,
+                  coupon: appliedCoupon?.code,
+                  sharedCart: sharedCartMode ? {
+                    token: sharedCartToken || null,
+                    creator_id: sharedCartCreator || null,
+                  } : null,
+                });
+
+                await sendOrderToBase44({
+                  sender: {
+                    name: insideSyria ? (recipientName?.trim() || 'غير محدد') : (senderName?.trim() || 'غير محدد'),
+                    email: currentUserEmail || 'guest@example.com',
+                    phone: insideSyria ? (recipientPhone?.trim() || '') : (senderPhone?.trim() || ''),
+                    country: insideSyria ? 'syria' : (senderCountry || 'uae')
+                  },
+                  recipient: {
+                    name: recipientName?.trim() || 'غير محدد',
+                    phone: recipientPhone?.trim() || '',
+                    address: recipientAddress?.trim() || '',
+                    delivery_time: deliveryTime || null,
+                  },
+                  items: cartItems.map(item => ({
+                    id: item.id,
+                    name: item.name_ar || item.name,
+                    name_ar: item.name_ar || item.name,
+                    quantity: Math.floor(item.quantity),
+                    priceSYP: Math.max(0, item.customer_price || item.price || 0),
+                    priceUSD: Math.max(0, (item.customer_price || item.price || 0) / exchangeRate),
+                    image_url: item.image_url || item.image
+                  })),
+                  totalSYP: finalTotalSYP,
+                  totalUSD: finalTotalUSD,
+                  membershipDiscountSYP: Math.max(0, membershipDiscountSYP),
+                  paymentMethod: 'bank_transfer',
+                  notes: (additionalNotes || '').substring(0, 500),
+                  deliveryTime: deliveryTime || null,
+                  tip: selectedTipSYP,
+                  coupon: appliedCoupon?.code,
+                  sharedCart: sharedCartMode ? {
+                    token: sharedCartToken || null,
+                    creator_id: sharedCartCreator || null,
+                  } : null,
+                });
+
+                clearCart?.();
+                localStorage.removeItem('wasel_shared_cart_session');
+                setShowPaymentSuccessAnimation(true);
+                setPaymentSuccessMessage('تم تأكيد الدفع البنكي بنجاح! شكرًا لك، سنقوم بمعالجة الطلب فورًا 📩');
+                setPaymentSuccessRedirectState({ showInvoicePrompt: true, invoiceOrderId: savedOrder?.id || null, activeOrdersTab: 'current' });
+                toast.success('تم تأكيد التحويل البنكي بنجاح! ✅', { duration: 5000 });
+              } catch (error) {
+                console.error('Bank transfer confirm error:', error);
+                toast.error('حدث خطأ أثناء تأكيد التحويل البنكي');
+              }
+            }}
+          />
+        )}
 
         {/* Order Summary - المجموع الفرعي = مجموع الأسعار المعروضة */}
         <OrderSummary

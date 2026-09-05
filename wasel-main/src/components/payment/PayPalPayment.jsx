@@ -11,7 +11,8 @@ const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 export default function PayPalPayment({ amount, onSuccess, onError }) {
     const paypalRef = useRef(null);
     const cardRef = useRef(null);
-    const [sdkReady, setSdkReady] = useState(Boolean(window.paypal));
+    const [sdkReady, setSdkReady] = useState(Boolean(typeof window !== 'undefined' && window.paypal));
+    const [renderError, setRenderError] = useState('');
     const isMountedRef = useRef(true);
 
     // Track component mount/unmount to prevent "Detected container element removed from DOM" error
@@ -22,23 +23,38 @@ export default function PayPalPayment({ amount, onSuccess, onError }) {
     }, []);
 
     useEffect(() => {
+        setRenderError('');
+        if (typeof window === 'undefined') return;
+
         // تحميل PayPal SDK
         if (window.paypal) {
             setSdkReady(true);
-        } else {
-            const script = document.createElement('script');
-            const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID || 'AQyh8RxcB162UBup5qnzvCCoHfQQShlukM5VW4j-gpDGofEsP4iQkwEN9ZU-gTlLPHerV90Qm15tBPve';
-            const merchantId = import.meta.env.VITE_PAYPAL_MERCHANT_ID || 'joudjr30@gmail.com';
-            script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&merchant-id=${merchantId}&currency=USD&enable-funding=card&disable-funding=venmo`;
-            script.async = true;
-            script.onload = () => setSdkReady(true);
-            script.onerror = () => {
-                console.error('Failed to load PayPal SDK');
-                toast.error('فشل تحميل PayPal');
-            };
-            document.body.appendChild(script);
+            return;
         }
-    }, [amount]);
+
+        const script = document.createElement('script');
+        const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID || 'AQyh8RxcB162UBup5qnzvCCoHfQQShlukM5VW4j-gpDGofEsP4iQkwEN9ZU-gTlLPHerV90Qm15tBPve';
+        const merchantId = import.meta.env.VITE_PAYPAL_MERCHANT_ID || 'joudjr30@gmail.com';
+        script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&merchant-id=${merchantId}&currency=USD&enable-funding=card&disable-funding=venmo`;
+        script.async = true;
+        script.onload = () => {
+            if (window.paypal) {
+                setSdkReady(true);
+                return;
+            }
+            console.warn('PayPal SDK loaded but window.paypal unavailable.');
+            setRenderError('PayPal غير متاح الآن في هذا المتصفح. يمكنك استخدام التحويل البنكي أو واتساب بدلاً من ذلك.');
+            toast.warning('PayPal غير متاح الآن في هذا المتصفح');
+            onError?.(new Error('paypal_sdk_unavailable'));
+        };
+        script.onerror = () => {
+            console.error('Failed to load PayPal SDK');
+            setRenderError('تعذر فتح PayPal في هذا الجهاز. جرب مرة أخرى أو استخدم التحويل البنكي.');
+            toast.error('فشل تحميل PayPal');
+            onError?.(new Error('paypal_sdk_load_failed'));
+        };
+        document.body.appendChild(script);
+    }, [amount, onError]);
 
     useEffect(() => {
         if (!sdkReady || !window.paypal || !paypalRef.current || !isMountedRef.current) return;
@@ -144,21 +160,38 @@ export default function PayPalPayment({ amount, onSuccess, onError }) {
             },
         };
 
-        const paypalButtons = window.paypal.Buttons({
-            ...baseConfig,
-            style: {
-                layout: 'vertical',
-                color: 'gold',
-                shape: 'rect',
-                label: 'paypal',
-                height: 45
-            },
-            fundingSource: window.paypal.FUNDING.PAYPAL,
-            ...(isMobile() ? { experience: { input_fields: { no_shipping: 1 } } } : {})
-        });
+        try {
+            const paypalButtons = window.paypal.Buttons({
+                ...baseConfig,
+                style: {
+                    layout: 'vertical',
+                    color: 'gold',
+                    shape: 'rect',
+                    label: 'paypal',
+                    height: 45
+                },
+                fundingSource: window.paypal.FUNDING.PAYPAL,
+                ...(isMobile() ? { experience: { input_fields: { no_shipping: 1 } } } : {})
+            });
 
-        if (paypalButtons?.isEligible?.()) {
+            if (!paypalButtons || typeof paypalButtons.render !== 'function') {
+                throw new Error('PayPal buttons not available');
+            }
+
+            if (paypalButtons.isEligible && !paypalButtons.isEligible()) {
+                setRenderError('PayPal غير متاح لهذه المعاملة في هذا المتصفح. استخدم التحويل البنكي أو واتساب.');
+                toast.warning('PayPal غير متاح الآن في هذا الجهاز');
+                onError?.(new Error('paypal_not_eligible'));
+                return;
+            }
+
             paypalButtons.render(paypalRef.current);
+        } catch (error) {
+            console.error('PayPal button render failed:', error);
+            const message = 'تعذر فتح أزرار PayPal. يمكنك المتابعة بالتحويل البنكي أو واتساب.';
+            setRenderError(message);
+            toast.error('فشل فتح PayPal');
+            onError?.(error || new Error('paypal_render_failed'));
         }
     }, [amount, onError, onSuccess, sdkReady]);
 
@@ -266,25 +299,35 @@ export default function PayPalPayment({ amount, onSuccess, onError }) {
             },
         };
 
-        const cardButtons = window.paypal.Buttons({
-            ...baseConfig,
-            style: {
-                layout: 'vertical',
-                color: 'black',
-                shape: 'rect',
-                label: 'pay',
-                height: 45
-            },
-            fundingSource: window.paypal.FUNDING.CARD
-        });
+        try {
+            const cardButtons = window.paypal.Buttons({
+                ...baseConfig,
+                style: {
+                    layout: 'vertical',
+                    color: 'black',
+                    shape: 'rect',
+                    label: 'pay',
+                    height: 45
+                },
+                fundingSource: window.paypal.FUNDING.CARD
+            });
 
-        if (cardButtons?.isEligible?.()) {
-            cardButtons.render(cardRef.current);
+            if (cardButtons?.isEligible?.()) {
+                cardButtons.render(cardRef.current);
+            }
+        } catch (error) {
+            console.warn('Card buttons unavailable:', error);
         }
     }, [amount, onError, onSuccess, sdkReady]);
 
     return (
         <div className="w-full space-y-3 flex flex-col items-center">
+            {renderError && (
+                <div className="w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800 text-center" dir="rtl">
+                    {renderError}
+                </div>
+            )}
+
             {/* زر PayPal - أصفر */}
             <div ref={paypalRef} className="w-full max-w-[360px] min-h-[50px]"
               style={isMobile() ? { minHeight: '55px', touchAction: 'manipulation' } : {}}
