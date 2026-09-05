@@ -26,6 +26,7 @@ import {
   getCountryFlag,
   getCurrencyByCode,
   getCurrencyRateToUsd,
+  convertUsdToCurrency,
 } from '@/utils/countryData';
 import {
   getSavedSenderInfo,
@@ -1050,11 +1051,9 @@ function BankTransferDetails({ totalUsd, senderCountry, onConfirm }) {
   const countryInfo = getCountryByArabicName(senderCountry) || COUNTRIES.find((country) => country.currency === 'AED') || COUNTRIES[0];
   const selectedCurrency = countryInfo?.currency || 'USD';
   const selectedCurrencyMeta = getCurrencyByCode(selectedCurrency);
-  const aedRate = getCurrencyRateToUsd('AED');
-  const localRate = Number(countryInfo?.currencyRate || getCurrencyRateToUsd(selectedCurrency));
-  const localAmount = Number(totalUsd || 0) * localRate;
-  const aedAmount = Number(totalUsd || 0) * aedRate;
   const usdAmount = Number(totalUsd || 0);
+  const localAmount = convertUsdToCurrency(usdAmount, selectedCurrency);
+  const aedAmount = convertUsdToCurrency(usdAmount, 'AED');
 
   const accountItems = [
     { label: 'اسم البنك', value: BANK_TRANSFER_DETAILS.bankName },
