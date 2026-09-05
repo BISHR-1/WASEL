@@ -17,7 +17,16 @@ import { toast } from 'sonner';
 import { base44 } from '@/api/base44Client';
 import PayPalModal from '@/components/payment/PayPalModal';
 import EnvelopeGift from '@/components/cart/EnvelopeGift';
-import { getCountriesArabicNames, getCountryByArabicName, getCallingCode, getCountryByCode, COUNTRIES, getCountryFlag } from '@/utils/countryData';
+import {
+  getCountriesArabicNames,
+  getCountryByArabicName,
+  getCallingCode,
+  getCountryByCode,
+  COUNTRIES,
+  getCountryFlag,
+  getCurrencyByCode,
+  getCurrencyRateToUsd,
+} from '@/utils/countryData';
 import {
   getSavedSenderInfo,
   getSavedReceiverInfo,
@@ -1039,8 +1048,14 @@ function PaymentMethodSelector({ selected, onChange, allowOnlinePayment = true, 
 
 function BankTransferDetails({ totalUsd, senderCountry, onConfirm }) {
   const countryInfo = getCountryByArabicName(senderCountry) || COUNTRIES.find((country) => country.currency === 'AED') || COUNTRIES[0];
-  const currencyRate = Number(countryInfo?.currencyRate || 3.67);
-  const convertedAmount = Number(totalUsd || 0) * currencyRate;
+  const selectedCurrency = countryInfo?.currency || 'USD';
+  const selectedCurrencyMeta = getCurrencyByCode(selectedCurrency);
+  const aedRate = getCurrencyRateToUsd('AED');
+  const localRate = Number(countryInfo?.currencyRate || getCurrencyRateToUsd(selectedCurrency));
+  const localAmount = Number(totalUsd || 0) * localRate;
+  const aedAmount = Number(totalUsd || 0) * aedRate;
+  const usdAmount = Number(totalUsd || 0);
+
   const accountItems = [
     { label: 'اسم البنك', value: BANK_TRANSFER_DETAILS.bankName },
     { label: 'اسم صاحب الحساب', value: BANK_TRANSFER_DETAILS.accountHolder },
@@ -1078,11 +1093,18 @@ function BankTransferDetails({ totalUsd, senderCountry, onConfirm }) {
 
       <div className="rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 p-4 border border-emerald-200 mb-4">
         <p className="text-xs text-emerald-700 mb-1">المبلغ المطلوب</p>
-        <p className="text-2xl font-black text-emerald-800">
-          {convertedAmount.toFixed(2)} {BANK_TRANSFER_DETAILS.currency}
-        </p>
-        <p className="text-xs text-emerald-600 mt-1">
-          {Number(totalUsd || 0).toFixed(2)} USD ≈ {convertedAmount.toFixed(2)} {BANK_TRANSFER_DETAILS.currency}
+        <div className="space-y-2">
+          <p className="text-2xl font-black text-emerald-800">
+            {localAmount.toFixed(2)} {selectedCurrency}
+          </p>
+          <div className="grid grid-cols-3 gap-2 text-xs text-emerald-700">
+            <div className="rounded-lg bg-white/80 px-2 py-1 font-bold text-center">{selectedCurrencyMeta?.name_ar || selectedCurrency} <br /> {localAmount.toFixed(2)}</div>
+            <div className="rounded-lg bg-white/80 px-2 py-1 font-bold text-center">AED <br /> {aedAmount.toFixed(2)}</div>
+            <div className="rounded-lg bg-white/80 px-2 py-1 font-bold text-center">USD <br /> {usdAmount.toFixed(2)}</div>
+          </div>
+        </div>
+        <p className="text-xs text-emerald-600 mt-2">
+          {Number(totalUsd || 0).toFixed(2)} USD ≈ {localAmount.toFixed(2)} {selectedCurrency} • {aedAmount.toFixed(2)} AED
         </p>
       </div>
 
